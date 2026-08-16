@@ -1,0 +1,4 @@
+name = "InGameRank"
+author = "nixvio64"
+version = "2.0.0"
+entry = "main.lua"

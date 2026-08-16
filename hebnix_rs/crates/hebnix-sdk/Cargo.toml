@@ -1,0 +1,22 @@
+[package]
+name = "hebnix-sdk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aes = "0.8"
+crossbeam-channel.workspace = true
+dirs = "6.0.0"
+hidapi = "2.6.6"
+regex = "1.12.4"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sysinfo = "0.38.4"
+thiserror.workspace = true
+tracing.workspace = true
+ureq = { workspace = true, features = ["json"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Input_XboxController", "Win32_System_Threading", "Win32_System_LibraryLoader", "Win32_System_Memory", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Diagnostics_Debug"] }
+tungstenite = "0.21"
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

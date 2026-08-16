@@ -1,0 +1,12 @@
+# example theme. drop in the themes/ folder next to the exe, pick "Ocean" in
+# Settings > Theme.
+
+base = "dark"
+
+[colors]
+accent    = "#2E86C1"
+window_bg = "#101820"
+panel_bg  = "#16212C"
+widget_bg = "#1F2E3D"
+text      = "#D6E4F0"
+hyperlink = "#5DADE2"

@@ -1,0 +1,34 @@
+[workspace]
+resolver = "2"
+members = ["crates/hebnix-sdk", "crates/hebnix-app"]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2021"
+authors = ["Hebbins", "nixvio64"]
+
+[profile.release]
+opt-level = 3
+# ThinLTO currently crashes rustc.exe with STATUS_ACCESS_VIOLATION on the
+# Windows MSVC toolchain used to build Hebnix. Fat/off LTO is not required for
+# this desktop application; disabling it keeps full opt-level 3 while making
+# release builds deterministic.
+lto = false
+codegen-units = 16
+# keep line-table debug info so crash.txt backtraces are readable.
+# flip strip = true if you care more about size than crash reports.
+debug = 1
+strip = "none"
+
+# patched copy of egui-winit 0.35.0
+[patch.crates-io]
+egui-winit = { path = "patches/egui-winit" }
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+# preserve_order, psynet wants Class first and sorted keys break its parser
+serde_json = { version = "1", features = ["preserve_order"] }
+thiserror = "2"
+tracing = "0.1"
+ureq = { version = "2", features = ["json"] }
+crossbeam-channel = "0.5"

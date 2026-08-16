@@ -1,0 +1,2439 @@
+{
+  "base_engine_audio_upk": "EngineAudio_Car01_REV_SF.upk",
+  "base_thumbnail_upk": "EngineAudio_Car01_REV_T_SF.upk",
+  "engineaudios": [
+    {
+      "name": "007's Aston Martin DB5",
+      "engine_audio_upk": "engineaudio_amber_SF.upk",
+      "thumbnail_upk": "EngineAudio_Amber_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "5635",
+      "asset_package_name": "engineaudio_amber",
+      "asset_path": "engineaudio_amber.engineaudio_amber"
+    },
+    {
+      "name": "007's Aston Martin DBS",
+      "engine_audio_upk": "engineaudio_quartz_SF.upk",
+      "thumbnail_upk": "EngineAudio_Quartz_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7831",
+      "asset_package_name": "engineaudio_quartz",
+      "asset_path": "engineaudio_quartz.engineaudio_quartz"
+    },
+    {
+      "name": "BMW 1 Series",
+      "engine_audio_upk": "engineaudio_bober_SF.upk",
+      "thumbnail_upk": "EngineAudio_Bober_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10966",
+      "asset_package_name": "engineaudio_bober",
+      "asset_path": "engineaudio_bober.engineaudio_bober"
+    },
+    {
+      "name": "Ace",
+      "engine_audio_upk": "engineaudio_aa_SF.upk",
+      "thumbnail_upk": "EngineAudio_AA_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10014",
+      "asset_package_name": "engineaudio_aa",
+      "asset_path": "engineaudio_aa.engineaudio_aa"
+    },
+    {
+      "name": "Admiral",
+      "engine_audio_upk": "engineaudio_ODB_SF.upk",
+      "thumbnail_upk": "EngineAudio_ODB_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10380",
+      "asset_package_name": "engineaudio_ODB",
+      "asset_path": "engineaudio_ODB.engineaudio_ODB"
+    },
+    {
+      "name": "Aftershock",
+      "engine_audio_upk": "EngineAudio_Aftershock_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_Aftershock_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1786",
+      "asset_package_name": "EngineAudio_Aftershock_OE",
+      "asset_path": "EngineAudio_Aftershock_OE.EngineAudio_Aftershock_OE"
+    },
+    {
+      "name": "Aftershock v2",
+      "engine_audio_upk": "EngineAudio_Aftershock_V2_SF.upk",
+      "thumbnail_upk": "EngineAudio_Aftershock_V2_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1873",
+      "asset_package_name": "EngineAudio_Aftershock_V2",
+      "asset_path": "EngineAudio_Aftershock_V2.EngineAudio_Aftershock_V2"
+    },
+    {
+      "name": "Alokin",
+      "engine_audio_upk": "engineaudio_alokin_SF.upk",
+      "thumbnail_upk": "EngineAudio_Alokin_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_alokin",
+      "asset_path": "engineaudio_alokin.engineaudio_alokin"
+    },
+    {
+      "name": "Animus GP",
+      "engine_audio_upk": "EngineAudio_F1_SF.upk",
+      "thumbnail_upk": "EngineAudio_F1_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1805",
+      "asset_package_name": "EngineAudio_F1",
+      "asset_path": "EngineAudio_F1.EngineAudio_F1"
+    },
+    {
+      "name": "Aquamarine",
+      "engine_audio_upk": "engineaudio_rp_s14_water_SF.upk",
+      "thumbnail_upk": "EngineAudio_RP_S14_Water_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10362",
+      "asset_package_name": "engineaudio_rp_s14_water",
+      "asset_path": "engineaudio_rp_s14_water.engineaudio_rp_s14_water"
+    },
+    {
+      "name": "Armadillo",
+      "engine_audio_upk": "EngineAudio_Armadillo_SF.upk",
+      "thumbnail_upk": "EngineAudio_Armadillo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1788",
+      "asset_package_name": "EngineAudio_Armadillo",
+      "asset_path": "EngineAudio_Armadillo.EngineAudio_Armadillo"
+    },
+    {
+      "name": "Arrow",
+      "engine_audio_upk": "engineaudio_arrow_SF.upk",
+      "thumbnail_upk": "EngineAudio_Arrow_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_arrow",
+      "asset_path": "engineaudio_arrow.engineaudio_arrow"
+    },
+    {
+      "name": "Artemis",
+      "engine_audio_upk": "engineaudio_enspire_SF.upk",
+      "thumbnail_upk": "EngineAudio_Enspire_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "3475",
+      "asset_package_name": "engineaudio_enspire",
+      "asset_path": "engineaudio_enspire.engineaudio_enspire"
+    },
+    {
+      "name": "Aught-O",
+      "engine_audio_upk": "engineaudio_Pepe_SF.upk",
+      "thumbnail_upk": "EngineAudio_Pepe_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5097",
+      "asset_package_name": "engineaudio_Pepe",
+      "asset_path": "engineaudio_Pepe.engineaudio_Pepe"
+    },
+    {
+      "name": "Austimiko",
+      "engine_audio_upk": "engineaudio_drift_SF.upk",
+      "thumbnail_upk": "EngineAudio_Drift_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4691",
+      "asset_package_name": "engineaudio_drift",
+      "asset_path": "engineaudio_drift.engineaudio_drift"
+    },
+    {
+      "name": "Banjo",
+      "engine_audio_upk": "engineaudio_banjo_SF.upk",
+      "thumbnail_upk": "EngineAudio_Banjo_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_banjo",
+      "asset_path": "engineaudio_banjo.engineaudio_banjo"
+    },
+    {
+      "name": "Batmobile (1989)",
+      "engine_audio_upk": "EngineAudio_Eggplant_SF.upk",
+      "thumbnail_upk": "EngineAudio_Eggplant_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "2769",
+      "asset_package_name": "EngineAudio_Eggplant",
+      "asset_path": "EngineAudio_Eggplant.EngineAudio_Eggplant"
+    },
+    {
+      "name": "Batmobile (2016)",
+      "engine_audio_upk": "EngineAudio_DarkCar_SF.upk",
+      "thumbnail_upk": "EngineAudio_DarkCar_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1801",
+      "asset_package_name": "EngineAudio_DarkCar",
+      "asset_path": "EngineAudio_DarkCar.EngineAudio_DarkCar"
+    },
+    {
+      "name": "Batmobile (2022)",
+      "engine_audio_upk": "engineaudio_tomb_SF.upk",
+      "thumbnail_upk": "EngineAudio_Tomb_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7421",
+      "asset_package_name": "engineaudio_tomb",
+      "asset_path": "engineaudio_tomb.engineaudio_tomb"
+    },
+    {
+      "name": "Battle Bus",
+      "engine_audio_upk": "engineaudio_bb_SF.upk",
+      "thumbnail_upk": "EngineAudio_BB_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5098",
+      "asset_package_name": "engineaudio_bb",
+      "asset_path": "engineaudio_bb.engineaudio_bb"
+    },
+    {
+      "name": "Bawu",
+      "engine_audio_upk": "engineaudio_bawu_SF.upk",
+      "thumbnail_upk": "EngineAudio_Bawu_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_bawu",
+      "asset_path": "engineaudio_bawu.engineaudio_bawu"
+    },
+    {
+      "name": "Behemoth",
+      "engine_audio_upk": "engineaudio_moonflaxsuv_SF.upk",
+      "thumbnail_upk": "EngineAudio_MoonflaxSUV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10691",
+      "asset_package_name": "engineaudio_moonflaxsuv",
+      "asset_path": "engineaudio_moonflaxsuv.engineaudio_moonflaxsuv"
+    },
+    {
+      "name": "Beskar",
+      "engine_audio_upk": "engineaudio_spartan_SF.upk",
+      "thumbnail_upk": "EngineAudio_Spartan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10506",
+      "asset_package_name": "engineaudio_spartan",
+      "asset_path": "engineaudio_spartan.engineaudio_spartan"
+    },
+    {
+      "name": "Bluetorque",
+      "engine_audio_upk": "EngineAudio_BlueTorque_SF.upk",
+      "thumbnail_upk": "EngineAudio_BlueTorque_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "EngineAudio_BlueTorque",
+      "asset_path": "EngineAudio_BlueTorque.EngineAudio_BlueTorque"
+    },
+    {
+      "name": "Bone Shaker",
+      "engine_audio_upk": "EngineAudio_BoneShaker_SF.upk",
+      "thumbnail_upk": "EngineAudio_BoneShaker_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1789",
+      "asset_package_name": "EngineAudio_BoneShaker",
+      "asset_path": "EngineAudio_BoneShaker.EngineAudio_BoneShaker"
+    },
+    {
+      "name": "Bootlegger",
+      "engine_audio_upk": "engineaudio_s3_01_SF.upk",
+      "thumbnail_upk": "EngineAudio_S3_01_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5927",
+      "asset_package_name": "engineaudio_s3_01",
+      "asset_path": "engineaudio_s3_01.engineaudio_s3_01"
+    },
+    {
+      "name": "Breakout Type-S",
+      "engine_audio_upk": "engineaudio_breakoutmk2_oe_SF.upk",
+      "thumbnail_upk": "EngineAudio_BreakoutMK2_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1790",
+      "asset_package_name": "engineaudio_breakoutmk2_oe",
+      "asset_path": "engineaudio_breakoutmk2_oe.engineaudio_breakoutmk2_oe"
+    },
+    {
+      "name": "Breakout Type-S v2",
+      "engine_audio_upk": "EngineAudio_BreakoutMK2_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_BreakoutMK2_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1791",
+      "asset_package_name": "EngineAudio_BreakoutMK2_REV",
+      "asset_path": "EngineAudio_BreakoutMK2_REV.EngineAudio_BreakoutMK2_REV"
+    },
+    {
+      "name": "Bullet",
+      "engine_audio_upk": "engineaudio_bullet_SF.upk",
+      "thumbnail_upk": "EngineAudio_Bullet_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_bullet",
+      "asset_path": "engineaudio_bullet.engineaudio_bullet"
+    },
+    {
+      "name": "Bumblebee",
+      "engine_audio_upk": "engineaudio_trap_SF.upk",
+      "thumbnail_upk": "EngineAudio_Trap_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "9110",
+      "asset_package_name": "engineaudio_trap",
+      "asset_path": "engineaudio_trap.engineaudio_trap"
+    },
+    {
+      "name": "Centio",
+      "engine_audio_upk": "EngineAudio_Lemons_SF.upk",
+      "thumbnail_upk": "EngineAudio_Lemons_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1811",
+      "asset_package_name": "EngineAudio_Lemons",
+      "asset_path": "EngineAudio_Lemons.EngineAudio_Lemons"
+    },
+    {
+      "name": "Chikara",
+      "engine_audio_upk": "engineaudio_durian_SF.upk",
+      "thumbnail_upk": "EngineAudio_Durian_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4566",
+      "asset_package_name": "engineaudio_durian",
+      "asset_path": "engineaudio_durian.engineaudio_durian"
+    },
+    {
+      "name": "BMW M3 (E30)",
+      "engine_audio_upk": "engineaudio_chrisp_SF.upk",
+      "thumbnail_upk": "EngineAudio_Chrisp_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_chrisp",
+      "asset_path": "engineaudio_chrisp.engineaudio_chrisp"
+    },
+    {
+      "name": "Civet",
+      "engine_audio_upk": "engineaudio_Cat_SF.upk",
+      "thumbnail_upk": "EngineAudio_Cat_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4620",
+      "asset_package_name": "engineaudio_Cat",
+      "asset_path": "engineaudio_Cat.engineaudio_Cat"
+    },
+    {
+      "name": "Condormotor",
+      "engine_audio_upk": "engineaudio_condormotor_SF.upk",
+      "thumbnail_upk": "EngineAudio_CondorMotor_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_condormotor",
+      "asset_path": "engineaudio_condormotor.engineaudio_condormotor"
+    },
+    {
+      "name": "Crikey",
+      "engine_audio_upk": "engineaudio_crikey_SF.upk",
+      "thumbnail_upk": "EngineAudio_Crikey_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_crikey",
+      "asset_path": "engineaudio_crikey.engineaudio_crikey"
+    },
+    {
+      "name": "CrypTEK",
+      "engine_audio_upk": "engineaudio_telemetry_SF.upk",
+      "thumbnail_upk": "EngineAudio_Telemetry_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9460",
+      "asset_package_name": "engineaudio_telemetry",
+      "asset_path": "engineaudio_telemetry.engineaudio_telemetry"
+    },
+    {
+      "name": "Cutie",
+      "engine_audio_upk": "engineaudio_cutie_SF.upk",
+      "thumbnail_upk": "EngineAudio_Cutie_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_cutie",
+      "asset_path": "engineaudio_cutie.engineaudio_cutie"
+    },
+    {
+      "name": "Cyclone",
+      "engine_audio_upk": "EngineAudio_Squash_SF.upk",
+      "thumbnail_upk": "EngineAudio_Squash_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "3091",
+      "asset_package_name": "EngineAudio_Squash",
+      "asset_path": "EngineAudio_Squash.EngineAudio_Squash"
+    },
+    {
+      "name": "DeLorean Time Machine",
+      "engine_audio_upk": "EngineAudio_GrayCar_SF.upk",
+      "thumbnail_upk": "EngineAudio_GrayCar_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1808",
+      "asset_package_name": "EngineAudio_GrayCar",
+      "asset_path": "EngineAudio_GrayCar.EngineAudio_GrayCar"
+    },
+    {
+      "name": "Diesel",
+      "engine_audio_upk": "engineaudio_rebar_SF.upk",
+      "thumbnail_upk": "EngineAudio_Rebar_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "9845",
+      "asset_package_name": "engineaudio_rebar",
+      "asset_path": "engineaudio_rebar.engineaudio_rebar"
+    },
+    {
+      "name": "Diestro",
+      "engine_audio_upk": "engineaudio_carrot_SF.upk",
+      "thumbnail_upk": "EngineAudio_Carrot_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "3436",
+      "asset_package_name": "engineaudio_carrot",
+      "asset_path": "engineaudio_carrot.engineaudio_carrot"
+    },
+    {
+      "name": "Dingo",
+      "engine_audio_upk": "engineaudio_ramen_SF.upk",
+      "thumbnail_upk": "EngineAudio_Ramen_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "6071",
+      "asset_package_name": "engineaudio_ramen",
+      "asset_path": "engineaudio_ramen.engineaudio_ramen"
+    },
+    {
+      "name": "Dirt Bike",
+      "engine_audio_upk": "engineaudio_dirtbike125_SF.upk",
+      "thumbnail_upk": "EngineAudio_DirtBike125_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4327",
+      "asset_package_name": "engineaudio_dirtbike125",
+      "asset_path": "engineaudio_dirtbike125.engineaudio_dirtbike125"
+    },
+    {
+      "name": "Dominus",
+      "engine_audio_upk": "EngineAudio_Dominus_SF.upk",
+      "thumbnail_upk": "EngineAudio_Dominus_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1845",
+      "asset_package_name": "EngineAudio_Dominus",
+      "asset_path": "EngineAudio_Dominus.EngineAudio_Dominus"
+    },
+    {
+      "name": "Dominus GT",
+      "engine_audio_upk": "engineaudio_dominusgt_oe_SF.upk",
+      "thumbnail_upk": "EngineAudio_DominusGT_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1802",
+      "asset_package_name": "engineaudio_dominusgt_oe",
+      "asset_path": "engineaudio_dominusgt_oe.engineaudio_dominusgt_oe"
+    },
+    {
+      "name": "Dominus GT v2",
+      "engine_audio_upk": "EngineAudio_DominusGT_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_DominusGT_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1803",
+      "asset_package_name": "EngineAudio_DominusGT_REV",
+      "asset_path": "EngineAudio_DominusGT_REV.EngineAudio_DominusGT_REV"
+    },
+    {
+      "name": "Drude",
+      "engine_audio_upk": "engineaudio_twitch_SF.upk",
+      "thumbnail_upk": "EngineAudio_Twitch_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4315",
+      "asset_package_name": "engineaudio_twitch",
+      "asset_path": "engineaudio_twitch.engineaudio_twitch"
+    },
+    {
+      "name": "Eagle",
+      "engine_audio_upk": "engineaudio_eagle_SF.upk",
+      "thumbnail_upk": "EngineAudio_Eagle_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_eagle",
+      "asset_path": "engineaudio_eagle.engineaudio_eagle"
+    },
+    {
+      "name": "Econ",
+      "engine_audio_upk": "engineaudio_econ_SF.upk",
+      "thumbnail_upk": "EngineAudio_Econ_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_econ",
+      "asset_path": "engineaudio_econ.engineaudio_econ"
+    },
+    {
+      "name": "Ecto-1",
+      "engine_audio_upk": "EngineAudio_October_SF.upk",
+      "thumbnail_upk": "EngineAudio_October_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4175",
+      "asset_package_name": "EngineAudio_October",
+      "asset_path": "EngineAudio_October.EngineAudio_October"
+    },
+    {
+      "name": "Edison",
+      "engine_audio_upk": "engineaudio_edison_SF.upk",
+      "thumbnail_upk": "EngineAudio_Edison_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_edison",
+      "asset_path": "engineaudio_edison.engineaudio_edison"
+    },
+    {
+      "name": "Electric Saw",
+      "engine_audio_upk": "engineaudio_electricsaw_SF.upk",
+      "thumbnail_upk": "EngineAudio_ElectricSaw_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4075",
+      "asset_package_name": "engineaudio_electricsaw",
+      "asset_path": "engineaudio_electricsaw.engineaudio_electricsaw"
+    },
+    {
+      "name": "Electro-Mag",
+      "engine_audio_upk": "engineaudio_ElectroMagnetic_SF.upk",
+      "thumbnail_upk": "EngineAudio_ElectroMagnetic_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4865",
+      "asset_package_name": "engineaudio_ElectroMagnetic",
+      "asset_path": "engineaudio_ElectroMagnetic.engineaudio_ElectroMagnetic"
+    },
+    {
+      "name": "Endo",
+      "engine_audio_upk": "EngineAudio_Endo_SF.upk",
+      "thumbnail_upk": "EngineAudio_Endo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1804",
+      "asset_package_name": "EngineAudio_Endo",
+      "asset_path": "EngineAudio_Endo.EngineAudio_Endo"
+    },
+    {
+      "name": "Esper",
+      "engine_audio_upk": "EngineAudio_AkiraBike_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_AkiraBike_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1787",
+      "asset_package_name": "EngineAudio_AkiraBike_OE",
+      "asset_path": "EngineAudio_AkiraBike_OE.EngineAudio_AkiraBike_OE"
+    },
+    {
+      "name": "Fancyflake",
+      "engine_audio_upk": "engineaudio_fancyflake_SF.upk",
+      "thumbnail_upk": "EngineAudio_FancyFlake_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "has_key": false,
+      "asset_package_name": "engineaudio_fancyflake",
+      "asset_path": "engineaudio_fancyflake.engineaudio_fancyflake"
+    },
+    {
+      "name": "Fast & Furious Dodge Charger",
+      "engine_audio_upk": "engineAudio_Challah_SF.upk",
+      "thumbnail_upk": "EngineAudio_Challah_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "2373",
+      "asset_package_name": "engineAudio_Challah",
+      "asset_path": "engineAudio_Challah.engineAudio_Challah"
+    },
+    {
+      "name": "Fast & Furious Dodge Charger SRT Hellcat",
+      "engine_audio_upk": "engineaudio_claw_SF.upk",
+      "thumbnail_upk": "EngineAudio_Claw_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "9073",
+      "asset_package_name": "engineaudio_claw",
+      "asset_path": "engineaudio_claw.engineaudio_claw"
+    },
+    {
+      "name": "Fast & Furious Nissan Skyline",
+      "engine_audio_upk": "engineAudio_Melonpan_SF.upk",
+      "thumbnail_upk": "EngineAudio_Melonpan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "2490",
+      "asset_package_name": "engineAudio_Melonpan",
+      "asset_path": "engineAudio_Melonpan.engineAudio_Melonpan"
+    },
+    {
+      "name": "Fast & Furious Pontiac Fiero",
+      "engine_audio_upk": "engineaudio_fuego_SF.upk",
+      "thumbnail_upk": "EngineAudio_Fuego_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "5103",
+      "asset_package_name": "engineaudio_fuego",
+      "asset_path": "engineaudio_fuego.engineaudio_fuego"
+    },
+    {
+      "name": "Fast 4WD",
+      "engine_audio_upk": "engineaudio_daggy_SF.upk",
+      "thumbnail_upk": "EngineAudio_Daggy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "3400",
+      "asset_package_name": "engineaudio_daggy",
+      "asset_path": "engineaudio_daggy.engineaudio_daggy"
+    },
+    {
+      "name": "Fennec",
+      "engine_audio_upk": "EngineAudio_Grain_SF.upk",
+      "thumbnail_upk": "EngineAudio_Grain_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4295",
+      "asset_package_name": "EngineAudio_Grain",
+      "asset_path": "EngineAudio_Grain.EngineAudio_Grain"
+    },
+    {
+      "name": "Ferrari 296 GTB",
+      "engine_audio_upk": "engineaudio_rafael_SF.upk",
+      "thumbnail_upk": "engineaudio_rafael_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7793",
+      "asset_package_name": "engineaudio_rafael",
+      "asset_path": "engineaudio_rafael.engineaudio_rafael"
+    },
+    {
+      "name": "Ford Bronco Raptor RLE",
+      "engine_audio_upk": "engineaudio_rev_fbrn_SF.upk",
+      "thumbnail_upk": "EngineAudio_Rev_FBRN_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7820",
+      "asset_package_name": "engineaudio_rev_fbrn",
+      "asset_path": "engineaudio_rev_fbrn.engineaudio_rev_fbrn"
+    },
+    {
+      "name": "Ford Mustang Mach-E RLE",
+      "engine_audio_upk": "engineaudio_elm_SF.upk",
+      "thumbnail_upk": "EngineAudio_Elm_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "6983",
+      "asset_package_name": "engineaudio_elm",
+      "asset_path": "engineaudio_elm.engineaudio_elm"
+    },
+    {
+      "name": "Ford Mustang Shelby GT350R RLE",
+      "engine_audio_upk": "engineaudio_msg_SF.upk",
+      "thumbnail_upk": "EngineAudio_MSG_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7124",
+      "asset_package_name": "engineaudio_msg",
+      "asset_path": "engineaudio_msg.engineaudio_msg"
+    },
+    {
+      "name": "Formula 1 2022",
+      "engine_audio_upk": "Engineaudio_Cured_SF.upk",
+      "thumbnail_upk": "EngineAudio_Cured_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7596",
+      "asset_package_name": "Engineaudio_Cured",
+      "asset_path": "Engineaudio_Cured.Engineaudio_Cured"
+    },
+    {
+      "name": "Frog",
+      "engine_audio_upk": "engineaudio_frog_SF.upk",
+      "thumbnail_upk": "EngineAudio_Frog_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_frog",
+      "asset_path": "engineaudio_frog.engineaudio_frog"
+    },
+    {
+      "name": "Fuse",
+      "engine_audio_upk": "engineaudio_thrice_SF.upk",
+      "thumbnail_upk": "EngineAudio_Thrice_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10492",
+      "asset_package_name": "engineaudio_thrice",
+      "asset_path": "engineaudio_thrice.engineaudio_thrice"
+    },
+    {
+      "name": "Futureutopia",
+      "engine_audio_upk": "engineaudio_futureutopia_SF.upk",
+      "thumbnail_upk": "EngineAudio_FutureUtopia_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_futureutopia",
+      "asset_path": "engineaudio_futureutopia.engineaudio_futureutopia"
+    },
+    {
+      "name": "Galaxy",
+      "engine_audio_upk": "engineaudio_galaxy_SF.upk",
+      "thumbnail_upk": "EngineAudio_Galaxy_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_galaxy",
+      "asset_path": "engineaudio_galaxy.engineaudio_galaxy"
+    },
+    {
+      "name": "Garage",
+      "engine_audio_upk": "engineaudio_garage_SF.upk",
+      "thumbnail_upk": "EngineAudio_Garage_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_garage",
+      "asset_path": "engineaudio_garage.engineaudio_garage"
+    },
+    {
+      "name": "Gazella GT",
+      "engine_audio_upk": "engineaudio_doggy_SF.upk",
+      "thumbnail_upk": "EngineAudio_Doggy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "3402",
+      "asset_package_name": "engineaudio_doggy",
+      "asset_path": "engineaudio_doggy.engineaudio_doggy"
+    },
+    {
+      "name": "Go-Kart",
+      "engine_audio_upk": "EngineAudio_GoKart_SF.upk",
+      "thumbnail_upk": "EngineAudio_GoKart_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3080",
+      "asset_package_name": "EngineAudio_GoKart",
+      "asset_path": "EngineAudio_GoKart.EngineAudio_GoKart"
+    },
+    {
+      "name": "Greenclaw",
+      "engine_audio_upk": "engineaudio_greenclaw_SF.upk",
+      "thumbnail_upk": "EngineAudio_GreenClaw_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_greenclaw",
+      "asset_path": "engineaudio_greenclaw.engineaudio_greenclaw"
+    },
+    {
+      "name": "Grog",
+      "engine_audio_upk": "EngineAudio_Grog_SF.upk",
+      "thumbnail_upk": "EngineAudio_Grog_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1809",
+      "asset_package_name": "EngineAudio_Grog",
+      "asset_path": "EngineAudio_Grog.EngineAudio_Grog"
+    },
+    {
+      "name": "Guardian",
+      "engine_audio_upk": "engineaudio_mango_SF.upk",
+      "thumbnail_upk": "EngineAudio_Mango_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4117",
+      "asset_package_name": "engineaudio_mango",
+      "asset_path": "engineaudio_mango.engineaudio_mango"
+    },
+    {
+      "name": "Harbinger",
+      "engine_audio_upk": "engineaudio_lemonade_SF.upk",
+      "thumbnail_upk": "EngineAudio_Lemonade_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "5068",
+      "asset_package_name": "engineaudio_lemonade",
+      "asset_path": "engineaudio_lemonade.engineaudio_lemonade"
+    },
+    {
+      "name": "Heinrich",
+      "engine_audio_upk": "engineaudio_s3_03_SF.upk",
+      "thumbnail_upk": "EngineAudio_S3_03_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5981",
+      "asset_package_name": "engineaudio_s3_03",
+      "asset_path": "engineaudio_s3_03.engineaudio_s3_03"
+    },
+    {
+      "name": "Helicopter",
+      "engine_audio_upk": "engineaudio_helicopter_SF.upk",
+      "thumbnail_upk": "EngineAudio_Helicopter_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4129",
+      "asset_package_name": "engineaudio_helicopter",
+      "asset_path": "engineaudio_helicopter.engineaudio_helicopter"
+    },
+    {
+      "name": "Hero",
+      "engine_audio_upk": "engineaudio_hero_SF.upk",
+      "thumbnail_upk": "EngineAudio_Hero_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_hero",
+      "asset_path": "engineaudio_hero.engineaudio_hero"
+    },
+    {
+      "name": "HogSticker",
+      "engine_audio_upk": "EngineAudio_Warthog_SF.upk",
+      "thumbnail_upk": "EngineAudio_Warthog_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1822",
+      "asset_package_name": "EngineAudio_Warthog",
+      "asset_path": "EngineAudio_Warthog.EngineAudio_Warthog"
+    },
+    {
+      "name": "Honda Civic Type R",
+      "engine_audio_upk": "engineaudio_hic_SF.upk",
+      "thumbnail_upk": "EngineAudio_Hic_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7864",
+      "asset_package_name": "engineaudio_hic",
+      "asset_path": "engineaudio_hic.engineaudio_hic"
+    },
+    {
+      "name": "Honda Civic Type R-LE",
+      "engine_audio_upk": "engineaudio_hic_t2_SF.upk",
+      "thumbnail_upk": "EngineAudio_Hic_T2_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7924",
+      "asset_package_name": "engineaudio_hic_t2",
+      "asset_path": "engineaudio_hic_t2.engineaudio_hic_t2"
+    },
+    {
+      "name": "Horsepower",
+      "engine_audio_upk": "engineaudio_horse_SF.upk",
+      "thumbnail_upk": "EngineAudio_Horse_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4337",
+      "asset_package_name": "engineaudio_horse",
+      "asset_path": "engineaudio_horse.engineaudio_horse"
+    },
+    {
+      "name": "Hydet1",
+      "engine_audio_upk": "engineaudio_hydet1_SF.upk",
+      "thumbnail_upk": "EngineAudio_HydeT1_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_hydet1",
+      "asset_path": "engineaudio_hydet1.engineaudio_hydet1"
+    },
+    {
+      "name": "Hydet2",
+      "engine_audio_upk": "engineaudio_hydet2_SF.upk",
+      "thumbnail_upk": "EngineAudio_HydeT2_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_hydet2",
+      "asset_path": "engineaudio_hydet2.engineaudio_hydet2"
+    },
+    {
+      "name": "Ice Charger",
+      "engine_audio_upk": "EngineAudio_IceCharger_SF.upk",
+      "thumbnail_upk": "EngineAudio_IceCharger_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1810",
+      "asset_package_name": "EngineAudio_IceCharger",
+      "asset_path": "EngineAudio_IceCharger.EngineAudio_IceCharger"
+    },
+    {
+      "name": "Imperator DT5",
+      "engine_audio_upk": "engineAudio_Multigrain_SF.upk",
+      "thumbnail_upk": "EngineAudio_Multigrain_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1909",
+      "asset_package_name": "engineAudio_Multigrain",
+      "asset_path": "engineAudio_Multigrain.engineAudio_Multigrain"
+    },
+    {
+      "name": "Initializer",
+      "engine_audio_upk": "engineaudio_RP6_03_SF.upk",
+      "thumbnail_upk": "EngineAudio_RP6_03_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4930",
+      "asset_package_name": "engineaudio_RP6_03",
+      "asset_path": "engineaudio_RP6_03.engineaudio_RP6_03"
+    },
+    {
+      "name": "Insidio",
+      "engine_audio_upk": "engineaudio_peach_SF.upk",
+      "thumbnail_upk": "EngineAudio_Peach_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4483",
+      "asset_package_name": "engineaudio_peach",
+      "asset_path": "engineaudio_peach.engineaudio_peach"
+    },
+    {
+      "name": "Iron Horse",
+      "engine_audio_upk": "engineaudio_train_voice_SF.upk",
+      "thumbnail_upk": "EngineAudio_Train_Voice_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "6236",
+      "asset_package_name": "engineaudio_train_voice",
+      "asset_path": "engineaudio_train_voice.engineaudio_train_voice"
+    },
+    {
+      "name": "Ivorycascade",
+      "engine_audio_upk": "engineaudio_ivorycascade_SF.upk",
+      "thumbnail_upk": "EngineAudio_IvoryCascade_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_ivorycascade",
+      "asset_path": "engineaudio_ivorycascade.engineaudio_ivorycascade"
+    },
+    {
+      "name": "Jackal",
+      "engine_audio_upk": "engineaudio_tomahawk_SF.upk",
+      "thumbnail_upk": "EngineAudio_Tomahawk_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "6314",
+      "asset_package_name": "engineaudio_tomahawk",
+      "asset_path": "engineaudio_tomahawk.engineaudio_tomahawk"
+    },
+    {
+      "name": "Jam",
+      "engine_audio_upk": "engineaudio_jam_SF.upk",
+      "thumbnail_upk": "EngineAudio_Jam_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_jam",
+      "asset_path": "engineaudio_jam.engineaudio_jam"
+    },
+    {
+      "name": "Jekyll",
+      "engine_audio_upk": "engineaudio_jekyll_SF.upk",
+      "thumbnail_upk": "EngineAudio_Jekyll_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_jekyll",
+      "asset_path": "engineaudio_jekyll.engineaudio_jekyll"
+    },
+    {
+      "name": "Jurassic Jeep® Wrangler",
+      "engine_audio_upk": "engineaudio_maple_SF.upk",
+      "thumbnail_upk": "EngineAudio_Maple_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "2927",
+      "asset_package_name": "engineaudio_maple",
+      "asset_path": "engineaudio_maple.engineaudio_maple"
+    },
+    {
+      "name": "Jäger 619",
+      "engine_audio_upk": "engineAudio_Sourdough_SF.upk",
+      "thumbnail_upk": "EngineAudio_Sourdough_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1869",
+      "asset_package_name": "engineAudio_Sourdough",
+      "asset_path": "engineAudio_Sourdough.engineAudio_Sourdough"
+    },
+    {
+      "name": "K.I.T.T.",
+      "engine_audio_upk": "EngineAudio_feline_SF.upk",
+      "thumbnail_upk": "EngineAudio_Feline_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4324",
+      "asset_package_name": "EngineAudio_feline",
+      "asset_path": "EngineAudio_feline.EngineAudio_feline"
+    },
+    {
+      "name": "Lamborghini Countach LPI 800-4",
+      "engine_audio_upk": "engineaudio_rage_SF.upk",
+      "thumbnail_upk": "EngineAudio_Rage_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7496",
+      "asset_package_name": "engineaudio_rage",
+      "asset_path": "engineaudio_rage.engineaudio_rage"
+    },
+    {
+      "name": "Lawrence",
+      "engine_audio_upk": "engineaudio_lawrence_SF.upk",
+      "thumbnail_upk": "EngineAudio_Lawrence_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_lawrence",
+      "asset_path": "engineaudio_lawrence.engineaudio_lawrence"
+    },
+    {
+      "name": "Legs",
+      "engine_audio_upk": "engineaudio_legs_SF.upk",
+      "thumbnail_upk": "EngineAudio_Legs_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_legs",
+      "asset_path": "engineaudio_legs.engineaudio_legs"
+    },
+    {
+      "name": "Lime",
+      "engine_audio_upk": "engineaudio_lime_SF.upk",
+      "thumbnail_upk": "EngineAudio_Lime_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_lime",
+      "asset_path": "engineaudio_lime.engineaudio_lime"
+    },
+    {
+      "name": "Lionsmane",
+      "engine_audio_upk": "engineaudio_lionsmane_SF.upk",
+      "thumbnail_upk": "EngineAudio_LionsMane_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_lionsmane",
+      "asset_path": "engineaudio_lionsmane.engineaudio_lionsmane"
+    },
+    {
+      "name": "Lockjaw",
+      "engine_audio_upk": "engineaudio_moonflaxsportscar_SF.upk",
+      "thumbnail_upk": "EngineAudio_MoonflaxSportsCar_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10690",
+      "asset_package_name": "engineaudio_moonflaxsportscar",
+      "asset_path": "engineaudio_moonflaxsportscar.engineaudio_moonflaxsportscar"
+    },
+    {
+      "name": "Locomotive",
+      "engine_audio_upk": "engineaudio_train_SF.upk",
+      "thumbnail_upk": "EngineAudio_Train_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3461",
+      "asset_package_name": "engineaudio_train",
+      "asset_path": "engineaudio_train.engineaudio_train"
+    },
+    {
+      "name": "Macht",
+      "engine_audio_upk": "engineaudio_macht_SF.upk",
+      "thumbnail_upk": "EngineAudio_Macht_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_macht",
+      "asset_path": "engineaudio_macht.engineaudio_macht"
+    },
+    {
+      "name": "Maestro",
+      "engine_audio_upk": "engineaudio_lux_SF.upk",
+      "thumbnail_upk": "EngineAudio_Lux_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7724",
+      "asset_package_name": "engineaudio_lux",
+      "asset_path": "engineaudio_lux.engineaudio_lux"
+    },
+    {
+      "name": "Magnet",
+      "engine_audio_upk": "engineaudio_magnet_SF.upk",
+      "thumbnail_upk": "EngineAudio_Magnet_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_magnet",
+      "asset_path": "engineaudio_magnet.engineaudio_magnet"
+    },
+    {
+      "name": "Mako",
+      "engine_audio_upk": "engineaudio_keanu_SF.upk",
+      "thumbnail_upk": "EngineAudio_Keanu_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10379",
+      "asset_package_name": "engineaudio_keanu",
+      "asset_path": "engineaudio_keanu.engineaudio_keanu"
+    },
+    {
+      "name": "Mamba",
+      "engine_audio_upk": "engineaudio_maser_SF.upk",
+      "thumbnail_upk": "engineaudio_maser_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7487",
+      "asset_package_name": "engineaudio_maser",
+      "asset_path": "engineaudio_maser.engineaudio_maser"
+    },
+    {
+      "name": "Mantis",
+      "engine_audio_upk": "EngineAudio_Flatbread_SF.upk",
+      "thumbnail_upk": "EngineAudio_Flatbread_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1806",
+      "asset_package_name": "EngineAudio_Flatbread",
+      "asset_path": "EngineAudio_Flatbread.EngineAudio_Flatbread"
+    },
+    {
+      "name": "Manual",
+      "engine_audio_upk": "engineaudio_manual_SF.upk",
+      "thumbnail_upk": "EngineAudio_Manual_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_manual",
+      "asset_path": "engineaudio_manual.engineaudio_manual"
+    },
+    {
+      "name": "Marauder",
+      "engine_audio_upk": "EngineAudio_Maurader_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_Maurader_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1812",
+      "asset_package_name": "EngineAudio_Maurader_OE",
+      "asset_path": "EngineAudio_Maurader_OE.EngineAudio_Maurader_OE"
+    },
+    {
+      "name": "Masamune",
+      "engine_audio_upk": "EngineAudio_NeoCar_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_NeoCar_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1813",
+      "asset_package_name": "EngineAudio_NeoCar_OE",
+      "asset_path": "EngineAudio_NeoCar_OE.EngineAudio_NeoCar_OE"
+    },
+    {
+      "name": "Maurader REV",
+      "engine_audio_upk": "EngineAudio_Maurader_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_Maurader_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "EngineAudio_Maurader_REV",
+      "asset_path": "EngineAudio_Maurader_REV.EngineAudio_Maurader"
+    },
+    {
+      "name": "Maverick",
+      "engine_audio_upk": "EngineAudio_Rye_SF.upk",
+      "thumbnail_upk": "EngineAudio_Rye_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1868",
+      "asset_package_name": "EngineAudio_Rye",
+      "asset_path": "EngineAudio_Rye.EngineAudio_Rye"
+    },
+    {
+      "name": "McLaren 570S",
+      "engine_audio_upk": "engineaudio_ron_SF.upk",
+      "thumbnail_upk": "EngineAudio_Ron_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "3444",
+      "asset_package_name": "engineaudio_ron",
+      "asset_path": "engineaudio_ron.engineaudio_ron"
+    },
+    {
+      "name": "Motor Buggy",
+      "engine_audio_upk": "engineaudio_ModelT_SF.upk",
+      "thumbnail_upk": "EngineAudio_ModelT_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5096",
+      "asset_package_name": "engineaudio_ModelT",
+      "asset_path": "engineaudio_ModelT.engineaudio_ModelT"
+    },
+    {
+      "name": "Motormouth",
+      "engine_audio_upk": "EngineAudio_HumanVoice_SF.upk",
+      "thumbnail_upk": "EngineAudio_HumanVoice_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3073",
+      "asset_package_name": "EngineAudio_HumanVoice",
+      "asset_path": "EngineAudio_HumanVoice.EngineAudio_HumanVoice"
+    },
+    {
+      "name": "MR11",
+      "engine_audio_upk": "engineaudio_diggy_SF.upk",
+      "thumbnail_upk": "EngineAudio_Diggy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "3401",
+      "asset_package_name": "engineaudio_diggy",
+      "asset_path": "engineaudio_diggy.engineaudio_diggy"
+    },
+    {
+      "name": "Mudcat",
+      "engine_audio_upk": "engineaudio_melon_SF.upk",
+      "thumbnail_upk": "EngineAudio_Melon_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4267",
+      "asset_package_name": "engineaudio_melon",
+      "asset_path": "engineaudio_melon.engineaudio_melon"
+    },
+    {
+      "name": "Mudpie",
+      "engine_audio_upk": "engineaudio_mudpie_SF.upk",
+      "thumbnail_upk": "EngineAudio_Mudpie_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_mudpie",
+      "asset_path": "engineaudio_mudpie.engineaudio_mudpie"
+    },
+    {
+      "name": "Muscle Car",
+      "engine_audio_upk": "EngineAudio_V8_muscle_SF.upk",
+      "thumbnail_upk": "EngineAudio_V8_Muscle_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3081",
+      "asset_package_name": "EngineAudio_V8_muscle",
+      "asset_path": "EngineAudio_V8_muscle.EngineAudio_V8_muscle"
+    },
+    {
+      "name": "Nemesis",
+      "engine_audio_upk": "EngineAudio_ZMoney_SF.upk",
+      "thumbnail_upk": "EngineAudio_ZMoney_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "1825",
+      "asset_package_name": "EngineAudio_ZMoney",
+      "asset_path": "EngineAudio_ZMoney.EngineAudio_ZMoney"
+    },
+    {
+      "name": "Neptuneshell",
+      "engine_audio_upk": "engineaudio_neptuneshell_SF.upk",
+      "thumbnail_upk": "EngineAudio_NeptuneShell_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "has_key": false,
+      "asset_package_name": "engineaudio_neptuneshell",
+      "asset_path": "engineaudio_neptuneshell.engineaudio_neptuneshell"
+    },
+    {
+      "name": "Nerd",
+      "engine_audio_upk": "engineaudio_nerd_SF.upk",
+      "thumbnail_upk": "EngineAudio_Nerd_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_nerd",
+      "asset_path": "engineaudio_nerd.engineaudio_nerd"
+    },
+    {
+      "name": "Nexus",
+      "engine_audio_upk": "engineaudio_norton_SF.upk",
+      "thumbnail_upk": "EngineAudio_Norton_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "6980",
+      "asset_package_name": "engineaudio_norton",
+      "asset_path": "engineaudio_norton.engineaudio_norton"
+    },
+    {
+      "name": "Nimbus",
+      "engine_audio_upk": "engineaudio_retro_SF.upk",
+      "thumbnail_upk": "EngineAudio_Retro_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "3452",
+      "asset_package_name": "engineaudio_retro",
+      "asset_path": "engineaudio_retro.engineaudio_retro"
+    },
+    {
+      "name": "Nissan Fairlady Z",
+      "engine_audio_upk": "engineaudio_akuma_t1_SF.upk",
+      "thumbnail_upk": "EngineAudio_Akuma_T1_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10682",
+      "asset_package_name": "engineaudio_akuma_t1",
+      "asset_path": "engineaudio_akuma_t1.engineaudio_akuma_t1"
+    },
+    {
+      "name": "Nissan Fairlady Z RLE",
+      "engine_audio_upk": "engineaudio_akuma_t2_SF.upk",
+      "thumbnail_upk": "EngineAudio_Akuma_T2_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10683",
+      "asset_package_name": "engineaudio_akuma_t2",
+      "asset_path": "engineaudio_akuma_t2.engineaudio_akuma_t2"
+    },
+    {
+      "name": "Nissan Silvia",
+      "engine_audio_upk": "engineaudio_seasalt_T1_SF.upk",
+      "thumbnail_upk": "EngineAudio_SeaSalt_T1_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "9237",
+      "asset_package_name": "engineaudio_seasalt_T1",
+      "asset_path": "engineaudio_seasalt_T1.engineaudio_seasalt_T1"
+    },
+    {
+      "name": "Nissan Silvia RLE",
+      "engine_audio_upk": "engineaudio_seasalt_T2_SF.upk",
+      "thumbnail_upk": "EngineAudio_SeaSalt_T2_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "9218",
+      "asset_package_name": "engineaudio_seasalt_T2",
+      "asset_path": "engineaudio_seasalt_T2.engineaudio_seasalt_T2"
+    },
+    {
+      "name": "Nissan Z Performance",
+      "engine_audio_upk": "engineaudio_sassy_SF.upk",
+      "thumbnail_upk": "EngineAudio_Sassy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7607",
+      "asset_package_name": "engineaudio_sassy",
+      "asset_path": "engineaudio_sassy.engineaudio_sassy"
+    },
+    {
+      "name": "Nomad",
+      "engine_audio_upk": "engineaudio_maui_SF.upk",
+      "thumbnail_upk": "EngineAudio_Maui_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7461",
+      "asset_package_name": "engineaudio_maui",
+      "asset_path": "engineaudio_maui.engineaudio_maui"
+    },
+    {
+      "name": "Numb",
+      "engine_audio_upk": "engineaudio_numb_SF.upk",
+      "thumbnail_upk": "EngineAudio_Numb_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_numb",
+      "asset_path": "engineaudio_numb.engineaudio_numb"
+    },
+    {
+      "name": "Number6 REV",
+      "engine_audio_upk": "EngineAudio_Number6_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_Number6_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "EngineAudio_Number6_REV",
+      "asset_path": "EngineAudio_Number6_REV.EngineAudio_Number6"
+    },
+    {
+      "name": "Octane ZSR",
+      "engine_audio_upk": "engineaudio_octanemk2_oe_SF.upk",
+      "thumbnail_upk": "EngineAudio_OctaneMK2_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1815",
+      "asset_package_name": "engineaudio_octanemk2_oe",
+      "asset_path": "engineaudio_octanemk2_oe.engineaudio_octanemk2_oe"
+    },
+    {
+      "name": "Octane ZSR v2",
+      "engine_audio_upk": "EngineAudio_OctaneMK2_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_OctaneMK2_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1816",
+      "asset_package_name": "EngineAudio_OctaneMK2_REV",
+      "asset_path": "EngineAudio_OctaneMK2_REV.EngineAudio_OctaneMK2_REV"
+    },
+    {
+      "name": "OEM-A",
+      "engine_audio_upk": "EngineAudio_Car01_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_Car01_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1793",
+      "asset_package_name": "EngineAudio_Car01_OE",
+      "asset_path": "EngineAudio_Car01_OE.EngineAudio_Car01_OE"
+    },
+    {
+      "name": "OEM-A v2",
+      "engine_audio_upk": "EngineAudio_Car01_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_Car01_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1794",
+      "asset_package_name": "EngineAudio_Car01_REV",
+      "asset_path": "EngineAudio_Car01_REV.EngineAudio_Car01_REV"
+    },
+    {
+      "name": "OEM-B",
+      "engine_audio_upk": "engineaudio_car04_oe_SF.upk",
+      "thumbnail_upk": "EngineAudio_Car04_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1799",
+      "asset_package_name": "engineaudio_car04_oe",
+      "asset_path": "engineaudio_car04_oe.engineaudio_car04_oe"
+    },
+    {
+      "name": "OEM-B v2",
+      "engine_audio_upk": "EngineAudio_Car04_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_Car04_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1800",
+      "asset_package_name": "EngineAudio_Car04_REV",
+      "asset_path": "EngineAudio_Car04_REV.EngineAudio_Car04_REV"
+    },
+    {
+      "name": "OEM-C",
+      "engine_audio_upk": "engineaudio_car03_oe_SF.upk",
+      "thumbnail_upk": "EngineAudio_Car03_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1797",
+      "asset_package_name": "engineaudio_car03_oe",
+      "asset_path": "engineaudio_car03_oe.engineaudio_car03_oe"
+    },
+    {
+      "name": "OEM-C v2",
+      "engine_audio_upk": "EngineAudio_Car03_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_Car03_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1798",
+      "asset_package_name": "EngineAudio_Car03_REV",
+      "asset_path": "EngineAudio_Car03_REV.EngineAudio_Car03_REV"
+    },
+    {
+      "name": "OEM-D",
+      "engine_audio_upk": "engineaudio_car02_oe_SF.upk",
+      "thumbnail_upk": "EngineAudio_Car02_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1795",
+      "asset_package_name": "engineaudio_car02_oe",
+      "asset_path": "engineaudio_car02_oe.engineaudio_car02_oe"
+    },
+    {
+      "name": "OEM-D v2",
+      "engine_audio_upk": "EngineAudio_Car02_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_Car02_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1796",
+      "asset_package_name": "EngineAudio_Car02_REV",
+      "asset_path": "EngineAudio_Car02_REV.EngineAudio_Car02_REV"
+    },
+    {
+      "name": "Outlaw",
+      "engine_audio_upk": "engineaudio_rattrap_SF.upk",
+      "thumbnail_upk": "engineaudio_rattrap_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "6106",
+      "asset_package_name": "engineaudio_rattrap",
+      "asset_path": "engineaudio_rattrap.engineaudio_rattrap"
+    },
+    {
+      "name": "Peregrine TT",
+      "engine_audio_upk": "engineaudio_shark_SF.upk",
+      "thumbnail_upk": "EngineAudio_Shark_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "5194",
+      "asset_package_name": "engineaudio_shark",
+      "asset_path": "engineaudio_shark.engineaudio_shark"
+    },
+    {
+      "name": "Pickle",
+      "engine_audio_upk": "engineaudio_pickle_SF.upk",
+      "thumbnail_upk": "EngineAudio_Pickle_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_pickle",
+      "asset_path": "engineaudio_pickle.engineaudio_pickle"
+    },
+    {
+      "name": "Porsche 911 Turbo",
+      "engine_audio_upk": "engineaudio_butter_t1_SF.upk",
+      "thumbnail_upk": "EngineAudio_Butter_T1_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "9408",
+      "asset_package_name": "engineaudio_butter_t1",
+      "asset_path": "engineaudio_butter_t1.engineaudio_butter_t1"
+    },
+    {
+      "name": "Porsche 911 Turbo RLE",
+      "engine_audio_upk": "engineaudio_butter_t2_SF.upk",
+      "thumbnail_upk": "EngineAudio_Butter_T2_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "9424",
+      "asset_package_name": "engineaudio_butter_t2",
+      "asset_path": "engineaudio_butter_t2.engineaudio_butter_t2"
+    },
+    {
+      "name": "Pother",
+      "engine_audio_upk": "engineaudio_Cloud_SF.upk",
+      "thumbnail_upk": "EngineAudio_Cloud_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4565",
+      "asset_package_name": "engineaudio_Cloud",
+      "asset_path": "engineaudio_Cloud.engineaudio_Cloud"
+    },
+    {
+      "name": "Primo",
+      "engine_audio_upk": "engineaudio_skunkz_SF.upk",
+      "thumbnail_upk": "EngineAudio_Skunkz_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "9999",
+      "asset_package_name": "engineaudio_skunkz",
+      "asset_path": "engineaudio_skunkz.engineaudio_skunkz"
+    },
+    {
+      "name": "Proteus",
+      "engine_audio_upk": "EngineAudio_Number6_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_Number6_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1814",
+      "asset_package_name": "EngineAudio_Number6_OE",
+      "asset_path": "EngineAudio_Number6_OE.EngineAudio_Number6_OE"
+    },
+    {
+      "name": "Pulser",
+      "engine_audio_upk": "engineaudio_pod_SF.upk",
+      "thumbnail_upk": "EngineAudio_Pod_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "6945",
+      "asset_package_name": "engineaudio_pod",
+      "asset_path": "engineaudio_pod.engineaudio_pod"
+    },
+    {
+      "name": "R/C",
+      "engine_audio_upk": "engineaudio_rc_SF.upk",
+      "thumbnail_upk": "EngineAudio_RC_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3485",
+      "asset_package_name": "engineaudio_rc",
+      "asset_path": "engineaudio_rc.engineaudio_rc"
+    },
+    {
+      "name": "NASCAR",
+      "engine_audio_upk": "engineaudio_racsan_SF.upk",
+      "thumbnail_upk": "engineaudio_racsan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "6047",
+      "asset_package_name": "engineaudio_racsan",
+      "asset_path": "engineaudio_racsan.engineaudio_ncrcy"
+    },
+    {
+      "name": "NASCAR",
+      "engine_audio_upk": "engineaudio_racsan_SF.upk",
+      "thumbnail_upk": "engineaudio_racsan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "6048",
+      "asset_package_name": "engineaudio_racsan",
+      "asset_path": "engineaudio_racsan.engineaudio_ncrfd"
+    },
+    {
+      "name": "NASCAR",
+      "engine_audio_upk": "engineaudio_racsan_SF.upk",
+      "thumbnail_upk": "engineaudio_racsan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "6049",
+      "asset_package_name": "engineaudio_racsan",
+      "asset_path": "engineaudio_racsan.engineaudio_ncrta"
+    },
+    {
+      "name": "NASCAR Next Gen Ford Mustang",
+      "engine_audio_upk": "engineaudio_racsan_SF.upk",
+      "thumbnail_upk": "engineaudio_racsan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7501",
+      "asset_package_name": "engineaudio_racsan",
+      "asset_path": "engineaudio_racsan.engineaudio_scar_a"
+    },
+    {
+      "name": "NASCAR Next Gen Chevrolet Camaro",
+      "engine_audio_upk": "engineaudio_racsan_SF.upk",
+      "thumbnail_upk": "engineaudio_racsan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7502",
+      "asset_package_name": "engineaudio_racsan",
+      "asset_path": "engineaudio_racsan.engineaudio_scar_b"
+    },
+    {
+      "name": "NASCAR Next Gen Toyota Camry",
+      "engine_audio_upk": "engineaudio_racsan_SF.upk",
+      "thumbnail_upk": "engineaudio_racsan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7503",
+      "asset_package_name": "engineaudio_racsan",
+      "asset_path": "engineaudio_racsan.engineaudio_scar_c"
+    },
+    {
+      "name": "Rally",
+      "engine_audio_upk": "engineaudio_rally_SF.upk",
+      "thumbnail_upk": "EngineAudio_Rally_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4359",
+      "asset_package_name": "engineaudio_rally",
+      "asset_path": "engineaudio_rally.engineaudio_rally"
+    },
+    {
+      "name": "Rat Rod",
+      "engine_audio_upk": "engineaudio_ratrod_SF.upk",
+      "thumbnail_upk": "EngineAudio_RatRod_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3465",
+      "asset_package_name": "engineaudio_ratrod",
+      "asset_path": "engineaudio_ratrod.engineaudio_ratrod"
+    },
+    {
+      "name": "Redline",
+      "engine_audio_upk": "engineaudio_jinn_SF.upk",
+      "thumbnail_upk": "EngineAudio_Jinn_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "8995",
+      "asset_package_name": "engineaudio_jinn",
+      "asset_path": "engineaudio_jinn.engineaudio_jinn"
+    },
+    {
+      "name": "Rio",
+      "engine_audio_upk": "engineaudio_rio_SF.upk",
+      "thumbnail_upk": "EngineAudio_Rio_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_rio",
+      "asset_path": "engineaudio_rio.engineaudio_rio"
+    },
+    {
+      "name": "Ripper",
+      "engine_audio_upk": "EngineAudio_Ripper_SF.upk",
+      "thumbnail_upk": "EngineAudio_Ripper_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1849",
+      "asset_package_name": "EngineAudio_Ripper",
+      "asset_path": "EngineAudio_Ripper.EngineAudio_Ripper"
+    },
+    {
+      "name": "Road Hog XL",
+      "engine_audio_upk": "EngineAudio_RoadHogMK2_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_RoadHogMK2_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1817",
+      "asset_package_name": "EngineAudio_RoadHogMK2_OE",
+      "asset_path": "EngineAudio_RoadHogMK2_OE.EngineAudio_RoadHogMK2_OE"
+    },
+    {
+      "name": "Road Hog XL v2",
+      "engine_audio_upk": "EngineAudio_RoadHogMK2_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_RoadHogMK2_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1842",
+      "asset_package_name": "EngineAudio_RoadHogMK2_REV",
+      "asset_path": "EngineAudio_RoadHogMK2_REV.EngineAudio_RoadHogMK2_REV"
+    },
+    {
+      "name": "Ronin",
+      "engine_audio_upk": "engineaudio_kusanagi_SF.upk",
+      "thumbnail_upk": "EngineAudio_Kusanagi_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4692",
+      "asset_package_name": "engineaudio_kusanagi",
+      "asset_path": "engineaudio_kusanagi.engineaudio_kusanagi"
+    },
+    {
+      "name": "Rp S17 Arcade",
+      "engine_audio_upk": "engineaudio_rp_s17_arcade_SF.upk",
+      "thumbnail_upk": "EngineAudio_RP_S17_Arcade_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_rp_s17_arcade",
+      "asset_path": "engineaudio_rp_s17_arcade.engineaudio_rp_s17_arcade"
+    },
+    {
+      "name": "RP S18 Scifi",
+      "engine_audio_upk": "engineaudio_RP_S18_scifi_SF.upk",
+      "thumbnail_upk": "engineaudio_rp_s18_scifi_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_RP_S18_scifi",
+      "asset_path": "engineaudio_RP_S18_scifi.engineaudio_RP_S18_scifi"
+    },
+    {
+      "name": "Ruckus",
+      "engine_audio_upk": "engineaudio_ruckus_SF.upk",
+      "thumbnail_upk": "EngineAudio_Ruckus_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_ruckus",
+      "asset_path": "engineaudio_ruckus.engineaudio_ruckus"
+    },
+    {
+      "name": "Ryzarevt1",
+      "engine_audio_upk": "engineaudio_ryzarevt1_SF.upk",
+      "thumbnail_upk": "EngineAudio_RyzaRevT1_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_ryzarevt1",
+      "asset_path": "engineaudio_ryzarevt1.engineaudio_ryzarevt1"
+    },
+    {
+      "name": "Ryzarevt2",
+      "engine_audio_upk": "engineaudio_ryzarevt2_SF.upk",
+      "thumbnail_upk": "EngineAudio_RyzaRevT2_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_ryzarevt2",
+      "asset_path": "engineaudio_ryzarevt2.engineaudio_ryzarevt2"
+    },
+    {
+      "name": "Samurai",
+      "engine_audio_upk": "engineAudio_Wheatbread_SF.upk",
+      "thumbnail_upk": "EngineAudio_Wheatbread_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1961",
+      "asset_package_name": "engineAudio_Wheatbread",
+      "asset_path": "engineAudio_Wheatbread.engineAudio_Wheatbread"
+    },
+    {
+      "name": "Sandscreen",
+      "engine_audio_upk": "engineaudio_sandscreen_SF.upk",
+      "thumbnail_upk": "EngineAudio_SandScreen_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "has_key": false,
+      "asset_package_name": "engineaudio_sandscreen",
+      "asset_path": "engineaudio_sandscreen.engineaudio_sandscreen"
+    },
+    {
+      "name": "Scarab",
+      "engine_audio_upk": "EngineAudio_Scarab_SF.upk",
+      "thumbnail_upk": "EngineAudio_Scarab_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1850",
+      "asset_package_name": "EngineAudio_Scarab",
+      "asset_path": "EngineAudio_Scarab.EngineAudio_Scarab"
+    },
+    {
+      "name": "Seba",
+      "engine_audio_upk": "engineaudio_seba_SF.upk",
+      "thumbnail_upk": "EngineAudio_Seba_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_seba",
+      "asset_path": "engineaudio_seba.engineaudio_seba"
+    },
+    {
+      "name": "Sentinel",
+      "engine_audio_upk": "engineaudio_chip_SF.upk",
+      "thumbnail_upk": "EngineAudio_Chip_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "4396",
+      "asset_package_name": "engineaudio_chip",
+      "asset_path": "engineaudio_chip.engineaudio_chip"
+    },
+    {
+      "name": "Serenity",
+      "engine_audio_upk": "engineaudio_singingbowl_SF.upk",
+      "thumbnail_upk": "EngineAudio_SingingBowl_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8920",
+      "asset_package_name": "engineaudio_singingbowl",
+      "asset_path": "engineaudio_singingbowl.engineaudio_singingbowl"
+    },
+    {
+      "name": "Sheepbolt",
+      "engine_audio_upk": "engineaudio_sheepbolt_SF.upk",
+      "thumbnail_upk": "EngineAudio_SheepBolt_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_sheepbolt",
+      "asset_path": "engineaudio_sheepbolt.engineaudio_sheepbolt"
+    },
+    {
+      "name": "Showoff",
+      "engine_audio_upk": "engineaudio_carshow_SF.upk",
+      "thumbnail_upk": "engineaudio_carshow_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9045",
+      "asset_package_name": "engineaudio_carshow",
+      "asset_path": "engineaudio_carshow.engineaudio_carshow"
+    },
+    {
+      "name": "Skateboard",
+      "engine_audio_upk": "engineaudio_skateboard_SF.upk",
+      "thumbnail_upk": "EngineAudio_Skateboard_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10643",
+      "asset_package_name": "engineaudio_skateboard",
+      "asset_path": "engineaudio_skateboard.engineaudio_skateboard"
+    },
+    {
+      "name": "Slick",
+      "engine_audio_upk": "engineaudio_slick_SF.upk",
+      "thumbnail_upk": "EngineAudio_Slick_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_slick",
+      "asset_path": "engineaudio_slick.engineaudio_slick"
+    },
+    {
+      "name": "Smoke",
+      "engine_audio_upk": "engineaudio_smoke_SF.upk",
+      "thumbnail_upk": "EngineAudio_Smoke_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_smoke",
+      "asset_path": "engineaudio_smoke.engineaudio_smoke"
+    },
+    {
+      "name": "Spike",
+      "engine_audio_upk": "engineaudio_spike_SF.upk",
+      "thumbnail_upk": "EngineAudio_Spike_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_spike",
+      "asset_path": "engineaudio_spike.engineaudio_spike"
+    },
+    {
+      "name": "Sport Cycle",
+      "engine_audio_upk": "engineaudio_s3_02_SF.upk",
+      "thumbnail_upk": "EngineAudio_S3_02_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5959",
+      "asset_package_name": "engineaudio_s3_02",
+      "asset_path": "engineaudio_s3_02.engineaudio_s3_02"
+    },
+    {
+      "name": "Sportytack",
+      "engine_audio_upk": "engineaudio_sportytack_SF.upk",
+      "thumbnail_upk": "EngineAudio_SportyTack_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_sportytack",
+      "asset_path": "engineaudio_sportytack.engineaudio_sportytack"
+    },
+    {
+      "name": "Sprinkle",
+      "engine_audio_upk": "engineaudio_sprinkle_SF.upk",
+      "thumbnail_upk": "EngineAudio_Sprinkle_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_sprinkle",
+      "asset_path": "engineaudio_sprinkle.engineaudio_sprinkle"
+    },
+    {
+      "name": "Steel Horse",
+      "engine_audio_upk": "engineaudio_chopper_SF.upk",
+      "thumbnail_upk": "EngineAudio_Chopper_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "6240",
+      "asset_package_name": "engineaudio_chopper",
+      "asset_path": "engineaudio_chopper.engineaudio_chopper"
+    },
+    {
+      "name": "String Trimmer",
+      "engine_audio_upk": "engineaudio_weedwacker_SF.upk",
+      "thumbnail_upk": "EngineAudio_Weedwacker_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4076",
+      "asset_package_name": "engineaudio_weedwacker",
+      "asset_path": "engineaudio_weedwacker.engineaudio_weedwacker"
+    },
+    {
+      "name": "BMW M2 Racing",
+      "engine_audio_upk": "engineaudio_stubbyhog_SF.upk",
+      "thumbnail_upk": "EngineAudio_StubbyHog_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_stubbyhog",
+      "asset_path": "engineaudio_stubbyhog.engineaudio_stubbyhog"
+    },
+    {
+      "name": "Superomega",
+      "engine_audio_upk": "engineaudio_superomega_SF.upk",
+      "thumbnail_upk": "EngineAudio_SuperOmega_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_superomega",
+      "asset_path": "engineaudio_superomega.engineaudio_superomega"
+    },
+    {
+      "name": "Sweet Tooth",
+      "engine_audio_upk": "EngineAudio_SweetTooth_SF.upk",
+      "thumbnail_upk": "EngineAudio_SweetTooth_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1818",
+      "asset_package_name": "EngineAudio_SweetTooth",
+      "asset_path": "EngineAudio_SweetTooth.EngineAudio_SweetTooth"
+    },
+    {
+      "name": "Tagtiger",
+      "engine_audio_upk": "engineaudio_tagtiger_SF.upk",
+      "thumbnail_upk": "EngineAudio_TagTiger_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_tagtiger",
+      "asset_path": "engineaudio_tagtiger.engineaudio_tagtiger"
+    },
+    {
+      "name": "Takumi",
+      "engine_audio_upk": "EngineAudio_Takumi_SF.upk",
+      "thumbnail_upk": "EngineAudio_Takumi_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1838",
+      "asset_package_name": "EngineAudio_Takumi",
+      "asset_path": "EngineAudio_Takumi.EngineAudio_Takumi"
+    },
+    {
+      "name": "Takumi RX-T",
+      "engine_audio_upk": "engineaudio_takumimk2_oe_SF.upk",
+      "thumbnail_upk": "EngineAudio_TakumiMK2_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1819",
+      "asset_package_name": "engineaudio_takumimk2_oe",
+      "asset_path": "engineaudio_takumimk2_oe.engineaudio_takumimk2_oe"
+    },
+    {
+      "name": "Takumi RX-T v2",
+      "engine_audio_upk": "EngineAudio_TakumiMK2_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_TakumiMK2_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1820",
+      "asset_package_name": "EngineAudio_TakumiMK2_REV",
+      "asset_path": "EngineAudio_TakumiMK2_REV.EngineAudio_TakumiMK2_REV"
+    },
+    {
+      "name": "Tesla Cybertruck",
+      "engine_audio_upk": "engineaudio_future_SF.upk",
+      "thumbnail_upk": "EngineAudio_Future_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "10620",
+      "asset_package_name": "engineaudio_future",
+      "asset_path": "engineaudio_future.engineaudio_future"
+    },
+    {
+      "name": "The Dark Knight's Tumbler",
+      "engine_audio_upk": "EngineAudio_Berry_SF.upk",
+      "thumbnail_upk": "EngineAudio_Berry_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "2768",
+      "asset_package_name": "EngineAudio_Berry",
+      "asset_path": "EngineAudio_Berry.EngineAudio_Berry"
+    },
+    {
+      "name": "BMW M4 GT3 EVO",
+      "engine_audio_upk": "engineaudio_topple_SF.upk",
+      "thumbnail_upk": "EngineAudio_Topple_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_topple",
+      "asset_path": "engineaudio_topple.engineaudio_topple"
+    },
+    {
+      "name": "Tranquil",
+      "engine_audio_upk": "EngineAudio_Oasis_SF.upk",
+      "thumbnail_upk": "engineaudio_oasis_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8828",
+      "asset_package_name": "EngineAudio_Oasis",
+      "asset_path": "EngineAudio_Oasis.EngineAudio_Oasis"
+    },
+    {
+      "name": "Triton",
+      "engine_audio_upk": "EngineAudio_Cannonboy_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_Cannonboy_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1792",
+      "asset_package_name": "EngineAudio_Cannonboy_OE",
+      "asset_path": "EngineAudio_Cannonboy_OE.EngineAudio_Cannonboy_OE"
+    },
+    {
+      "name": "Triton v2",
+      "engine_audio_upk": "EngineAudio_Cannonboy_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_Cannonboy_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1834",
+      "asset_package_name": "EngineAudio_Cannonboy_REV",
+      "asset_path": "EngineAudio_Cannonboy_REV.EngineAudio_Cannonboy_REV"
+    },
+    {
+      "name": "Turtlemodem",
+      "engine_audio_upk": "engineaudio_turtlemodem_SF.upk",
+      "thumbnail_upk": "EngineAudio_TurtleModem_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_turtlemodem",
+      "asset_path": "engineaudio_turtlemodem.engineaudio_turtlemodem"
+    },
+    {
+      "name": "Twin Mill III",
+      "engine_audio_upk": "EngineAudio_TwinMill_SF.upk",
+      "thumbnail_upk": "EngineAudio_TwinMill_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1821",
+      "asset_package_name": "EngineAudio_TwinMill",
+      "asset_path": "EngineAudio_TwinMill.EngineAudio_TwinMill"
+    },
+    {
+      "name": "Twinzer",
+      "engine_audio_upk": "engineaudio_twinzer_SF.upk",
+      "thumbnail_upk": "EngineAudio_Twinzer_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "2999",
+      "asset_package_name": "engineaudio_twinzer",
+      "asset_path": "engineaudio_twinzer.engineaudio_twinzer"
+    },
+    {
+      "name": "Tygris",
+      "engine_audio_upk": "engineaudio_brick_SF.upk",
+      "thumbnail_upk": "EngineAudio_Brick_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "5848",
+      "asset_package_name": "engineaudio_brick",
+      "asset_path": "engineaudio_brick.engineaudio_brick"
+    },
+    {
+      "name": "UFO",
+      "engine_audio_upk": "engineaudio_UFO_SF.upk",
+      "thumbnail_upk": "EngineAudio_UFO_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4797",
+      "asset_package_name": "engineaudio_UFO",
+      "asset_path": "engineaudio_UFO.engineaudio_UFO"
+    },
+    {
+      "name": "UTV",
+      "engine_audio_upk": "engineaudio_rzr_SF.upk",
+      "thumbnail_upk": "EngineAudio_RZR_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4416",
+      "asset_package_name": "engineaudio_rzr",
+      "asset_path": "engineaudio_rzr.engineaudio_rzr"
+    },
+    {
+      "name": "Vulcan",
+      "engine_audio_upk": "EngineAudio_Gilliam_OE_SF.upk",
+      "thumbnail_upk": "EngineAudio_Gilliam_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1807",
+      "asset_package_name": "EngineAudio_Gilliam_OE",
+      "asset_path": "EngineAudio_Gilliam_OE.EngineAudio_Gilliam_OE"
+    },
+    {
+      "name": "Vuvuzela",
+      "engine_audio_upk": "engineaudio_vuvuzela_SF.upk",
+      "thumbnail_upk": "EngineAudio_Vuvuzela_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9122",
+      "asset_package_name": "engineaudio_vuvuzela",
+      "asset_path": "engineaudio_vuvuzela.engineaudio_vuvuzela"
+    },
+    {
+      "name": "Wedding",
+      "engine_audio_upk": "engineaudio_wedding_SF.upk",
+      "thumbnail_upk": "EngineAudio_Wedding_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_wedding",
+      "asset_path": "engineaudio_wedding.engineaudio_wedding"
+    },
+    {
+      "name": "Werewolf",
+      "engine_audio_upk": "EngineAudio_Speedster_SF.upk",
+      "thumbnail_upk": "EngineAudio_Speedster_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1870",
+      "asset_package_name": "EngineAudio_Speedster",
+      "asset_path": "EngineAudio_Speedster.EngineAudio_Speedster"
+    },
+    {
+      "name": "Whiplash",
+      "engine_audio_upk": "engineaudio_whiplash_SF.upk",
+      "thumbnail_upk": "engineaudio_whiplash_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "7808",
+      "asset_package_name": "engineaudio_whiplash",
+      "asset_path": "engineaudio_whiplash.engineaudio_whiplash"
+    },
+    {
+      "name": "Wurst",
+      "engine_audio_upk": "engineaudio_wurst_SF.upk",
+      "thumbnail_upk": "EngineAudio_Wurst_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_wurst",
+      "asset_path": "engineaudio_wurst.engineaudio_wurst"
+    },
+    {
+      "name": "X-Devil Mk2",
+      "engine_audio_upk": "engineaudio_xdevilmk2_oe_SF.upk",
+      "thumbnail_upk": "EngineAudio_XDevilMK2_OE_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1823",
+      "asset_package_name": "engineaudio_xdevilmk2_oe",
+      "asset_path": "engineaudio_xdevilmk2_oe.engineaudio_xdevilmk2_oe"
+    },
+    {
+      "name": "X-Devil Mk2 v2",
+      "engine_audio_upk": "EngineAudio_XDevilMK2_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_XDevilMK2_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1824",
+      "asset_package_name": "EngineAudio_XDevilMK2_REV",
+      "asset_path": "EngineAudio_XDevilMK2_REV.EngineAudio_XDevilMK2_REV"
+    },
+    {
+      "name": "Zaku T1",
+      "engine_audio_upk": "engineaudio_zaku_t1_SF.upk",
+      "thumbnail_upk": "EngineAudio_Zaku_T1_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_zaku_t1",
+      "asset_path": "engineaudio_zaku_t1.engineaudio_zaku_t1"
+    },
+    {
+      "name": "Zaku T2",
+      "engine_audio_upk": "engineaudio_zaku_t2_SF.upk",
+      "thumbnail_upk": "EngineAudio_Zaku_T2_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_zaku_t2",
+      "asset_path": "engineaudio_zaku_t2.engineaudio_zaku_t2"
+    },
+    {
+      "name": "Zedthirty",
+      "engine_audio_upk": "engineaudio_zedthirty_SF.upk",
+      "thumbnail_upk": "EngineAudio_ZedThirty_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_zedthirty",
+      "asset_path": "engineaudio_zedthirty.engineaudio_zedthirty"
+    },
+    {
+      "name": "Zippy",
+      "engine_audio_upk": "EngineAudio_Zippy_REV_SF.upk",
+      "thumbnail_upk": "EngineAudio_Zippy_REV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "1861",
+      "asset_package_name": "EngineAudio_Zippy_REV",
+      "asset_path": "EngineAudio_Zippy_REV.EngineAudio_Zippy_REV"
+    },
+    {
+      "name": "Zrf",
+      "engine_audio_upk": "engineaudio_zrf_SF.upk",
+      "thumbnail_upk": "EngineAudio_ZRF_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_zrf",
+      "asset_path": "engineaudio_zrf.engineaudio_zrf"
+    },
+    {
+      "name": "Zuse",
+      "engine_audio_upk": "engineaudio_zuse_SF.upk",
+      "thumbnail_upk": "EngineAudio_Zuse_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_zuse",
+      "asset_path": "engineaudio_zuse.engineaudio_zuse"
+    },
+    {
+      "name": "Ford F-150 RLE",
+      "engine_audio_upk": "EngineAudio_Rev_Drof_SF.upk",
+      "thumbnail_upk": "EngineAudio_Rev_Drof_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "EngineAudio_Rev_Drof",
+      "asset_path": "EngineAudio_Rev_Drof.EngineAudio_Rev_Drof"
+    },
+    {
+      "name": "Emperor",
+      "engine_audio_upk": "engineaudio_beak_SF.upk",
+      "thumbnail_upk": "EngineAudio_Beak_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_beak",
+      "asset_path": "engineaudio_beak.engineaudio_beak"
+    },
+    {
+      "name": "Volkswagen Golf GTI",
+      "engine_audio_upk": "engineaudio_dub_SF.upk",
+      "thumbnail_upk": "EngineAudio_Dub_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_dub",
+      "asset_path": "engineaudio_dub.engineaudio_dub"
+    },
+    {
+      "name": "Volkswagen Golf GTI RLE",
+      "engine_audio_upk": "engineaudio_dub_t2_SF.upk",
+      "thumbnail_upk": "EngineAudio_Dub_T2_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_dub_t2",
+      "asset_path": "engineaudio_dub_t2.engineaudio_dub_t2"
+    },
+    {
+      "name": "Formula 1 2021",
+      "engine_audio_upk": "engineaudio_fracture_SF.upk",
+      "thumbnail_upk": "EngineAudio_Fracture_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_fracture",
+      "asset_path": "engineaudio_fracture.engineaudio_fracture"
+    },
+    {
+      "name": "Scorpion",
+      "engine_audio_upk": "engineaudio_ghost_SF.upk",
+      "thumbnail_upk": "EngineAudio_Ghost_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_ghost",
+      "asset_path": "engineaudio_ghost.engineaudio_ghost"
+    },
+    {
+      "name": "007's Aston Martin Valhalla",
+      "engine_audio_upk": "engineaudio_heaven_SF.upk",
+      "thumbnail_upk": "EngineAudio_Heaven_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_heaven",
+      "asset_path": "engineaudio_heaven.engineaudio_heaven"
+    },
+    {
+      "name": "Komodo",
+      "engine_audio_upk": "engineaudio_mitty_SF.upk",
+      "thumbnail_upk": "EngineAudio_Mitty_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_mitty",
+      "asset_path": "engineaudio_mitty.engineaudio_mitty"
+    },
+    {
+      "name": "Lamborghini Huracán STO",
+      "engine_audio_upk": "engineaudio_oblong_SF.upk",
+      "thumbnail_upk": "EngineAudio_Oblong_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_oblong",
+      "asset_path": "engineaudio_oblong.engineaudio_oblong"
+    },
+    {
+      "name": "Fast & Furious Mazda RX-7",
+      "engine_audio_upk": "engineaudio_pete_SF.upk",
+      "thumbnail_upk": "EngineAudio_Pete_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_pete",
+      "asset_path": "engineaudio_pete.engineaudio_pete"
+    },
+    {
+      "name": "Lightning McQueen",
+      "engine_audio_upk": "engineaudio_pixie_SF.upk",
+      "thumbnail_upk": "EngineAudio_Pixie_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_pixie",
+      "asset_path": "engineaudio_pixie.engineaudio_pixie"
+    },
+    {
+      "name": "Tyranno",
+      "engine_audio_upk": "engineaudio_raddish_SF.upk",
+      "thumbnail_upk": "EngineAudio_Raddish_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_raddish",
+      "asset_path": "engineaudio_raddish.engineaudio_raddish"
+    },
+    {
+      "name": "McLaren 765LT",
+      "engine_audio_upk": "engineaudio_ran_SF.upk",
+      "thumbnail_upk": "EngineAudio_Ran_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_ran",
+      "asset_path": "engineaudio_ran.engineaudio_ran"
+    },
+    {
+      "name": "BMW M240i",
+      "engine_audio_upk": "engineaudio_sixty_SF.upk",
+      "thumbnail_upk": "EngineAudio_Sixty_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_sixty",
+      "asset_path": "engineaudio_sixty.engineaudio_sixty"
+    },
+    {
+      "name": "Bugatti Centodieci",
+      "engine_audio_upk": "engineaudio_ten_SF.upk",
+      "thumbnail_upk": "EngineAudio_Ten_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_ten",
+      "asset_path": "engineaudio_ten.engineaudio_ten"
+    },
+    {
+      "name": "R3MX GXT",
+      "engine_audio_upk": "engineaudio_unicorn_SF.upk",
+      "thumbnail_upk": "EngineAudio_Unicorn_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "engineaudio_unicorn",
+      "asset_path": "engineaudio_unicorn.engineaudio_unicorn"
+    }
+  ]
+}

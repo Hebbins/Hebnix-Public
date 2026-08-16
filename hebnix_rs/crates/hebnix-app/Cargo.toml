@@ -1,0 +1,49 @@
+[package]
+name = "hebnix-app"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aes = "0.8"
+crossbeam-channel.workspace = true
+dirs = "6.0.0"
+eframe = "0.35.0"
+egui_extras = { version = "0.35.0", features = ["image", "svg"] }
+global-hotkey = "0.8.0"
+hebnix-sdk = { version = "0.1.0", path = "../hebnix-sdk" }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "ico", "bmp", "webp"] }
+bcdec_rs = "0.1"
+mlua = { version = "0.11.6", features = ["lua54", "vendored", "serialize"] }
+httparse = "1"
+open = "5.3.6"
+rand = "0.8"
+rcgen = { version = "0.14", features = ["x509-parser"] }
+rfd = "0.17.2"
+rsa = "0.9"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rust-ini = "0.21.3"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+toml = "1.1.2"
+tracing.workspace = true
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tray-icon = "0.24.1"
+ureq = { workspace = true, features = ["json"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Direct2D", "Win32_Graphics_Direct2D_Common", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_DirectComposition", "Win32_Graphics_DirectWrite", "Win32_Graphics_Dxgi", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Networking_WinInet"] }
+windows-numerics = "0.3.1"
+winreg = "0.56.0"
+zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+reqwest = { version = "0.11", features = ["blocking"] }
+base64 = "0.21"
+flate2 = "1.0"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+gamepads = "0.1"
+rodio = "0.17"
+tungstenite = { version = "0.21", features = ["native-tls"] }
+
+[build-dependencies]
+embed-manifest = "1.5.0"
+embed-resource = "3.0.6"

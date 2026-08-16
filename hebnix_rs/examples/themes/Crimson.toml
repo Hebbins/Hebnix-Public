@@ -1,0 +1,14 @@
+# red example theme. drop in the themes/ folder next to the exe, pick
+# "Crimson" in Settings > Theme.
+
+base = "dark"
+
+[colors]
+accent    = "#C0392B"
+window_bg = "#171010"
+panel_bg  = "#1E1414"
+widget_bg = "#2B1B1B"
+text      = "#F2DEDE"
+hyperlink = "#E74C3C"
+warn      = "#E67E22"
+error     = "#FF6B6B"

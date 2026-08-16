@@ -1,0 +1,4 @@
+name = "Goal Tracker"
+author = "Hebnix"
+version = "1.0"
+entry = "main.lua"

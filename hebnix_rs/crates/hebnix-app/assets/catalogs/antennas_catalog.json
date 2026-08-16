@@ -1,0 +1,2517 @@
+{
+  "base_antenna_upk": "Antenna_8Ball_SF.upk",
+  "base_thumbnail_upk": "Antenna_8Ball_T_SF.upk",
+  "antennas": [
+    {
+      "name": "(Beta Reward) Gold Nugget",
+      "antenna_upk": "Antenna_GoldNugget_SF.upk",
+      "thumbnail_upk": "Antenna_GoldNugget_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "6",
+      "asset_package_name": "Antenna_GoldNugget",
+      "asset_path": "Antenna_GoldNugget.Antenna_GoldNugget"
+    },
+    {
+      "name": "10year",
+      "antenna_upk": "antenna_10year_SF.upk",
+      "thumbnail_upk": "Antenna_10year_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_10year",
+      "asset_path": "antenna_10year.antenna_10year"
+    },
+    {
+      "name": "8-Ball",
+      "antenna_upk": "Antenna_8Ball_SF.upk",
+      "thumbnail_upk": "Antenna_8Ball_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "1",
+      "asset_package_name": "Antenna_8Ball",
+      "asset_path": "Antenna_8Ball.Antenna_8Ball"
+    },
+    {
+      "name": "A.W. Mask",
+      "antenna_upk": "antenna_aw2_SF.upk",
+      "thumbnail_upk": "Antenna_AW2_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10528",
+      "asset_package_name": "antenna_aw2",
+      "asset_path": "antenna_aw2.antenna_aw2"
+    },
+    {
+      "name": "Alien",
+      "antenna_upk": "Antenna_Alien_SF.upk",
+      "thumbnail_upk": "Antenna_Alien_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "753",
+      "asset_package_name": "Antenna_Alien",
+      "asset_path": "Antenna_Alien.Antenna_Alien"
+    },
+    {
+      "name": "Anglerfish",
+      "antenna_upk": "antenna_anglerfishy_SF.upk",
+      "thumbnail_upk": "antenna_AnglerFishy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8623",
+      "asset_package_name": "antenna_anglerfishy",
+      "asset_path": "antenna_anglerfishy.antenna_anglerfishy"
+    },
+    {
+      "name": "Arachnotenna",
+      "antenna_upk": "antenna_Spider_SF.upk",
+      "thumbnail_upk": "Antenna_Spider_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2352",
+      "asset_package_name": "antenna_Spider",
+      "asset_path": "antenna_Spider.antenna_Spider"
+    },
+    {
+      "name": "Argyled Egg",
+      "antenna_upk": "Antenna_EggB_SF.upk",
+      "thumbnail_upk": "antenna_EggB_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4829",
+      "asset_package_name": "Antenna_EggB",
+      "asset_path": "Antenna_EggB.Antenna_EggB"
+    },
+    {
+      "name": "Autumn",
+      "antenna_upk": "antenna_twig_SF.upk",
+      "thumbnail_upk": "Antenna_Twig_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4471",
+      "asset_package_name": "antenna_twig",
+      "asset_path": "antenna_twig.antenna_twig"
+    },
+    {
+      "name": "Aventurine",
+      "antenna_upk": "antenna_aventurine_SF.upk",
+      "thumbnail_upk": "Antenna_Aventurine_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_aventurine",
+      "asset_path": "antenna_aventurine.antenna_aventurine"
+    },
+    {
+      "name": "Badbeat",
+      "antenna_upk": "antenna_badbeats_SF.upk",
+      "thumbnail_upk": "Antenna_Badbeats_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9448",
+      "asset_package_name": "antenna_badbeats",
+      "asset_path": "antenna_badbeats.antenna_badbeats"
+    },
+    {
+      "name": "Balloon Dog",
+      "antenna_upk": "Antenna_DogBalloon_SF.upk",
+      "thumbnail_upk": "Antenna_DogBalloon_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "752",
+      "asset_package_name": "Antenna_DogBalloon",
+      "asset_path": "Antenna_DogBalloon.Antenna_DogBalloon"
+    },
+    {
+      "name": "Ballsnake",
+      "antenna_upk": "antenna_ballsnake_SF.upk",
+      "thumbnail_upk": "Antenna_BallSnake_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_ballsnake",
+      "asset_path": "antenna_ballsnake.antenna_ballsnake"
+    },
+    {
+      "name": "Basketball Hoop",
+      "antenna_upk": "antenna_basketballhoop_SF.upk",
+      "thumbnail_upk": "Antenna_BasketballHoop_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "8896",
+      "asset_package_name": "antenna_basketballhoop",
+      "asset_path": "antenna_basketballhoop.antenna_basketballhoop"
+    },
+    {
+      "name": "Battle Balloon",
+      "antenna_upk": "antenna_bb_SF.upk",
+      "thumbnail_upk": "antenna_bb_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4975",
+      "asset_package_name": "antenna_bb",
+      "asset_path": "antenna_bb.antenna_bb"
+    },
+    {
+      "name": "Bell",
+      "antenna_upk": "antenna_bell_SF.upk",
+      "thumbnail_upk": "Antenna_Bell_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4058",
+      "asset_package_name": "antenna_bell",
+      "asset_path": "antenna_bell.antenna_bell"
+    },
+    {
+      "name": "Bent Antenna",
+      "antenna_upk": "antenna_bent_SF.upk",
+      "thumbnail_upk": "Antenna_Bent_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10487",
+      "asset_package_name": "antenna_bent",
+      "asset_path": "antenna_bent.antenna_bent"
+    },
+    {
+      "name": "Big Bite",
+      "antenna_upk": "antenna_elves_SF.upk",
+      "thumbnail_upk": "antenna_elves_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7424",
+      "asset_package_name": "antenna_elves",
+      "asset_path": "antenna_elves.antenna_elves"
+    },
+    {
+      "name": "Billiard Cue",
+      "antenna_upk": "antenna_cue_SF.upk",
+      "thumbnail_upk": "Antenna_Cue_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "9106",
+      "asset_package_name": "antenna_cue",
+      "asset_path": "antenna_cue.antenna_cue"
+    },
+    {
+      "name": "Birthday",
+      "antenna_upk": "antenna_birthday_SF.upk",
+      "thumbnail_upk": "antenna_birthday_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "has_key": false,
+      "asset_package_name": "antenna_birthday",
+      "asset_path": "antenna_birthday.antenna_birthday"
+    },
+    {
+      "name": "Birthdaycandle",
+      "antenna_upk": "antenna_birthdaycandle_SF.upk",
+      "thumbnail_upk": "antenna_birthdaycandle_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_birthdaycandle",
+      "asset_path": "antenna_birthdaycandle.antenna_birthdaycandle"
+    },
+    {
+      "name": "Blacklight",
+      "antenna_upk": "Antenna_Blacklight_SF.upk",
+      "thumbnail_upk": "Antenna_Blacklight_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "385",
+      "asset_package_name": "Antenna_Blacklight",
+      "asset_path": "Antenna_Blacklight.Antenna_Blacklight"
+    },
+    {
+      "name": "Bloomed Plant",
+      "antenna_upk": "antenna_succulent_SF.upk",
+      "thumbnail_upk": "Antenna_Succulent_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "8899",
+      "asset_package_name": "antenna_succulent",
+      "asset_path": "antenna_succulent.antenna_succulent"
+    },
+    {
+      "name": "Boba Drink",
+      "antenna_upk": "Antenna_boba_SF.upk",
+      "thumbnail_upk": "antenna_Boba_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4376",
+      "asset_package_name": "Antenna_boba",
+      "asset_path": "Antenna_boba.Antenna_boba"
+    },
+    {
+      "name": "Bobergrille T1",
+      "antenna_upk": "antenna_bobergrille_t1_SF.upk",
+      "thumbnail_upk": "antenna_Bobergrille_T1_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_bobergrille_t1",
+      "asset_path": "antenna_bobergrille_t1.antenna_bobergrille_t1"
+    },
+    {
+      "name": "Bobergrille T2",
+      "antenna_upk": "antenna_bobergrille_t2_SF.upk",
+      "thumbnail_upk": "antenna_Bobergrille_T2_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_bobergrille_t2",
+      "asset_path": "antenna_bobergrille_t2.antenna_bobergrille_t2"
+    },
+    {
+      "name": "Bomb Pole",
+      "antenna_upk": "Antenna_Bomb_SF.upk",
+      "thumbnail_upk": "Antenna_Bomb_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "614",
+      "asset_package_name": "Antenna_Bomb",
+      "asset_path": "Antenna_Bomb.Antenna_Bomb"
+    },
+    {
+      "name": "BooBoo",
+      "antenna_upk": "antenna_booboo_SF.upk",
+      "thumbnail_upk": "Antenna_Booboo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9471",
+      "asset_package_name": "antenna_booboo",
+      "asset_path": "antenna_booboo.antenna_booboo"
+    },
+    {
+      "name": "Bracelet",
+      "antenna_upk": "antenna_bracelet_SF.upk",
+      "thumbnail_upk": "Antenna_Bracelet_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_bracelet",
+      "asset_path": "antenna_bracelet.antenna_bracelet"
+    },
+    {
+      "name": "Bubble Wand",
+      "antenna_upk": "antenna_bubbleblower_SF.upk",
+      "thumbnail_upk": "Antenna_Bubbleblower_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2903",
+      "asset_package_name": "antenna_bubbleblower",
+      "asset_path": "antenna_bubbleblower.antenna_bubbleblower"
+    },
+    {
+      "name": "Calamaro",
+      "antenna_upk": "antenna_Calamaro_SF.upk",
+      "thumbnail_upk": "antenna_calamaro_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4966",
+      "asset_package_name": "antenna_Calamaro",
+      "asset_path": "antenna_Calamaro.antenna_Calamaro"
+    },
+    {
+      "name": "Calavera",
+      "antenna_upk": "Antenna_DOTDSkull_SF.upk",
+      "thumbnail_upk": "Antenna_DOTDSkull_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "574",
+      "asset_package_name": "Antenna_DOTDSkull",
+      "asset_path": "Antenna_DOTDSkull.Antenna_DOTDSkull"
+    },
+    {
+      "name": "Calculated",
+      "antenna_upk": "antenna_calculator_SF.upk",
+      "thumbnail_upk": "Antenna_Calculator_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3125",
+      "asset_package_name": "antenna_calculator",
+      "asset_path": "antenna_calculator.antenna_calculator"
+    },
+    {
+      "name": "Can't Stop Me",
+      "antenna_upk": "antenna_cantstopme_SF.upk",
+      "thumbnail_upk": "Antenna_CantStopMe_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7923",
+      "asset_package_name": "antenna_cantstopme",
+      "asset_path": "antenna_cantstopme.antenna_cantstopme"
+    },
+    {
+      "name": "Candle",
+      "antenna_upk": "Antenna_Candle_SF.upk",
+      "thumbnail_upk": "Antenna_Candle_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "757",
+      "asset_package_name": "Antenna_Candle",
+      "asset_path": "Antenna_Candle.Antenna_Candle"
+    },
+    {
+      "name": "Candlelight",
+      "antenna_upk": "antenna_candlelight_SF.upk",
+      "thumbnail_upk": "Antenna_Candlelight_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_candlelight",
+      "asset_path": "antenna_candlelight.FX.antenna_candlelight"
+    },
+    {
+      "name": "Candy Cane",
+      "antenna_upk": "Antenna_CandyCane_SF.upk",
+      "thumbnail_upk": "Antenna_CandyCane_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "649",
+      "asset_package_name": "Antenna_CandyCane",
+      "asset_path": "Antenna_CandyCane.Antenna_CandyCane"
+    },
+    {
+      "name": "Carnival Feathers",
+      "antenna_upk": "antenna_partyfeathers_SF.upk",
+      "thumbnail_upk": "Antenna_PartyFeathers_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9212",
+      "asset_package_name": "antenna_partyfeathers",
+      "asset_path": "antenna_partyfeathers.antenna_partyfeathers"
+    },
+    {
+      "name": "Cattoy",
+      "antenna_upk": "antenna_cattoy_SF.upk",
+      "thumbnail_upk": "Antenna_CatToy_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_cattoy",
+      "asset_path": "antenna_cattoy.antenna_cattoy"
+    },
+    {
+      "name": "Celebration Kite",
+      "antenna_upk": "antenna_ornamentkite_SF.upk",
+      "thumbnail_upk": "antenna_ornamentkite_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3647",
+      "asset_package_name": "antenna_ornamentkite",
+      "asset_path": "antenna_ornamentkite.antenna_ornamentkite"
+    },
+    {
+      "name": "Centerbeast",
+      "antenna_upk": "antenna_vase_SF.upk",
+      "thumbnail_upk": "Antenna_Vase_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10759",
+      "asset_package_name": "antenna_vase",
+      "asset_path": "antenna_vase.antenna_vase"
+    },
+    {
+      "name": "Cheesecan",
+      "antenna_upk": "antenna_cheesecan_SF.upk",
+      "thumbnail_upk": "Antenna_CheeseCan_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_cheesecan",
+      "asset_path": "antenna_cheesecan.antenna_cheesecan"
+    },
+    {
+      "name": "Chick Magnet",
+      "antenna_upk": "Antenna_ChickMagnet_SF.upk",
+      "thumbnail_upk": "Antenna_ChickMagnet_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "392",
+      "asset_package_name": "Antenna_ChickMagnet",
+      "asset_path": "Antenna_ChickMagnet.Antenna_ChickMagnet"
+    },
+    {
+      "name": "ChickenBot",
+      "antenna_upk": "antenna_chickenbot_SF.upk",
+      "thumbnail_upk": "Antenna_ChickenBot_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9292",
+      "asset_package_name": "antenna_chickenbot",
+      "asset_path": "antenna_chickenbot.antenna_chickenbot"
+    },
+    {
+      "name": "Chocolate Chip",
+      "antenna_upk": "antenna_cookie_SF.upk",
+      "thumbnail_upk": "Antenna_Cookie_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7839",
+      "asset_package_name": "antenna_cookie",
+      "asset_path": "antenna_cookie.antenna_cookie"
+    },
+    {
+      "name": "Classiccontroller",
+      "antenna_upk": "antenna_classiccontroller_SF.upk",
+      "thumbnail_upk": "Antenna_ClassicController_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_classiccontroller",
+      "asset_path": "antenna_classiccontroller.antenna_classiccontroller"
+    },
+    {
+      "name": "Coolcactus",
+      "antenna_upk": "antenna_coolcactus_SF.upk",
+      "thumbnail_upk": "Antenna_CoolCactus_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_coolcactus",
+      "asset_path": "antenna_coolcactus.antenna_coolcactus"
+    },
+    {
+      "name": "Corndog",
+      "antenna_upk": "antenna_corndog_SF.upk",
+      "thumbnail_upk": "antenna_corndog_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_corndog",
+      "asset_path": "antenna_corndog.antenna_corndog"
+    },
+    {
+      "name": "Corseque I",
+      "antenna_upk": "antenna_corseque_SF.upk",
+      "thumbnail_upk": "Antenna_Corseque_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4443",
+      "asset_package_name": "antenna_corseque",
+      "asset_path": "antenna_corseque.antenna_corseque"
+    },
+    {
+      "name": "Corseque II",
+      "antenna_upk": "antenna_corseque_tier2_SF.upk",
+      "thumbnail_upk": "antenna_corseque_tier2_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4638",
+      "asset_package_name": "antenna_corseque_tier2",
+      "asset_path": "antenna_corseque_tier2.antenna_corseque_tier2"
+    },
+    {
+      "name": "Crescent Moon",
+      "antenna_upk": "Antenna_crescent_moon_SF.upk",
+      "thumbnail_upk": "antenna_crescent_moon_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "6217",
+      "asset_package_name": "Antenna_crescent_moon",
+      "asset_path": "Antenna_crescent_moon.Antenna_crescent_moon"
+    },
+    {
+      "name": "Crowbar",
+      "antenna_upk": "antenna_crowbar_SF.upk",
+      "thumbnail_upk": "Antenna_Crowbar_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_crowbar",
+      "asset_path": "antenna_crowbar.antenna_crowbar"
+    },
+    {
+      "name": "Cuckoo Clock",
+      "antenna_upk": "antenna_Cuckoo_SF.upk",
+      "thumbnail_upk": "Antenna_Cuckoo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "2053",
+      "asset_package_name": "antenna_Cuckoo",
+      "asset_path": "antenna_Cuckoo.antenna_Cuckoo"
+    },
+    {
+      "name": "Cupcake",
+      "antenna_upk": "Antenna_Cupcake_SF.upk",
+      "thumbnail_upk": "Antenna_Cupcake_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "393",
+      "asset_package_name": "Antenna_Cupcake",
+      "asset_path": "Antenna_Cupcake.Antenna_Cupcake"
+    },
+    {
+      "name": "Cupcake Anniversary: Noire",
+      "antenna_upk": "antenna_cupcake_anni_SF.upk",
+      "thumbnail_upk": "Antenna_Cupcake_anni_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "9180",
+      "asset_package_name": "antenna_cupcake_anni",
+      "asset_path": "antenna_cupcake_anni.antenna_cupcake_anni"
+    },
+    {
+      "name": "Curling Broom",
+      "antenna_upk": "antenna_curlingbroom_SF.upk",
+      "thumbnail_upk": "Antenna_CurlingBroom_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9798",
+      "asset_package_name": "antenna_curlingbroom",
+      "asset_path": "antenna_curlingbroom.antenna_curlingbroom"
+    },
+    {
+      "name": "Cute Engine",
+      "antenna_upk": "antenna_turbine_SF.upk",
+      "thumbnail_upk": "Antenna_Turbine_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9645",
+      "asset_package_name": "antenna_turbine",
+      "asset_path": "antenna_turbine.antenna_turbine"
+    },
+    {
+      "name": "Dandelion Seed",
+      "antenna_upk": "Antenna_Dandelion_SF.upk",
+      "thumbnail_upk": "Antenna_Dandelion_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2726",
+      "asset_package_name": "Antenna_Dandelion",
+      "asset_path": "Antenna_Dandelion.Antenna_Dandelion"
+    },
+    {
+      "name": "Dave's Bread",
+      "antenna_upk": "Antenna_Bread_SF.upk",
+      "thumbnail_upk": "Antenna_Bread_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "391",
+      "asset_package_name": "Antenna_Bread",
+      "asset_path": "Antenna_Bread.Antenna_Bread"
+    },
+    {
+      "name": "deadmau5",
+      "antenna_upk": "Antenna_Mau5_SF.upk",
+      "thumbnail_upk": "Antenna_Mau5_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "781",
+      "asset_package_name": "Antenna_Mau5",
+      "asset_path": "Antenna_Mau5.Antenna_Mau5"
+    },
+    {
+      "name": "Deadrose",
+      "antenna_upk": "antenna_deadrose_SF.upk",
+      "thumbnail_upk": "antenna_DeadRose_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_deadrose",
+      "asset_path": "antenna_deadrose.antenna_deadrose"
+    },
+    {
+      "name": "DigiGlobe",
+      "antenna_upk": "antenna_digiglobe_SF.upk",
+      "thumbnail_upk": "Antenna_DigiGlobe_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "4832",
+      "asset_package_name": "antenna_digiglobe",
+      "asset_path": "antenna_digiglobe.antenna_digiglobe"
+    },
+    {
+      "name": "Dinosaurus",
+      "antenna_upk": "antenna_Dino_SF.upk",
+      "thumbnail_upk": "Antenna_Dino_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7594",
+      "asset_package_name": "antenna_Dino",
+      "asset_path": "antenna_Dino.antenna_Dino"
+    },
+    {
+      "name": "Disco Ball",
+      "antenna_upk": "Antenna_DiscoBall_SF.upk",
+      "thumbnail_upk": "Antenna_DiscoBall_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "800",
+      "asset_package_name": "Antenna_DiscoBall",
+      "asset_path": "Antenna_DiscoBall.Antenna_DiscoBall"
+    },
+    {
+      "name": "Disconnect",
+      "antenna_upk": "Antenna_Disconnected_SF.upk",
+      "thumbnail_upk": "Antenna_Disconnected_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "394",
+      "asset_package_name": "Antenna_Disconnected",
+      "asset_path": "Antenna_Disconnected.Antenna_Disconnected"
+    },
+    {
+      "name": "Div",
+      "antenna_upk": "Antenna_DIV_SF.upk",
+      "thumbnail_upk": "Antenna_DIV_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "918",
+      "asset_package_name": "Antenna_DIV",
+      "asset_path": "Antenna_DIV.Antenna_DIV"
+    },
+    {
+      "name": "Dollar Sign",
+      "antenna_upk": "Antenna_DollarSign_SF.upk",
+      "thumbnail_upk": "Antenna_DollarSign_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "3",
+      "asset_package_name": "Antenna_DollarSign",
+      "asset_path": "Antenna_DollarSign.Antenna_DollarSign"
+    },
+    {
+      "name": "Doughnut",
+      "antenna_upk": "Antenna_Donut_SF.upk",
+      "thumbnail_upk": "Antenna_Donut_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "395",
+      "asset_package_name": "Antenna_Donut",
+      "asset_path": "Antenna_Donut.Antenna_Donut"
+    },
+    {
+      "name": "Dragonfly",
+      "antenna_upk": "antenna_flydragon_SF.upk",
+      "thumbnail_upk": "Antenna_FlyDragon_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7497",
+      "asset_package_name": "antenna_flydragon",
+      "asset_path": "antenna_flydragon.antenna_flydragon"
+    },
+    {
+      "name": "Dreamcatcher",
+      "antenna_upk": "antenna_dreamcatcher_SF.upk",
+      "thumbnail_upk": "antenna_dreamcatcher_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "6234",
+      "asset_package_name": "antenna_dreamcatcher",
+      "asset_path": "antenna_dreamcatcher.antenna_dreamcatcher"
+    },
+    {
+      "name": "Dreidel",
+      "antenna_upk": "antenna_dreidel_wooden_SF.upk",
+      "thumbnail_upk": "Antenna_Dreidel_Wooden_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3600",
+      "asset_package_name": "antenna_dreidel_wooden",
+      "asset_path": "antenna_dreidel_wooden.antenna_dreidel_wooden"
+    },
+    {
+      "name": "Drone",
+      "antenna_upk": "antenna_drone_SF.upk",
+      "thumbnail_upk": "Antenna_Drone_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_drone",
+      "asset_path": "antenna_drone.antenna_drone"
+    },
+    {
+      "name": "Dying Light - Gas Tank",
+      "antenna_upk": "Antenna_DLZ_SF.upk",
+      "thumbnail_upk": "Antenna_DLZ_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "1351",
+      "asset_package_name": "Antenna_DLZ",
+      "asset_path": "Antenna_DLZ.Antenna_DLZ"
+    },
+    {
+      "name": "Easter Egg",
+      "antenna_upk": "antenna_easteregg_SF.upk",
+      "thumbnail_upk": "Antenna_EasterEgg_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "1676",
+      "asset_package_name": "antenna_easteregg",
+      "asset_path": "antenna_easteregg.antenna_easteregg"
+    },
+    {
+      "name": "Eggshellsior",
+      "antenna_upk": "antenna_eggmaker_SF.upk",
+      "thumbnail_upk": "Antenna_Eggmaker_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9472",
+      "asset_package_name": "antenna_eggmaker",
+      "asset_path": "antenna_eggmaker.antenna_eggmaker"
+    },
+    {
+      "name": "Electron I",
+      "antenna_upk": "antenna_orbit_tier1_SF.upk",
+      "thumbnail_upk": "Antenna_Orbit_Tier1_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3601",
+      "asset_package_name": "antenna_orbit_tier1",
+      "asset_path": "antenna_orbit_tier1.antenna_orbit_tier1"
+    },
+    {
+      "name": "Mage Glass I",
+      "antenna_upk": "antenna_energysphere_SF.upk",
+      "thumbnail_upk": "Antenna_EnergySphere_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3225",
+      "asset_package_name": "antenna_energysphere",
+      "asset_path": "antenna_energysphere.antenna_energysphere_tier1"
+    },
+    {
+      "name": "Mage Glass II",
+      "antenna_upk": "antenna_energysphere_SF.upk",
+      "thumbnail_upk": "Antenna_EnergySphere_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3226",
+      "asset_package_name": "antenna_energysphere",
+      "asset_path": "antenna_energysphere.antenna_energysphere_tier2"
+    },
+    {
+      "name": "Mage Glass III",
+      "antenna_upk": "antenna_energysphere_SF.upk",
+      "thumbnail_upk": "Antenna_EnergySphere_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3227",
+      "asset_package_name": "antenna_energysphere",
+      "asset_path": "antenna_energysphere.antenna_energysphere_Tier3"
+    },
+    {
+      "name": "Euro Truck Simulator Rig",
+      "antenna_upk": "Antenna_ETS2_SF.upk",
+      "thumbnail_upk": "Antenna_ETS2_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "813",
+      "asset_package_name": "Antenna_ETS2",
+      "asset_path": "Antenna_ETS2.Antenna_ETS2"
+    },
+    {
+      "name": "Eyeball",
+      "antenna_upk": "Antenna_Eyeball_SF.upk",
+      "thumbnail_upk": "Antenna_Eyeball_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "396",
+      "asset_package_name": "Antenna_Eyeball",
+      "asset_path": "Antenna_Eyeball.Antenna_Eyeball"
+    },
+    {
+      "name": "Fallout - Vault Boy",
+      "antenna_upk": "Antenna_Fallout_VaultBoy_SF.upk",
+      "thumbnail_upk": "Antenna_Fallout_VaultBoy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "673",
+      "asset_package_name": "Antenna_Fallout_VaultBoy",
+      "asset_path": "Antenna_Fallout_VaultBoy.Antenna_Fallout_VaultBoy"
+    },
+    {
+      "name": "Fancy Cane",
+      "antenna_upk": "antenna_cane_SF.upk",
+      "thumbnail_upk": "Antenna_Cane_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7620",
+      "asset_package_name": "antenna_cane",
+      "asset_path": "antenna_cane.antenna_cane"
+    },
+    {
+      "name": "Fancy Ferrule",
+      "antenna_upk": "antenna_tuxcane_SF.upk",
+      "thumbnail_upk": "antenna_Tuxcane_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "6020",
+      "asset_package_name": "antenna_tuxcane",
+      "asset_path": "antenna_tuxcane.antenna_tuxcane"
+    },
+    {
+      "name": "Fish Fly",
+      "antenna_upk": "antenna_fishfly_SF.upk",
+      "thumbnail_upk": "Antenna_FishFly_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4993",
+      "asset_package_name": "antenna_fishfly",
+      "asset_path": "antenna_fishfly.antenna_fishfly"
+    },
+    {
+      "name": "Fish Taco",
+      "antenna_upk": "antenna_fishtaco_SF.upk",
+      "thumbnail_upk": "antenna_fishtaco_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4933",
+      "asset_package_name": "antenna_fishtaco",
+      "asset_path": "antenna_fishtaco.antenna_fishtaco"
+    },
+    {
+      "name": "Fishing Rod",
+      "antenna_upk": "antenna_fishingrod_SF.upk",
+      "thumbnail_upk": "Antenna_FishingRod_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8895",
+      "asset_package_name": "antenna_fishingrod",
+      "asset_path": "antenna_fishingrod.antenna_fishingrod"
+    },
+    {
+      "name": "Flaming Fork",
+      "antenna_upk": "antenna_flamingdevilfork_SF.upk",
+      "thumbnail_upk": "antenna_flamingdevilfork_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "8773",
+      "asset_package_name": "antenna_flamingdevilfork",
+      "asset_path": "antenna_flamingdevilfork.antenna_flamingdevilfork"
+    },
+    {
+      "name": "Flipper",
+      "antenna_upk": "antenna_flipper_SF.upk",
+      "thumbnail_upk": "Antenna_Flipper_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9946",
+      "asset_package_name": "antenna_flipper",
+      "asset_path": "antenna_flipper.antenna_flipper"
+    },
+    {
+      "name": "Floppy",
+      "antenna_upk": "antenna_floppy_SF.upk",
+      "thumbnail_upk": "Antenna_Floppy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3910",
+      "asset_package_name": "antenna_floppy",
+      "asset_path": "antenna_floppy.antenna_floppy"
+    },
+    {
+      "name": "Floppy Disk",
+      "antenna_upk": "antenna_floppydisc_large_SF.upk",
+      "thumbnail_upk": "antenna_floppyDisc_Large_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3911",
+      "asset_package_name": "antenna_floppydisc_large",
+      "asset_path": "antenna_floppydisc_large.antenna_floppydisc_large"
+    },
+    {
+      "name": "Flower - Daisy",
+      "antenna_upk": "antenna_Flower_Daisy_SF.upk",
+      "thumbnail_upk": "Antenna_Flower_Daisy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "783",
+      "asset_package_name": "antenna_Flower_Daisy",
+      "asset_path": "antenna_Flower_Daisy.antenna_Flower_Daisy"
+    },
+    {
+      "name": "Flower - Orchid",
+      "antenna_upk": "antenna_Flower_Orchid_SF.upk",
+      "thumbnail_upk": "Antenna_Flower_Orchid_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "784",
+      "asset_package_name": "antenna_Flower_Orchid",
+      "asset_path": "antenna_Flower_Orchid.antenna_Flower_Orchid"
+    },
+    {
+      "name": "Flower - Rose",
+      "antenna_upk": "Antenna_Flower_Rose_SF.upk",
+      "thumbnail_upk": "Antenna_Flower_Rose_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "785",
+      "asset_package_name": "Antenna_Flower_Rose",
+      "asset_path": "Antenna_Flower_Rose.Antenna_Flower_Rose"
+    },
+    {
+      "name": "Flower - Sunflower",
+      "antenna_upk": "Antenna_Flower_Sunflower_SF.upk",
+      "thumbnail_upk": "Antenna_Flower_Sunflower_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "786",
+      "asset_package_name": "Antenna_Flower_Sunflower",
+      "asset_path": "Antenna_Flower_Sunflower.Antenna_Flower_Sunflower"
+    },
+    {
+      "name": "Flower - Tulip",
+      "antenna_upk": "antenna_Flower_Tulip_SF.upk",
+      "thumbnail_upk": "Antenna_Flower_Tulip_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "787",
+      "asset_package_name": "antenna_Flower_Tulip",
+      "asset_path": "antenna_Flower_Tulip.antenna_Flower_Tulip"
+    },
+    {
+      "name": "Fly Pig",
+      "antenna_upk": "antenna_flyingpig_SF.upk",
+      "thumbnail_upk": "Antenna_FlyingPig_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7881",
+      "asset_package_name": "antenna_flyingpig",
+      "asset_path": "antenna_flyingpig.antenna_flyingpig"
+    },
+    {
+      "name": "Foam Finger",
+      "antenna_upk": "Antenna_FoamFinger_SF.upk",
+      "thumbnail_upk": "Antenna_FoamFinger_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "398",
+      "asset_package_name": "Antenna_FoamFinger",
+      "asset_path": "Antenna_FoamFinger.Antenna_FoamFinger"
+    },
+    {
+      "name": "Fortune Fan",
+      "antenna_upk": "antenna_cnnyf_SF.upk",
+      "thumbnail_upk": "antenna_cnnyf_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3639",
+      "asset_package_name": "antenna_cnnyf",
+      "asset_path": "antenna_cnnyf.antenna_cnnyf"
+    },
+    {
+      "name": "Fuzzy Brute",
+      "antenna_upk": "Antenna_FurballFrakenstein_SF.upk",
+      "thumbnail_upk": "Antenna_FurballFrakenstein_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "593",
+      "asset_package_name": "Antenna_FurballFrakenstein",
+      "asset_path": "Antenna_FurballFrakenstein.Antenna_FurballFrakenstein"
+    },
+    {
+      "name": "Fuzzy Skull",
+      "antenna_upk": "antenna_furballskull_SF.upk",
+      "thumbnail_upk": "Antenna_FurballSkull_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "1507",
+      "asset_package_name": "antenna_furballskull",
+      "asset_path": "antenna_furballskull.antenna_furballskull"
+    },
+    {
+      "name": "Fuzzy Vamp",
+      "antenna_upk": "Antenna_FurballVampire_SF.upk",
+      "thumbnail_upk": "Antenna_FurballVampire_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "595",
+      "asset_package_name": "Antenna_FurballVampire",
+      "asset_path": "Antenna_FurballVampire.Antenna_FurballVampire"
+    },
+    {
+      "name": "Fuzzyearsmuffs",
+      "antenna_upk": "antenna_fuzzyearsmuffs_SF.upk",
+      "thumbnail_upk": "Antenna_FuzzyEarsMuffs_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_fuzzyearsmuffs",
+      "asset_path": "antenna_fuzzyearsmuffs.antenna_fuzzyearsmuffs"
+    },
+    {
+      "name": "Fútbol",
+      "antenna_upk": "antenna_soccerball_pulse_SF.upk",
+      "thumbnail_upk": "Antenna_SoccerBall_Pulse_T_SF.upk",
+      "swap_compat": null,
+      "quality": "VeryRare",
+      "id": "7377",
+      "asset_package_name": "antenna_soccerball_pulse",
+      "asset_path": "antenna_soccerball_pulse.antenna_soccerball_pulse"
+    },
+    {
+      "name": "Genie Lamp",
+      "antenna_upk": "Antenna_GenieLamp_SF.upk",
+      "thumbnail_upk": "Antenna_GenieLamp_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "798",
+      "asset_package_name": "Antenna_GenieLamp",
+      "asset_path": "Antenna_GenieLamp.Antenna_GenieLamp"
+    },
+    {
+      "name": "Ghoulpost",
+      "antenna_upk": "antenna_guidingman_SF.upk",
+      "thumbnail_upk": "antenna_guidingman_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10780",
+      "asset_package_name": "antenna_guidingman",
+      "asset_path": "antenna_guidingman.antenna_guidingman"
+    },
+    {
+      "name": "Giant Panda",
+      "antenna_upk": "antenna_Panda_SF.upk",
+      "thumbnail_upk": "Antenna_Panda_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "399",
+      "asset_package_name": "antenna_Panda",
+      "asset_path": "antenna_Panda.antenna_Panda"
+    },
+    {
+      "name": "Gingerbread Man",
+      "antenna_upk": "Antenna_Gingerbread_Man_SF.upk",
+      "thumbnail_upk": "Antenna_Gingerbread_Man_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "5",
+      "asset_package_name": "Antenna_Gingerbread_Man",
+      "asset_path": "Antenna_Gingerbread_Man.Antenna_Gingerbread_Man"
+    },
+    {
+      "name": "Goat Simulator - G2",
+      "antenna_upk": "Antenna_GoatSimulator_G2Robot_SF.upk",
+      "thumbnail_upk": "Antenna_GoatSimulator_G2Robot_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "927",
+      "asset_package_name": "Antenna_GoatSimulator_G2Robot",
+      "asset_path": "Antenna_GoatSimulator_G2Robot.Antenna_GoatSimulator_G2Robot"
+    },
+    {
+      "name": "Goat Simulator - Goatenna",
+      "antenna_upk": "Antenna_GoatSimulator_Goat_SF.upk",
+      "thumbnail_upk": "Antenna_GoatSimulator_Goat_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "867",
+      "asset_package_name": "Antenna_GoatSimulator_Goat",
+      "asset_path": "Antenna_GoatSimulator_Goat.Antenna_GoatSimulator_Goat"
+    },
+    {
+      "name": "Goldenlycheelte",
+      "antenna_upk": "antenna_goldenlycheelte_SF.upk",
+      "thumbnail_upk": "Antenna_GoldenLycheeLTE_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_goldenlycheelte",
+      "asset_path": "antenna_goldenlycheelte.antenna_goldenlycheelte"
+    },
+    {
+      "name": "Goldenskull",
+      "antenna_upk": "antenna_goldenskull_SF.upk",
+      "thumbnail_upk": "Antenna_GoldenSkull_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_goldenskull",
+      "asset_path": "antenna_goldenskull.antenna_goldenskull"
+    },
+    {
+      "name": "Golfdriver",
+      "antenna_upk": "antenna_golfdriver_SF.upk",
+      "thumbnail_upk": "antenna_GolfDriver_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_golfdriver",
+      "asset_path": "antenna_golfdriver.antenna_golfdriver"
+    },
+    {
+      "name": "Green Leaf",
+      "antenna_upk": "antenna_palmleaf_SF.upk",
+      "thumbnail_upk": "antenna_palmleaf_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8808",
+      "asset_package_name": "antenna_palmleaf",
+      "asset_path": "antenna_palmleaf.antenna_palmleaf"
+    },
+    {
+      "name": "Happy Hummingbird",
+      "antenna_upk": "Antenna_FlowerHummingbird_SF.upk",
+      "thumbnail_upk": "Antenna_FlowerHummingbird_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8823",
+      "asset_package_name": "Antenna_FlowerHummingbird",
+      "asset_path": "Antenna_FlowerHummingbird.Antenna_FlowerHummingbird"
+    },
+    {
+      "name": "Harpoon",
+      "antenna_upk": "Antenna_Spearfish_SF.upk",
+      "thumbnail_upk": "Antenna_Spearfish_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "1528",
+      "asset_package_name": "Antenna_Spearfish",
+      "asset_path": "Antenna_Spearfish.Antenna_Spearfish"
+    },
+    {
+      "name": "Headlander - Starcophagus",
+      "antenna_upk": "Antenna_WakeupShip_SF.upk",
+      "thumbnail_upk": "Antenna_WakeupShip_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "1347",
+      "asset_package_name": "Antenna_WakeupShip",
+      "asset_path": "Antenna_WakeupShip.Antenna_WakeupShip"
+    },
+    {
+      "name": "Heart",
+      "antenna_upk": "Antenna_Heart_SF.upk",
+      "thumbnail_upk": "Antenna_Heart_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7",
+      "asset_package_name": "Antenna_Heart",
+      "asset_path": "Antenna_Heart.Antenna_Heart"
+    },
+    {
+      "name": "Hhbanjolte01",
+      "antenna_upk": "antenna_hhbanjolte01_SF.upk",
+      "thumbnail_upk": "Antenna_HHBanjoLTE01_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_hhbanjolte01",
+      "asset_path": "antenna_hhbanjolte01.antenna_hhbanjolte01"
+    },
+    {
+      "name": "Hockey Stick",
+      "antenna_upk": "antenna_hockeystick_SF.upk",
+      "thumbnail_upk": "Antenna_HockeyStick_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9802",
+      "asset_package_name": "antenna_hockeystick",
+      "asset_path": "antenna_hockeystick.antenna_hockeystick"
+    },
+    {
+      "name": "Holiday Gift",
+      "antenna_upk": "Antenna_ChristmasGift_SF.upk",
+      "thumbnail_upk": "Antenna_ChristmasGift_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "650",
+      "asset_package_name": "Antenna_ChristmasGift",
+      "asset_path": "Antenna_ChristmasGift.Antenna_ChristmasGift"
+    },
+    {
+      "name": "Holiday Stocking",
+      "antenna_upk": "antenna_stocking_SF.upk",
+      "thumbnail_upk": "Antenna_Stocking_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2356",
+      "asset_package_name": "antenna_stocking",
+      "asset_path": "antenna_stocking.antenna_stocking"
+    },
+    {
+      "name": "Horseshoe",
+      "antenna_upk": "Antenna_Horseshoe_SF.upk",
+      "thumbnail_upk": "Antenna_Horseshoe_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "8",
+      "asset_package_name": "Antenna_Horseshoe",
+      "asset_path": "Antenna_Horseshoe.Antenna_Horseshoe"
+    },
+    {
+      "name": "Hot Dog",
+      "antenna_upk": "antenna_hotdog_SF.upk",
+      "thumbnail_upk": "Antenna_HotDog_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "1329",
+      "asset_package_name": "antenna_hotdog",
+      "asset_path": "antenna_hotdog.antenna_hotdog"
+    },
+    {
+      "name": "Hotcocoa",
+      "antenna_upk": "antenna_hotcocoa_SF.upk",
+      "thumbnail_upk": "Antenna_HotCocoa_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_hotcocoa",
+      "asset_path": "antenna_hotcocoa.antenna_hotcocoa"
+    },
+    {
+      "name": "Hula Girl",
+      "antenna_upk": "Antenna_HulaGirl_SF.upk",
+      "thumbnail_upk": "Antenna_HulaGirl_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "762",
+      "asset_package_name": "Antenna_HulaGirl",
+      "asset_path": "Antenna_HulaGirl.Antenna_HulaGirl"
+    },
+    {
+      "name": "Ice Pop",
+      "antenna_upk": "antenna_displeased_pop_SF.upk",
+      "thumbnail_upk": "antenna_Displeased_Pop_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7825",
+      "asset_package_name": "antenna_displeased_pop",
+      "asset_path": "antenna_displeased_pop.antenna_displeased_pop"
+    },
+    {
+      "name": "Icy Axe",
+      "antenna_upk": "antenna_iceaxe_SF.upk",
+      "thumbnail_upk": "Antenna_IceAxe_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8401",
+      "asset_package_name": "antenna_iceaxe",
+      "asset_path": "antenna_iceaxe.antenna_iceaxe"
+    },
+    {
+      "name": "J!NX",
+      "antenna_upk": "Antenna_jinx_SF.upk",
+      "thumbnail_upk": "Antenna_Jinx_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "1846",
+      "asset_package_name": "Antenna_jinx",
+      "asset_path": "Antenna_jinx.Antenna_jinx"
+    },
+    {
+      "name": "Jitb",
+      "antenna_upk": "antenna_jitb_SF.upk",
+      "thumbnail_upk": "Antenna_JitB_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_jitb",
+      "asset_path": "antenna_jitb.antenna_jitb"
+    },
+    {
+      "name": "Kelp",
+      "antenna_upk": "antenna_kelp_SF.upk",
+      "thumbnail_upk": "Antenna_Kelp_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9996",
+      "asset_package_name": "antenna_kelp",
+      "asset_path": "antenna_kelp.antenna_kelp"
+    },
+    {
+      "name": "Kettle Bell",
+      "antenna_upk": "antenna_kettlebell_SF.upk",
+      "thumbnail_upk": "Antenna_Kettlebell_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7351",
+      "asset_package_name": "antenna_kettlebell",
+      "asset_path": "antenna_kettlebell.antenna_kettlebell"
+    },
+    {
+      "name": "Koinobori",
+      "antenna_upk": "Antenna_Windsock_SF.upk",
+      "thumbnail_upk": "Antenna_WindSock_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2049",
+      "asset_package_name": "Antenna_Windsock",
+      "asset_path": "Antenna_Windsock.Antenna_Windsock"
+    },
+    {
+      "name": "Labrys",
+      "antenna_upk": "Antenna_axe_tre_SF.upk",
+      "thumbnail_upk": "Antenna_Axe_Tre_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "6227",
+      "asset_package_name": "Antenna_axe_tre",
+      "asset_path": "Antenna_axe_tre.Antenna_axe_tre"
+    },
+    {
+      "name": "Lantern",
+      "antenna_upk": "antenna_lantern_SF.upk",
+      "thumbnail_upk": "Antenna_Lantern_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_lantern",
+      "asset_path": "antenna_lantern.antenna_lantern"
+    },
+    {
+      "name": "Lightning Bolt",
+      "antenna_upk": "Antenna_LightningBolt_SF.upk",
+      "thumbnail_upk": "Antenna_LightningBolt_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "9",
+      "asset_package_name": "Antenna_LightningBolt",
+      "asset_path": "Antenna_LightningBolt.Antenna_LightningBolt"
+    },
+    {
+      "name": "Lit Match",
+      "antenna_upk": "antenna_match_SF.upk",
+      "thumbnail_upk": "Antenna_Match_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8382",
+      "asset_package_name": "antenna_match",
+      "asset_path": "antenna_match.antenna_match"
+    },
+    {
+      "name": "Lollipop",
+      "antenna_upk": "antenna_Lollipop_SF.upk",
+      "thumbnail_upk": "Antenna_Lollipop_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "2039",
+      "asset_package_name": "antenna_Lollipop",
+      "asset_path": "antenna_Lollipop.antenna_Lollipop"
+    },
+    {
+      "name": "Lucky Ladybug",
+      "antenna_upk": "antenna_ladybug_SF.upk",
+      "thumbnail_upk": "Antenna_LadyBug_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7805",
+      "asset_package_name": "antenna_ladybug",
+      "asset_path": "antenna_ladybug.antenna_ladybug"
+    },
+    {
+      "name": "Macaron",
+      "antenna_upk": "antenna_macaron_SF.upk",
+      "thumbnail_upk": "Antenna_macaron_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "2075",
+      "asset_package_name": "antenna_macaron",
+      "asset_path": "antenna_macaron.antenna_macaron"
+    },
+    {
+      "name": "Milkshake",
+      "antenna_upk": "antenna_milkshake_SF.upk",
+      "thumbnail_upk": "antenna_milkshake_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8792",
+      "asset_package_name": "antenna_milkshake",
+      "asset_path": "antenna_milkshake.antenna_milkshake"
+    },
+    {
+      "name": "Moai",
+      "antenna_upk": "Antenna_Moai_SF.upk",
+      "thumbnail_upk": "Antenna_Moai_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "522",
+      "asset_package_name": "Antenna_Moai",
+      "asset_path": "Antenna_Moai.Antenna_Moai"
+    },
+    {
+      "name": "Moon",
+      "antenna_upk": "antenna_moonfull_SF.upk",
+      "thumbnail_upk": "Antenna_MoonFull_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "5729",
+      "asset_package_name": "antenna_moonfull",
+      "asset_path": "antenna_moonfull.antenna_moonfull"
+    },
+    {
+      "name": "Morty",
+      "antenna_upk": "antenna_rams_jb_SF.upk",
+      "thumbnail_upk": "Antenna_Rams_JB_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "1982",
+      "asset_package_name": "antenna_rams_jb",
+      "asset_path": "antenna_rams_jb.antenna_rams_jb"
+    },
+    {
+      "name": "Mothman",
+      "antenna_upk": "antenna_mothman_SF.upk",
+      "thumbnail_upk": "Antenna_Mothman_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10401",
+      "asset_package_name": "antenna_mothman",
+      "asset_path": "antenna_mothman.antenna_mothman"
+    },
+    {
+      "name": "Mr. Carrot",
+      "antenna_upk": "antenna_carrot_SF.upk",
+      "thumbnail_upk": "Antenna_Carrot_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5035",
+      "asset_package_name": "antenna_carrot",
+      "asset_path": "antenna_carrot.antenna_carrot"
+    },
+    {
+      "name": "Mr. Floeberg",
+      "antenna_upk": "antenna_snobro_SF.upk",
+      "thumbnail_upk": "Antenna_SnoBro_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "4961",
+      "asset_package_name": "antenna_snobro",
+      "asset_path": "antenna_snobro.antenna_snobro"
+    },
+    {
+      "name": "Mr. Toasty",
+      "antenna_upk": "antenna_marshmallow_SF.upk",
+      "thumbnail_upk": "Antenna_Marshmallow_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2828",
+      "asset_package_name": "antenna_marshmallow",
+      "asset_path": "antenna_marshmallow.antenna_marshmallow"
+    },
+    {
+      "name": "Mr. Tubeman",
+      "antenna_upk": "antenna_tubeman_SF.upk",
+      "thumbnail_upk": "Antenna_Tubeman_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4467",
+      "asset_package_name": "antenna_tubeman",
+      "asset_path": "antenna_tubeman.antenna_tubeman"
+    },
+    {
+      "name": "N-vader",
+      "antenna_upk": "antenna_nvader_SF.upk",
+      "thumbnail_upk": "Antenna_Nvader_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "6218",
+      "asset_package_name": "antenna_nvader",
+      "asset_path": "antenna_nvader.antenna_nvader"
+    },
+    {
+      "name": "Naginata",
+      "antenna_upk": "antenna_polearm_SF.upk",
+      "thumbnail_upk": "Antenna_Polearm_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4435",
+      "asset_package_name": "antenna_polearm",
+      "asset_path": "antenna_polearm.antenna_polearm"
+    },
+    {
+      "name": "Neonlight",
+      "antenna_upk": "antenna_neonlight_SF.upk",
+      "thumbnail_upk": "Antenna_NeonLight_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_neonlight",
+      "asset_path": "antenna_neonlight.antenna_neonlight"
+    },
+    {
+      "name": "Nomster",
+      "antenna_upk": "antenna_mauifluffyface_SF.upk",
+      "thumbnail_upk": "Antenna_MauiFluffyFace_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7399",
+      "asset_package_name": "antenna_mauifluffyface",
+      "asset_path": "antenna_mauifluffyface.antenna_mauifluffyface"
+    },
+    {
+      "name": "Nutcracker",
+      "antenna_upk": "antenna_nutcracker_SF.upk",
+      "thumbnail_upk": "Antenna_Nutcracker_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "1566",
+      "asset_package_name": "antenna_nutcracker",
+      "asset_path": "antenna_nutcracker.antenna_nutcracker"
+    },
+    {
+      "name": "Oil Can",
+      "antenna_upk": "antenna_Oilcan_SF.upk",
+      "thumbnail_upk": "antenna_OilCan_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7184",
+      "asset_package_name": "antenna_Oilcan",
+      "asset_path": "antenna_Oilcan.antenna_Oilcan"
+    },
+    {
+      "name": "Old School",
+      "antenna_upk": "antenna_classic_SF.upk",
+      "thumbnail_upk": "Antenna_Classic_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2280",
+      "asset_package_name": "antenna_classic",
+      "asset_path": "antenna_classic.antenna_classic"
+    },
+    {
+      "name": "Out To Dry",
+      "antenna_upk": "antenna_socks_SF.upk",
+      "thumbnail_upk": "antenna_Socks_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5054",
+      "asset_package_name": "antenna_socks",
+      "asset_path": "antenna_socks.antenna_socks"
+    },
+    {
+      "name": "Paint Brush",
+      "antenna_upk": "antenna_paintbrush_SF.upk",
+      "thumbnail_upk": "Antenna_Paintbrush_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "4496",
+      "asset_package_name": "antenna_paintbrush",
+      "asset_path": "antenna_paintbrush.antenna_paintbrush"
+    },
+    {
+      "name": "Painted Piñata",
+      "antenna_upk": "antenna_pinata_canvas_SF.upk",
+      "thumbnail_upk": "Antenna_Pinata_Canvas_T_SF.upk",
+      "swap_compat": null,
+      "quality": "VeryRare",
+      "id": "7376",
+      "asset_package_name": "antenna_pinata_canvas",
+      "asset_path": "antenna_pinata_canvas.antenna_pinata_canvas"
+    },
+    {
+      "name": "Paper Dragon",
+      "antenna_upk": "antenna_paperdragon_SF.upk",
+      "thumbnail_upk": "Antenna_PaperDragon_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3604",
+      "asset_package_name": "antenna_paperdragon",
+      "asset_path": "antenna_paperdragon.antenna_paperdragon"
+    },
+    {
+      "name": "Parasol",
+      "antenna_upk": "antenna_parasol_SF.upk",
+      "thumbnail_upk": "antenna_parasol_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "10384",
+      "asset_package_name": "antenna_parasol",
+      "asset_path": "antenna_parasol.antenna_parasol"
+    },
+    {
+      "name": "Parrot",
+      "antenna_upk": "Antenna_Parrot_SF.upk",
+      "thumbnail_upk": "Antenna_Parrot_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "750",
+      "asset_package_name": "Antenna_Parrot",
+      "asset_path": "Antenna_Parrot.Antenna_Parrot"
+    },
+    {
+      "name": "Peace",
+      "antenna_upk": "Antenna_PeaceSign_SF.upk",
+      "thumbnail_upk": "Antenna_PeaceSign_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "11",
+      "asset_package_name": "Antenna_PeaceSign",
+      "asset_path": "Antenna_PeaceSign.Antenna_PeaceSign"
+    },
+    {
+      "name": "Peggy Panda",
+      "antenna_upk": "antenna_pandaonbamboo_SF.upk",
+      "thumbnail_upk": "Antenna_PandaOnBamboo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2901",
+      "asset_package_name": "antenna_pandaonbamboo",
+      "asset_path": "antenna_pandaonbamboo.antenna_pandaonbamboo"
+    },
+    {
+      "name": "Pencil",
+      "antenna_upk": "antenna_pencil_SF.upk",
+      "thumbnail_upk": "Antenna_Pencil_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7769",
+      "asset_package_name": "antenna_pencil",
+      "asset_path": "antenna_pencil.antenna_pencil"
+    },
+    {
+      "name": "Peppermint",
+      "antenna_upk": "antenna_mint_SF.upk",
+      "thumbnail_upk": "Antenna_Mint_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2279",
+      "asset_package_name": "antenna_mint",
+      "asset_path": "antenna_mint.antenna_mint"
+    },
+    {
+      "name": "Pinch Hitter",
+      "antenna_upk": "antenna_BaseballBat_SF.upk",
+      "thumbnail_upk": "antenna_BaseballBat_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4763",
+      "asset_package_name": "antenna_BaseballBat",
+      "asset_path": "antenna_BaseballBat.antenna_BaseballBat"
+    },
+    {
+      "name": "Pink Flamingo",
+      "antenna_upk": "antenna_flamingo_SF.upk",
+      "thumbnail_upk": "Antenna_Flamingo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7930",
+      "asset_package_name": "antenna_flamingo",
+      "asset_path": "antenna_flamingo.antenna_flamingo"
+    },
+    {
+      "name": "Pinwheel",
+      "antenna_upk": "antenna_Pinwheel_SF.upk",
+      "thumbnail_upk": "Antenna_Pinwheel_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "2048",
+      "asset_package_name": "antenna_Pinwheel",
+      "asset_path": "antenna_Pinwheel.antenna_Pinwheel"
+    },
+    {
+      "name": "Pixelpizza",
+      "antenna_upk": "antenna_pixelpizza_SF.upk",
+      "thumbnail_upk": "Antenna_PixelPizza_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_pixelpizza",
+      "asset_path": "antenna_pixelpizza.antenna_pixelpizza"
+    },
+    {
+      "name": "Piñata",
+      "antenna_upk": "Antenna_Pinata_SF.upk",
+      "thumbnail_upk": "Antenna_Pinata_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "400",
+      "asset_package_name": "Antenna_Pinata",
+      "asset_path": "Antenna_Pinata.Antenna_Pinata"
+    },
+    {
+      "name": "Planetoid",
+      "antenna_upk": "Antenna_Saturn_SF.upk",
+      "thumbnail_upk": "Antenna_Saturn_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "12",
+      "asset_package_name": "Antenna_Saturn",
+      "asset_path": "Antenna_Saturn.Antenna_Saturn"
+    },
+    {
+      "name": "Poppet",
+      "antenna_upk": "antenna_voodoovoo_SF.upk",
+      "thumbnail_upk": "Antenna_Voodoovoo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "5430",
+      "asset_package_name": "antenna_voodoovoo",
+      "asset_path": "antenna_voodoovoo.antenna_voodoovoo"
+    },
+    {
+      "name": "Prize Ribbon",
+      "antenna_upk": "antenna_ribbon_SF.upk",
+      "thumbnail_upk": "antenna_ribbon_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "9922",
+      "asset_package_name": "antenna_ribbon",
+      "asset_path": "antenna_ribbon.antenna_ribbon"
+    },
+    {
+      "name": "PunkMetal",
+      "antenna_upk": "antenna_skullpunk_SF.upk",
+      "thumbnail_upk": "Antenna_Skullpunk_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9473",
+      "asset_package_name": "antenna_skullpunk",
+      "asset_path": "antenna_skullpunk.antenna_skullpunk"
+    },
+    {
+      "name": "Quick Jump",
+      "antenna_upk": "antenna_plier_SF.upk",
+      "thumbnail_upk": "Antenna_Plier_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8794",
+      "asset_package_name": "antenna_plier",
+      "asset_path": "antenna_plier.antenna_plier"
+    },
+    {
+      "name": "Radioactive",
+      "antenna_upk": "Antenna_RadiationSymbol_SF.upk",
+      "thumbnail_upk": "Antenna_RadiationSymbol_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "615",
+      "asset_package_name": "Antenna_RadiationSymbol",
+      "asset_path": "Antenna_RadiationSymbol.Antenna_RadiationSymbol"
+    },
+    {
+      "name": "Rattler",
+      "antenna_upk": "antenna_rattly_SF.upk",
+      "thumbnail_upk": "Antenna_rattly_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7348",
+      "asset_package_name": "antenna_rattly",
+      "asset_path": "antenna_rattly.antenna_rattly"
+    },
+    {
+      "name": "RC",
+      "antenna_upk": "antenna_rc_SF.upk",
+      "thumbnail_upk": "Antenna_RC_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8571",
+      "asset_package_name": "antenna_rc",
+      "asset_path": "antenna_rc.antenna_rc"
+    },
+    {
+      "name": "Red Card",
+      "antenna_upk": "antenna_redcard_SF.upk",
+      "thumbnail_upk": "antenna_Redcard_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "4845",
+      "asset_package_name": "antenna_redcard",
+      "asset_path": "antenna_redcard.antenna_redcard"
+    },
+    {
+      "name": "Reddit Snoo",
+      "antenna_upk": "Antenna_RedditSnoo_SF.upk",
+      "thumbnail_upk": "Antenna_RedditSnoo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "629",
+      "asset_package_name": "Antenna_RedditSnoo",
+      "asset_path": "Antenna_RedditSnoo.Antenna_RedditSnoo"
+    },
+    {
+      "name": "Retro Ball - Urban",
+      "antenna_upk": "Antenna_UrbanBall_SF.upk",
+      "thumbnail_upk": "Antenna_UrbanBall_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "575",
+      "asset_package_name": "Antenna_UrbanBall",
+      "asset_path": "Antenna_UrbanBall.Antenna_UrbanBall"
+    },
+    {
+      "name": "Retro Ball - Utopia",
+      "antenna_upk": "Antenna_UtopiaBall_SF.upk",
+      "thumbnail_upk": "Antenna_UtopiaBall_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "576",
+      "asset_package_name": "Antenna_UtopiaBall",
+      "asset_path": "Antenna_UtopiaBall.Antenna_UtopiaBall"
+    },
+    {
+      "name": "Retro Ball - Wasteland",
+      "antenna_upk": "Antenna_WastelandBall_SF.upk",
+      "thumbnail_upk": "Antenna_WastelandBall_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "577",
+      "asset_package_name": "Antenna_WastelandBall",
+      "asset_path": "Antenna_WastelandBall.Antenna_WastelandBall"
+    },
+    {
+      "name": "Retro Pad",
+      "antenna_upk": "antenna_stickycontroller_SF.upk",
+      "thumbnail_upk": "antenna_StickyController_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "5545",
+      "asset_package_name": "antenna_stickycontroller",
+      "asset_path": "antenna_stickycontroller.antenna_stickycontroller"
+    },
+    {
+      "name": "Retrophone",
+      "antenna_upk": "antenna_retrophone_SF.upk",
+      "thumbnail_upk": "Antenna_RetroPhone_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_retrophone",
+      "asset_path": "antenna_retrophone.antenna_retrophone"
+    },
+    {
+      "name": "Rick",
+      "antenna_upk": "antenna_rsic_SF.upk",
+      "thumbnail_upk": "Antenna_RSIC_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "1983",
+      "asset_package_name": "antenna_rsic",
+      "asset_path": "antenna_rsic.antenna_rsic"
+    },
+    {
+      "name": "RL Streamer",
+      "antenna_upk": "antenna_streamer_SF.upk",
+      "thumbnail_upk": "antenna_streamer_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "5109",
+      "asset_package_name": "antenna_streamer",
+      "asset_path": "antenna_streamer.antenna_streamer"
+    },
+    {
+      "name": "Rock Candy",
+      "antenna_upk": "antenna_rockyc_SF.upk",
+      "thumbnail_upk": "antenna_rockyc_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8672",
+      "asset_package_name": "antenna_rockyc",
+      "asset_path": "antenna_rockyc.antenna_rockyc"
+    },
+    {
+      "name": "Rock On",
+      "antenna_upk": "antenna_devilhornshand_SF.upk",
+      "thumbnail_upk": "antenna_devilhornshand_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10332",
+      "asset_package_name": "antenna_devilhornshand",
+      "asset_path": "antenna_devilhornshand.antenna_devilhornshand"
+    },
+    {
+      "name": "Rocket",
+      "antenna_upk": "Antenna_Rocket_SF.upk",
+      "thumbnail_upk": "Antenna_Rocket_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "755",
+      "asset_package_name": "Antenna_Rocket",
+      "asset_path": "Antenna_Rocket.Antenna_Rocket"
+    },
+    {
+      "name": "Rubber Duckie",
+      "antenna_upk": "Antenna_RubberDuckie_SF.upk",
+      "thumbnail_upk": "Antenna_RubberDuckie_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "779",
+      "asset_package_name": "Antenna_RubberDuckie",
+      "asset_path": "Antenna_RubberDuckie.Antenna_RubberDuckie"
+    },
+    {
+      "name": "S'mores",
+      "antenna_upk": "antenna_smores_SF.upk",
+      "thumbnail_upk": "Antenna_Smores_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10776",
+      "asset_package_name": "antenna_smores",
+      "asset_path": "antenna_smores.antenna_smores"
+    },
+    {
+      "name": "Sapling",
+      "antenna_upk": "antenna_springy_SF.upk",
+      "thumbnail_upk": "antenna_springy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "7580",
+      "asset_package_name": "antenna_springy",
+      "asset_path": "antenna_springy.antenna_springy"
+    },
+    {
+      "name": "Satellite",
+      "antenna_upk": "antenna_satellite_SF.upk",
+      "thumbnail_upk": "Antenna_Satellite_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "1554",
+      "asset_package_name": "antenna_satellite",
+      "asset_path": "antenna_satellite.antenna_satellite"
+    },
+    {
+      "name": "Scorched Scimitar",
+      "antenna_upk": "antenna_cutfire_SF.upk",
+      "thumbnail_upk": "antenna_cutfire_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8437",
+      "asset_package_name": "antenna_cutfire",
+      "asset_path": "antenna_cutfire.antenna_cutfire"
+    },
+    {
+      "name": "Scorpion",
+      "antenna_upk": "antenna_scorpion_SF.upk",
+      "thumbnail_upk": "antenna_scorpion_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_scorpion",
+      "asset_path": "antenna_scorpion.antenna_scorpion"
+    },
+    {
+      "name": "Seagull",
+      "antenna_upk": "antenna_seagull_SF.upk",
+      "thumbnail_upk": "antenna_Seagull_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_seagull",
+      "asset_path": "antenna_seagull.antenna_seagull"
+    },
+    {
+      "name": "Seastar",
+      "antenna_upk": "antenna_seastar_SF.upk",
+      "thumbnail_upk": "Antenna_SeaStar_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "1516",
+      "asset_package_name": "antenna_seastar",
+      "asset_path": "antenna_seastar.antenna_seastar"
+    },
+    {
+      "name": "Securitycamera",
+      "antenna_upk": "antenna_securitycamera_SF.upk",
+      "thumbnail_upk": "antenna_securitycamera_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_securitycamera",
+      "asset_path": "antenna_securitycamera.antenna_securitycamera"
+    },
+    {
+      "name": "Shadow Witch",
+      "antenna_upk": "antenna_Witch_SF.upk",
+      "thumbnail_upk": "Antenna_Witch_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2353",
+      "asset_package_name": "antenna_Witch",
+      "asset_path": "antenna_Witch.antenna_Witch"
+    },
+    {
+      "name": "SharpTongue",
+      "antenna_upk": "antenna_spikedtongue_SF.upk",
+      "thumbnail_upk": "Antenna_SpikedTongue_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10333",
+      "asset_package_name": "antenna_spikedtongue",
+      "asset_path": "antenna_spikedtongue.antenna_spikedtongue"
+    },
+    {
+      "name": "Shrub Hub",
+      "antenna_upk": "antenna_casa_SF.upk",
+      "thumbnail_upk": "Antenna_Casa_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7082",
+      "asset_package_name": "antenna_casa",
+      "asset_path": "antenna_casa.antenna_casa"
+    },
+    {
+      "name": "Siiick Reads",
+      "antenna_upk": "antenna_sickreads_SF.upk",
+      "thumbnail_upk": "Antenna_SickReads_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2806",
+      "asset_package_name": "antenna_sickreads",
+      "asset_path": "antenna_sickreads.antenna_sickreads"
+    },
+    {
+      "name": "Skull",
+      "antenna_upk": "Antenna_Skull_SF.upk",
+      "thumbnail_upk": "Antenna_Skull_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "13",
+      "asset_package_name": "Antenna_Skull",
+      "asset_path": "Antenna_Skull.Antenna_Skull"
+    },
+    {
+      "name": "Skullpunk",
+      "antenna_upk": "antenna_spikedskull_SF.upk",
+      "thumbnail_upk": "antenna_spikedskull_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10325",
+      "asset_package_name": "antenna_spikedskull",
+      "asset_path": "antenna_spikedskull.antenna_spikedskull"
+    },
+    {
+      "name": "Skyrocket",
+      "antenna_upk": "antenna_firecrackerrocket_SF.upk",
+      "thumbnail_upk": "Antenna_FirecrackerRocket_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8892",
+      "asset_package_name": "antenna_firecrackerrocket",
+      "asset_path": "antenna_firecrackerrocket.antenna_firecrackerrocket"
+    },
+    {
+      "name": "Smiley",
+      "antenna_upk": "Antenna_SmileyFace_SF.upk",
+      "thumbnail_upk": "Antenna_SmileyFace_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "14",
+      "asset_package_name": "Antenna_SmileyFace",
+      "asset_path": "Antenna_SmileyFace.Antenna_SmileyFace"
+    },
+    {
+      "name": "Smiley TP",
+      "antenna_upk": "antenna_teepee_SF.upk",
+      "thumbnail_upk": "Antenna_Teepee_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "4976",
+      "asset_package_name": "antenna_teepee",
+      "asset_path": "antenna_teepee.antenna_teepee"
+    },
+    {
+      "name": "Smoke Bomb",
+      "antenna_upk": "antenna_smokebomb_SF.upk",
+      "thumbnail_upk": "antenna_SmokeBomb_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9164",
+      "asset_package_name": "antenna_smokebomb",
+      "asset_path": "antenna_smokebomb.antenna_smokebomb"
+    },
+    {
+      "name": "Snorkel",
+      "antenna_upk": "antenna_snorkel_SF.upk",
+      "thumbnail_upk": "Antenna_snorkel_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10217",
+      "asset_package_name": "antenna_snorkel",
+      "asset_path": "antenna_snorkel.antenna_snorkel"
+    },
+    {
+      "name": "Snowflake",
+      "antenna_upk": "Antenna_Snowflake_SF.upk",
+      "thumbnail_upk": "Antenna_Snowflake_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8495",
+      "asset_package_name": "Antenna_Snowflake",
+      "asset_path": "Antenna_Snowflake.Antenna_Snowflake"
+    },
+    {
+      "name": "Snowman",
+      "antenna_upk": "Antenna_Snowman_SF.upk",
+      "thumbnail_upk": "Antenna_Snowman_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "15",
+      "asset_package_name": "Antenna_Snowman",
+      "asset_path": "Antenna_Snowman.Antenna_Snowman"
+    },
+    {
+      "name": "Soccer Ball",
+      "antenna_upk": "Antenna_SoccerBall_SF.upk",
+      "thumbnail_upk": "Antenna_SoccerBall_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "16",
+      "asset_package_name": "Antenna_SoccerBall",
+      "asset_path": "Antenna_SoccerBall.Antenna_SoccerBall"
+    },
+    {
+      "name": "Soccerball Anniversary",
+      "antenna_upk": "antenna_soccerball_anniversary_SF.upk",
+      "thumbnail_upk": "Antenna_SoccerBall_Anniversary_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_soccerball_anniversary",
+      "asset_path": "antenna_soccerball_anniversary.antenna_soccerball_anniversary"
+    },
+    {
+      "name": "Spaceman",
+      "antenna_upk": "antenna_spaceman_SF.upk",
+      "thumbnail_upk": "antenna_Spaceman_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "8679",
+      "asset_package_name": "antenna_spaceman",
+      "asset_path": "antenna_spaceman.antenna_spaceman"
+    },
+    {
+      "name": "Sparkler I",
+      "antenna_upk": "antenna_sparkler_SF.upk",
+      "thumbnail_upk": "Antenna_Sparkler_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4120",
+      "asset_package_name": "antenna_sparkler",
+      "asset_path": "antenna_sparkler.antenna_sparkler_tier1"
+    },
+    {
+      "name": "Sparkler II",
+      "antenna_upk": "antenna_sparkler_SF.upk",
+      "thumbnail_upk": "Antenna_Sparkler_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4121",
+      "asset_package_name": "antenna_sparkler",
+      "asset_path": "antenna_sparkler.antenna_sparkler_tier2"
+    },
+    {
+      "name": "Sparkler III",
+      "antenna_upk": "antenna_sparkler_tier3_SF.upk",
+      "thumbnail_upk": "Antenna_Sparkler_Tier3_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3857",
+      "asset_package_name": "antenna_sparkler_tier3",
+      "asset_path": "antenna_sparkler_tier3.antenna_sparkler_tier3"
+    },
+    {
+      "name": "Spartan Sam",
+      "antenna_upk": "Antenna_SpartanSam_SF.upk",
+      "thumbnail_upk": "Antenna_SpartanSam_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "1169",
+      "asset_package_name": "Antenna_SpartanSam",
+      "asset_path": "Antenna_SpartanSam.Antenna_SpartanSam"
+    },
+    {
+      "name": "SPF",
+      "antenna_upk": "antenna_sunscreen_SF.upk",
+      "thumbnail_upk": "antenna_sunscreen_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10594",
+      "asset_package_name": "antenna_sunscreen",
+      "asset_path": "antenna_sunscreen.antenna_sunscreen"
+    },
+    {
+      "name": "Star",
+      "antenna_upk": "Antenna_Star_SF.upk",
+      "thumbnail_upk": "Antenna_Star_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "17",
+      "asset_package_name": "Antenna_Star",
+      "asset_path": "Antenna_Star.Antenna_Star"
+    },
+    {
+      "name": "Star Burst",
+      "antenna_upk": "antenna_interstellar_SF.upk",
+      "thumbnail_upk": "antenna_interstellar_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "6997",
+      "asset_package_name": "antenna_interstellar",
+      "asset_path": "antenna_interstellar.antenna_interstellar"
+    },
+    {
+      "name": "Stickyhand",
+      "antenna_upk": "antenna_stickyhand_SF.upk",
+      "thumbnail_upk": "Antenna_StickyHand_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_stickyhand",
+      "asset_path": "antenna_stickyhand.antenna_stickyhand"
+    },
+    {
+      "name": "Stungun",
+      "antenna_upk": "antenna_stungun_SF.upk",
+      "thumbnail_upk": "Antenna_StunGun_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_stungun",
+      "asset_path": "antenna_stungun.antenna_stungun"
+    },
+    {
+      "name": "Tennis Ball",
+      "antenna_upk": "Antenna_TennisBall_SF.upk",
+      "thumbnail_upk": "Antenna_TennisBall_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "19",
+      "asset_package_name": "Antenna_TennisBall",
+      "asset_path": "Antenna_TennisBall.Antenna_TennisBall"
+    },
+    {
+      "name": "The Game Awards - Statue",
+      "antenna_upk": "Antenna_VGA_Statue_SF.upk",
+      "thumbnail_upk": "Antenna_VGA_Statue_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "655",
+      "asset_package_name": "Antenna_VGA_Statue",
+      "asset_path": "Antenna_VGA_Statue.Antenna_VGA_Statue"
+    },
+    {
+      "name": "Thermometer",
+      "antenna_upk": "antenna_thermometer_SF.upk",
+      "thumbnail_upk": "Antenna_Thermometer_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8386",
+      "asset_package_name": "antenna_thermometer",
+      "asset_path": "antenna_thermometer.antenna_thermometer"
+    },
+    {
+      "name": "Toasted",
+      "antenna_upk": "antenna_toaster_SF.upk",
+      "thumbnail_upk": "Antenna_Toaster_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "7663",
+      "asset_package_name": "antenna_toaster",
+      "asset_path": "antenna_toaster.antenna_toaster"
+    },
+    {
+      "name": "Toothbrush",
+      "antenna_upk": "antenna_toothbrush_SF.upk",
+      "thumbnail_upk": "Antenna_Toothbrush_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_toothbrush",
+      "asset_path": "antenna_toothbrush.antenna_toothbrush"
+    },
+    {
+      "name": "Torch",
+      "antenna_upk": "antenna_torch_SF.upk",
+      "thumbnail_upk": "Antenna_Torch_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "9230",
+      "asset_package_name": "antenna_torch",
+      "asset_path": "antenna_torch.antenna_torch"
+    },
+    {
+      "name": "Tower",
+      "antenna_upk": "antenna_tower_SF.upk",
+      "thumbnail_upk": "Antenna_Tower_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_tower",
+      "asset_path": "antenna_tower.antenna_tower"
+    },
+    {
+      "name": "Trident",
+      "antenna_upk": "Antenna_Trident_SF.upk",
+      "thumbnail_upk": "Antenna_Trident_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "1508",
+      "asset_package_name": "Antenna_Trident",
+      "asset_path": "Antenna_Trident.Antenna_Trident"
+    },
+    {
+      "name": "UFO",
+      "antenna_upk": "Antenna_UFO_SF.upk",
+      "thumbnail_upk": "Antenna_UFO_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "20",
+      "asset_package_name": "Antenna_UFO",
+      "asset_path": "Antenna_UFO.Antenna_UFO"
+    },
+    {
+      "name": "Unreal Tournament - Flak Shell",
+      "antenna_upk": "Antenna_FlakShell_SF.upk",
+      "thumbnail_upk": "Antenna_FlakShell_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "397",
+      "asset_package_name": "Antenna_FlakShell",
+      "asset_path": "Antenna_FlakShell.Antenna_FlakShell"
+    },
+    {
+      "name": "Vampire Teddy",
+      "antenna_upk": "antenna_scaryteddy_SF.upk",
+      "thumbnail_upk": "Antenna_ScaryTeddy_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "9508",
+      "asset_package_name": "antenna_scaryteddy",
+      "asset_path": "antenna_scaryteddy.antenna_scaryteddy"
+    },
+    {
+      "name": "Vampire Teeth",
+      "antenna_upk": "antenna_vampireteeth_SF.upk",
+      "thumbnail_upk": "Antenna_VampireTeeth_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "8766",
+      "asset_package_name": "antenna_vampireteeth",
+      "asset_path": "antenna_vampireteeth.antenna_vampireteeth"
+    },
+    {
+      "name": "Venus Flytrap",
+      "antenna_upk": "Antenna_Flower_Venus_SF.upk",
+      "thumbnail_upk": "Antenna_Flower_Venus_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "788",
+      "asset_package_name": "Antenna_Flower_Venus",
+      "asset_path": "Antenna_Flower_Venus.Antenna_Flower_Venus"
+    },
+    {
+      "name": "Victory Hand",
+      "antenna_upk": "antenna_peacesign_hand_SF.upk",
+      "thumbnail_upk": "Antenna_PeaceSign_Hand_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4362",
+      "asset_package_name": "antenna_peacesign_hand",
+      "asset_path": "antenna_peacesign_hand.antenna_peacesign_hand"
+    },
+    {
+      "name": "Vintage Mic",
+      "antenna_upk": "antenna_microphoneretro_SF.upk",
+      "thumbnail_upk": "Antenna_MicrophoneRetro_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4973",
+      "asset_package_name": "antenna_microphoneretro",
+      "asset_path": "antenna_microphoneretro.antenna_microphoneretro"
+    },
+    {
+      "name": "Waffle",
+      "antenna_upk": "Antenna_Waffle_SF.upk",
+      "thumbnail_upk": "Antenna_Waffle_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Uncommon",
+      "id": "401",
+      "asset_package_name": "Antenna_Waffle",
+      "asset_path": "Antenna_Waffle.Antenna_Waffle"
+    },
+    {
+      "name": "Walker World",
+      "antenna_upk": "antenna_AW1_SF.upk",
+      "thumbnail_upk": "Antenna_AW1_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "10527",
+      "asset_package_name": "antenna_AW1",
+      "asset_path": "antenna_AW1.antenna_AW1"
+    },
+    {
+      "name": "Warm Watermelon",
+      "antenna_upk": "antenna_watermelon_hot_SF.upk",
+      "thumbnail_upk": "Antenna_Watermelon_Hot_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "2783",
+      "asset_package_name": "antenna_watermelon_hot",
+      "asset_path": "antenna_watermelon_hot.antenna_watermelon_hot"
+    },
+    {
+      "name": "Whip",
+      "antenna_upk": "antenna_dub_SF.upk",
+      "thumbnail_upk": "Antenna_Dub_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Common",
+      "id": "8922",
+      "asset_package_name": "antenna_dub",
+      "asset_path": "antenna_dub.antenna_dub"
+    },
+    {
+      "name": "Witcher Medallion",
+      "antenna_upk": "Antenna_Witcher3_Medallion_SF.upk",
+      "thumbnail_upk": "Antenna_Witcher3_Medallion_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "749",
+      "asset_package_name": "Antenna_Witcher3_Medallion",
+      "asset_path": "Antenna_Witcher3_Medallion.Antenna_Witcher3_Medallion"
+    },
+    {
+      "name": "Fenrir I",
+      "antenna_upk": "antenna_wolvo_SF.upk",
+      "thumbnail_upk": "Antenna_Wolvo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4450",
+      "asset_package_name": "antenna_wolvo",
+      "asset_path": "antenna_wolvo.antenna_wolvo_tier1"
+    },
+    {
+      "name": "Fenrir II",
+      "antenna_upk": "antenna_wolvo_SF.upk",
+      "thumbnail_upk": "Antenna_Wolvo_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "4451",
+      "asset_package_name": "antenna_wolvo",
+      "asset_path": "antenna_wolvo.antenna_wolvo_tier2"
+    },
+    {
+      "name": "Worms W.M.D. Grenade",
+      "antenna_upk": "Antenna_Worms_Grenade_SF.upk",
+      "thumbnail_upk": "Antenna_Worms_Grenade_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Legacy",
+      "id": "1000",
+      "asset_package_name": "Antenna_Worms_Grenade",
+      "asset_path": "Antenna_Worms_Grenade.Antenna_Worms_Grenade"
+    },
+    {
+      "name": "Yardmarker",
+      "antenna_upk": "antenna_yardmarker_SF.upk",
+      "thumbnail_upk": "Antenna_YardMarker_T_SF.upk",
+      "swap_compat": null,
+      "quality": null,
+      "id": null,
+      "asset_package_name": "antenna_yardmarker",
+      "asset_path": "antenna_yardmarker.antenna_yardmarker"
+    },
+    {
+      "name": "Yellow Card",
+      "antenna_upk": "antenna_yellowcard_SF.upk",
+      "thumbnail_upk": "antenna_Yellowcard_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Rare",
+      "id": "4846",
+      "asset_package_name": "antenna_yellowcard",
+      "asset_path": "antenna_yellowcard.antenna_yellowcard"
+    },
+    {
+      "name": "ZagPET",
+      "antenna_upk": "antenna_dogballoon_metal_SF.upk",
+      "thumbnail_upk": "Antenna_DogBalloon_Metal_T_SF.upk",
+      "swap_compat": null,
+      "quality": "Limited",
+      "id": "3546",
+      "asset_package_name": "antenna_dogballoon_metal",
+      "asset_path": "antenna_dogballoon_metal.antenna_dogballoon_metal"
+    }
+  ]
+}

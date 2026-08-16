@@ -1,0 +1,4 @@
+name = "Test Plugin"
+author = "Hebnix"
+version = "2.1.0"
+entry = "main.lua"

@@ -1,0 +1,67 @@
+use hebnix_sdk::save_file::WindowMode;
+use hebnix_sdk::stats::StatsEvent;
+use serde_json::Value;
+
+#[derive(Debug)]
+pub enum AppMsg {
+    Log(String),
+    GameEvent(StatsEvent),
+    // periodic RL monitor result. root_dir is the game install folder resolved
+    // from the running process, used to auto-fill the configured paths.
+    RlStatus {
+        rl_open: bool,
+        api_open: bool,
+        root_dir: Option<String>,
+    },
+    // monitor set PacketSendRate, game needs a restart
+    StatsApiInitialised,
+    // only sent when it changes
+    WindowMode(WindowMode),
+    ToggleVisibility,
+    TrayOpen,
+    TrayQuit,
+    HotkeyCaptured(Option<String>),
+    // should the main window be topmost (RL or hebnix focused)
+    Topmost(bool),
+    WorkshopCatalog(Result<Vec<Value>, String>),
+    WorkshopImage {
+        key: String,
+        bytes: Vec<u8>,
+    },
+    WorkshopOpDone {
+        message: String,
+    },
+    // "install from hebnix" plugin metadata fetch done
+    PluginFetch {
+        result: Result<Value, String>,
+    },
+    PluginImage {
+        key: String,
+        bytes: Vec<u8>,
+    },
+    PluginDownloadDone {
+        result: Result<String, String>,
+    },
+    // http result, slug picks the plugin that asked
+    PluginHttpRes {
+        slug: String,
+        req_id: String,
+        status: u16,
+        body: String,
+    },
+    AppUpdateFetched {
+        result: Result<Option<crate::update::UpdateInfo>, String>,
+    },
+    AppUpdateFailed {
+        error: String,
+    },
+    PluginUpdatesFound {
+        updates: Result<Vec<Value>, String>,
+    },
+    PluginAutoUpdateDone {
+        slug: String,
+        was_enabled: bool,
+        result: Result<String, String>,
+    },
+    SendWsCommand(hebnix_sdk::stats::websocket::WsCommand),
+}
