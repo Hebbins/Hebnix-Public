@@ -615,6 +615,41 @@ fn send_req(req: reqwest::blocking::RequestBuilder) -> (u16, String) {
     }
 }
 
+/// separate client with redirects disabled — needed for OAuth flows (e.g.
+/// PSN's NPSSO exchange) that 302-redirect with the payload (an auth code)
+/// in the Location header itself; http_client()'s default policy follows
+/// redirects automatically, which would silently discard that header and
+/// hand back the followed-to page's body instead.
+fn http_client_no_redirect() -> &'static reqwest::blocking::Client {
+    static CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .redirect(reqwest::redirect::Policy::none())
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            .build()
+            .unwrap_or_default()
+    })
+}
+
+/// like send_req but returns the response's Location header instead of the
+/// body — status 0 (empty location) when the request never landed.
+fn send_req_location(req: reqwest::blocking::RequestBuilder) -> (u16, String) {
+    match req.send() {
+        Ok(res) => {
+            let status = res.status().as_u16();
+            let location = res
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_default()
+                .to_string();
+            (status, location)
+        }
+        Err(_) => (0, String::new()),
+    }
+}
+
 /// like send_req but preserves raw bytes instead of decoding as UTF-8 text —
 /// res.text() mangles/truncates binary responses (e.g. avatar images), since
 /// it forces the body into a Rust String. status 0 when it never landed.
@@ -1435,6 +1470,51 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                             req_id,
                             status,
                             body,
+                        });
+                    });
+                    Ok(())
+                },
+            )?,
+        )?;
+    }
+
+    // no-redirect GET — result lands in this plugin's
+    // on_http_redirect_response(req_id, status, location), where location
+    // is the response's Location header (empty string if the response
+    // wasn't a redirect, or had no such header). Needed for OAuth flows
+    // that hand back a payload (e.g. an auth code) IN the Location header
+    // of a 302 rather than in a followable page body — http_get_async
+    // would auto-follow that redirect via http_client()'s default policy
+    // and lose the header entirely.
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "http_get_no_redirect_async",
+            lua.create_function(
+                move |_,
+                      (req_id, url, headers): (
+                    String,
+                    String,
+                    Option<std::collections::HashMap<String, String>>,
+                )| {
+                    let thread_tx = host.tx.clone();
+                    let slug = host.slug.clone();
+
+                    std::thread::spawn(move || {
+                        let mut req = http_client_no_redirect().get(&url);
+
+                        if let Some(hdrs) = headers {
+                            for (k, v) in hdrs {
+                                req = req.header(k, v);
+                            }
+                        }
+
+                        let (status, location) = send_req_location(req);
+                        let _ = thread_tx.send(AppMsg::PluginHttpRedirectRes {
+                            slug,
+                            req_id,
+                            status,
+                            location,
                         });
                     });
                     Ok(())

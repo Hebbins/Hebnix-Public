@@ -86,6 +86,16 @@ pub enum AppMsg {
         status: u16,
         body: Vec<u8>,
     },
+    // result of http_get_no_redirect_async — location is the response's
+    // Location header (empty if none/not a redirect). Used for OAuth flows
+    // that put their payload in a 302's Location header (e.g. PSN's NPSSO
+    // exchange) instead of a followable body.
+    PluginHttpRedirectRes {
+        slug: String,
+        req_id: String,
+        status: u16,
+        location: String,
+    },
     AppUpdateFetched {
         result: Result<Option<crate::update::UpdateInfo>, String>,
     },
