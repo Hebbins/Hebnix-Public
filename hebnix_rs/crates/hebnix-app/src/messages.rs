@@ -77,6 +77,15 @@ pub enum AppMsg {
         status: u16,
         body: String,
     },
+    // byte-safe variant of PluginHttpRes for http_download_async — body is
+    // raw bytes, not decoded as UTF-8 text, so binary responses (e.g.
+    // avatar images) survive intact.
+    PluginHttpDownloadRes {
+        slug: String,
+        req_id: String,
+        status: u16,
+        body: Vec<u8>,
+    },
     AppUpdateFetched {
         result: Result<Option<crate::update::UpdateInfo>, String>,
     },

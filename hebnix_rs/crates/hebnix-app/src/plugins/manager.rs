@@ -477,6 +477,43 @@ impl PluginManager {
         }
     }
 
+    /// goes to the requesting plugin only. Byte-safe counterpart of
+    /// on_http_response for http_download_async — body is passed as a raw
+    /// Lua string (mlua strings are 8-bit clean) instead of a Rust `&str`,
+    /// so binary responses like avatar images survive intact.
+    pub fn on_http_download_response(&mut self, slug: &str, req_id: &str, status: u16, body: &[u8]) {
+        let Some(idx) = self.plugins.iter().position(|p| p.slug == slug) else {
+            return;
+        };
+        let plugin = &self.plugins[idx];
+        if !plugin.enabled {
+            return;
+        }
+        let Some(rt) = &plugin.runtime else {
+            return;
+        };
+        let name = plugin.display_name().to_string();
+
+        let call = (|| -> mlua::Result<()> {
+            let table: Table = rt.lua.registry_value(&rt.plugin_table)?;
+            let func: LuaValue = table.get("on_http_download_response")?;
+            if let LuaValue::Function(f) = func {
+                let lua_body = rt.lua.create_string(body)?;
+                f.call::<()>((req_id, status, lua_body))?;
+            }
+            Ok(())
+        })();
+
+        if let Err(e) = call {
+            self.log(format!(
+                "[Core] Critical Error in '{name}' on_http_download_response: {e}. Force disabling."
+            ));
+            self.plugins[idx].enabled = false;
+            Self::call_on_unload(&mut self.plugins[idx]);
+            self.plugins[idx].runtime = None;
+        }
+    }
+
     /// render a plugin's settings ui. Err(msg) if the callback raised, so the
     /// caller can log + disable.
     pub fn render_settings(&mut self, slug: &str, ui: &mut egui::Ui) -> Result<(), String> {

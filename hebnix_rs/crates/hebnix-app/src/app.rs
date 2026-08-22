@@ -1505,6 +1505,16 @@ impl HebnixApp {
                         .on_http_response(&slug, &req_id, status, &body);
                     ctx.request_repaint();
                 }
+                AppMsg::PluginHttpDownloadRes {
+                    slug,
+                    req_id,
+                    status,
+                    body,
+                } => {
+                    self.plugin_mgr
+                        .on_http_download_response(&slug, &req_id, status, &body);
+                    ctx.request_repaint();
+                }
             }
         }
     }

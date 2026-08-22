@@ -615,6 +615,20 @@ fn send_req(req: reqwest::blocking::RequestBuilder) -> (u16, String) {
     }
 }
 
+/// like send_req but preserves raw bytes instead of decoding as UTF-8 text —
+/// res.text() mangles/truncates binary responses (e.g. avatar images), since
+/// it forces the body into a Rust String. status 0 when it never landed.
+fn send_req_bytes(req: reqwest::blocking::RequestBuilder) -> (u16, Vec<u8>) {
+    match req.send() {
+        Ok(res) => {
+            let status = res.status().as_u16();
+            let body = res.bytes().map(|b| b.to_vec()).unwrap_or_default();
+            (status, body)
+        }
+        Err(e) => (0, e.to_string().into_bytes()),
+    }
+}
+
 const UI_TABLE_REGISTRY: &str = "hebnix_ui_table";
 const DRAW_TABLE_REGISTRY: &str = "hebnix_draw_table";
 
@@ -722,6 +736,25 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         hebnix.set(
             "slug",
             lua.create_function(move |_, ()| Ok(host.slug.clone()))?,
+        )?;
+    }
+    // Absolute path to this plugin's own folder — same base used to
+    // resolve draw.image/ui.image's relative paths (base_dir/plugins/
+    // <slug>). Lua's plain io.* library has no notion of "the plugin's
+    // folder" — it resolves relative paths against the process's
+    // current working directory, which the host never chdir()s, so it
+    // isn't reliably anything in particular. Plugins that need io.open
+    // (e.g. writing a downloaded file before draw.image can show it)
+    // should join this with a relative path instead of using a bare
+    // relative path directly.
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "plugin_dir",
+            lua.create_function(move |_, ()| {
+                let dir = crate::config::base_dir().join("plugins").join(&host.slug);
+                Ok(dir.to_string_lossy().to_string())
+            })?,
         )?;
     }
 
@@ -1368,6 +1401,47 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         )?;
     }
     hebnix.set("window", window)?;
+
+    // byte-safe download variant of http_get_async — result lands in this
+    // plugin's on_http_download_response(req_id, status, body), where body
+    // is a raw byte string (not decoded as UTF-8), for binary responses like
+    // avatar images that http_get_async's text-based body would corrupt.
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "http_download_async",
+            lua.create_function(
+                move |_,
+                      (req_id, url, headers): (
+                    String,
+                    String,
+                    Option<std::collections::HashMap<String, String>>,
+                )| {
+                    let thread_tx = host.tx.clone();
+                    let slug = host.slug.clone();
+
+                    std::thread::spawn(move || {
+                        let mut req = http_client().get(&url);
+
+                        if let Some(hdrs) = headers {
+                            for (k, v) in hdrs {
+                                req = req.header(k, v);
+                            }
+                        }
+
+                        let (status, body) = send_req_bytes(req);
+                        let _ = thread_tx.send(AppMsg::PluginHttpDownloadRes {
+                            slug,
+                            req_id,
+                            status,
+                            body,
+                        });
+                    });
+                    Ok(())
+                },
+            )?,
+        )?;
+    }
 
     // result lands in this plugin's on_http_response(req_id, status, body)
     {
