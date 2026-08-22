@@ -1,4 +1,5 @@
 //! app config, stored as config.toml next to the exe. first run imports an
+//! old config.ini (python version) if present so settings carry over.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -111,10 +112,10 @@ impl Config {
         std::fs::write(&tmp, text)?;
         std::fs::rename(&tmp, &path)?;
 
-        // Keep active patch state with the game installation, not merely in the
-        // global Hebnix config.  Patcher workers call Config::save directly, so
-        // doing this here persists a ball/boost/decal immediately after apply.
+        #[cfg(not(feature = "lite"))]
+        // keep active patch state with the game installation
         let game_root = Path::new(&self.settings.rl_path);
+        #[cfg(not(feature = "lite"))]
         if game_root.is_dir() {
             let marker = serde_json::json!({
                 "game_path": game_root.to_string_lossy(),
@@ -128,6 +129,7 @@ impl Config {
         Ok(())
     }
 
+    /// one-time import of the old python config.ini
     fn import_ini(path: &Path) -> Option<Config> {
         let ini = ini::Ini::load_from_file(path).ok()?;
         let mut cfg = Config::default();

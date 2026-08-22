@@ -1,0 +1,3698 @@
+{
+  "base_upk_path": "Boost_Standard_T_SF.upk",
+  "base_audio_bnk": "SFX_Boost_Standard.bnk",
+  "boosts": [
+    {
+      "id": "32",
+      "name": "(Alpha Reward) Gold Rush",
+      "upk_path": "Boost_AlphaReward_SF.upk",
+      "audio_bnk": "SFX_Boost_Alpha.bnk",
+      "quality": "Limited",
+      "package": "Boost_AlphaReward",
+      "path": "Boost_AlphaReward.Boost_AlphaReward"
+    },
+    {
+      "id": "10179",
+      "name": "2.5D",
+      "upk_path": "boost_lp_fire_SF.upk",
+      "audio_bnk": "SFX_Boost_LP_Fire.bnk",
+      "quality": "Limited",
+      "package": "boost_lp_fire",
+      "path": "boost_lp_fire.FX.boost_lp_fire"
+    },
+    {
+      "id": "10951",
+      "name": "AC Milan (Puma x Off-White)",
+      "upk_path": "boost_gray_SF.upk",
+      "audio_bnk": "SFX_Boost_Gray.bnk",
+      "quality": "Import",
+      "package": "boost_gray",
+      "path": "boost_gray.FX.boost_gray"
+    },
+    {
+      "id": "524",
+      "name": "Accelerato",
+      "upk_path": "Boost_MusicalNotes_SF.upk",
+      "audio_bnk": "",
+      "quality": "Rare",
+      "package": "Boost_MusicalNotes",
+      "path": "Boost_MusicalNotes.Boost_MusicalNotes"
+    },
+    {
+      "id": "8403",
+      "name": "Aerated",
+      "upk_path": "boost_greenair_SF.upk",
+      "audio_bnk": "SFX_Boost_GreenAir.bnk",
+      "quality": "Limited",
+      "package": "boost_greenair",
+      "path": "boost_greenair.boost_greenair"
+    },
+    {
+      "id": "5744",
+      "name": "Ambustion",
+      "upk_path": "boost_sphenergy_SF.upk",
+      "audio_bnk": "SFX_Boost_Sphenergy.bnk",
+      "quality": "Exotic",
+      "package": "boost_sphenergy",
+      "path": "boost_sphenergy.boost_sphenergy"
+    },
+    {
+      "id": "5590",
+      "name": "Anispray",
+      "upk_path": "boost_2d_smoke_SF.upk",
+      "audio_bnk": "SFX_Boost_2d_Smoke.bnk",
+      "quality": "Limited",
+      "package": "boost_2d_smoke",
+      "path": "boost_2d_smoke.boost_2d_smoke"
+    },
+    {
+      "id": "9901",
+      "name": "Artesian",
+      "upk_path": "boost_aurawater_SF.upk",
+      "audio_bnk": "SFX_Boost_AuraWater.bnk",
+      "quality": "Import",
+      "package": "boost_aurawater",
+      "path": "boost_aurawater.boost_aurawater"
+    },
+    {
+      "id": "4412",
+      "name": "Autumn",
+      "upk_path": "boost_autumn_SF.upk",
+      "audio_bnk": "SFX_Boost_Autumn.bnk",
+      "quality": "Limited",
+      "package": "boost_autumn",
+      "path": "boost_autumn.boost_autumn"
+    },
+    {
+      "id": "9906",
+      "name": "Avatar Elemental",
+      "upk_path": "boost_elements_SF.upk",
+      "audio_bnk": "SFX_Boost_Elements.bnk",
+      "quality": "Import",
+      "package": "boost_elements",
+      "path": "boost_elements.boost_elements"
+    },
+    {
+      "id": "5094",
+      "name": "Bandwidth",
+      "upk_path": "Boost_Illustrative_SF.upk",
+      "audio_bnk": "SFX_Boost_Illustrative.bnk",
+      "quality": "Limited",
+      "package": "Boost_Illustrative",
+      "path": "Boost_Illustrative.Boost_Illustrative"
+    },
+    {
+      "id": "3796",
+      "name": "Baseball",
+      "upk_path": "boost_baseball_SF.upk",
+      "audio_bnk": "SFX_Boost_Baseball.bnk",
+      "quality": "Rare",
+      "package": "boost_baseball",
+      "path": "boost_baseball.boost_baseball"
+    },
+    {
+      "id": "5466",
+      "name": "Bassline",
+      "upk_path": "Boost_BassBoost_SF.upk",
+      "audio_bnk": "SFX_Boost_BassBoost.bnk",
+      "quality": "Limited",
+      "package": "Boost_BassBoost",
+      "path": "Boost_BassBoost.Boost_BassBoost"
+    },
+    {
+      "id": "6801",
+      "name": "Batman",
+      "upk_path": "boost_B2000_SF.upk",
+      "audio_bnk": "SFX_Boost_B2000.bnk",
+      "quality": "Limited",
+      "package": "boost_B2000",
+      "path": "boost_B2000.boost_B2000"
+    },
+    {
+      "id": "2780",
+      "name": "Batmobile (1989)",
+      "upk_path": "boost_eggplant_SF.upk",
+      "audio_bnk": "SFX_Boost_Eggplant.bnk",
+      "quality": "Import",
+      "package": "boost_eggplant",
+      "path": "boost_eggplant.boost_eggplant"
+    },
+    {
+      "id": "868",
+      "name": "Batmobile (2016)",
+      "upk_path": "Boost_DarkCar_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "Boost_DarkCar",
+      "path": "Boost_DarkCar.Boost_DarkCar"
+    },
+    {
+      "id": "7420",
+      "name": "Batmobile (2022)",
+      "upk_path": "boost_tomb_SF.upk",
+      "audio_bnk": "SFX_Boost_Tomb.bnk",
+      "quality": "Import",
+      "package": "boost_tomb",
+      "path": "boost_tomb.boost_tomb"
+    },
+    {
+      "id": "545",
+      "name": "Battle-Stars",
+      "upk_path": "Boost_Stars_SF.upk",
+      "audio_bnk": "SFX_Boost_Star.bnk",
+      "quality": "Rare",
+      "package": "Boost_Stars",
+      "path": "Boost_Stars.Boost_Stars"
+    },
+    {
+      "id": "10185",
+      "name": "Battlebout",
+      "upk_path": "boost_rapid_rush_SF.upk",
+      "audio_bnk": "SFX_Boost_RapidRush.bnk",
+      "quality": "Import",
+      "package": "boost_rapid_rush",
+      "path": "boost_rapid_rush.FX.boost_rapid_rush"
+    },
+    {
+      "id": "10517",
+      "name": "Beast Mode",
+      "upk_path": "boost_future_SF.upk",
+      "audio_bnk": "SFX_Boost_Future.bnk",
+      "quality": "Import",
+      "package": "boost_future",
+      "path": "boost_future.boost_future"
+    },
+    {
+      "id": "4570",
+      "name": "Beat Saber",
+      "upk_path": "boost_beat_SF.upk",
+      "audio_bnk": "SFX_Boost_BeatS.bnk",
+      "quality": "Limited",
+      "package": "boost_beat",
+      "path": "boost_beat.boost_beat"
+    },
+    {
+      "id": "7844",
+      "name": "Bee Hive",
+      "upk_path": "boost_honeybees_SF.upk",
+      "audio_bnk": "SFX_Boost_Honeybees.bnk",
+      "quality": "Import",
+      "package": "boost_honeybees",
+      "path": "boost_honeybees.boost_honeybees"
+    },
+    {
+      "id": "12201",
+      "name": "Bell Saver",
+      "upk_path": "boost_dyepacket_SF.upk",
+      "audio_bnk": "SFX_Boost_DyePacket.bnk",
+      "quality": "Import",
+      "package": "boost_dyepacket",
+      "path": "boost_dyepacket.boost_dyepacket"
+    },
+    {
+      "id": "12802",
+      "name": "Bitcrush",
+      "upk_path": "boost_glitchybit_SF.upk",
+      "audio_bnk": "SFX_Boost_GlitchyBit.bnk",
+      "package": "boost_glitchybit",
+      "path": "boost_glitchybit.boost_glitchybit"
+    },
+    {
+      "id": "10688",
+      "name": "Bladeblast",
+      "upk_path": "boost_dagger_SF.upk",
+      "audio_bnk": "SFX_Boost_Dagger.bnk",
+      "quality": "Import",
+      "package": "boost_dagger",
+      "path": "boost_dagger.FX.boost_dagger"
+    },
+    {
+      "id": "2727",
+      "name": "Blast Ray",
+      "upk_path": "boost_hydroburst_SF.upk",
+      "audio_bnk": "SFX_Boost_Hydroburst.bnk",
+      "quality": "Limited",
+      "package": "boost_hydroburst",
+      "path": "boost_hydroburst.boost_hydroburst"
+    },
+    {
+      "id": "12584",
+      "name": "Blazed Matrix",
+      "upk_path": "boost_decoblue_SF.upk",
+      "audio_bnk": "SFX_Boost_DecoBlue.bnk",
+      "quality": "Limited",
+      "package": "boost_decoblue",
+      "path": "boost_decoblue.boost_decoblue"
+    },
+    {
+      "id": "5313",
+      "name": "Blue Smoke",
+      "upk_path": "boost_toon_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Toon.bnk",
+      "quality": "Premium",
+      "package": "boost_toon_psplus",
+      "path": "boost_toon_psplus.boost_toon_psplus"
+    },
+    {
+      "id": "10692",
+      "name": "Boba Tea",
+      "upk_path": "Boost_Boba_SF.upk",
+      "audio_bnk": "SFX_Boost_Boba.bnk",
+      "quality": "Limited",
+      "package": "Boost_Boba",
+      "path": "Boost_Boba.FX.Boost_Boba"
+    },
+    {
+      "id": "8453",
+      "name": "Bubble Gum",
+      "upk_path": "boost_bubblegum_SF.upk",
+      "audio_bnk": "SFX_Boost_Bubblegum.bnk",
+      "quality": "Import",
+      "package": "boost_bubblegum",
+      "path": "boost_bubblegum.boost_bubblegum"
+    },
+    {
+      "id": "33",
+      "name": "Bubbles",
+      "upk_path": "Boost_Bubble_SF.upk",
+      "audio_bnk": "SFX_Boost_Bubblegum.bnk",
+      "quality": "Common",
+      "package": "Boost_Bubble",
+      "path": "Boost_Bubble.Boost_Bubble"
+    },
+    {
+      "id": "387",
+      "name": "Burnout",
+      "upk_path": "Boost_Burnout_SF.upk",
+      "audio_bnk": "SFX_Boost_Burnout.bnk",
+      "quality": "Import",
+      "package": "Boost_Burnout",
+      "path": "Boost_Burnout.Boost_Burnout"
+    },
+    {
+      "id": "578",
+      "name": "Candy Corn",
+      "upk_path": "Boost_CandyCorn_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "Boost_CandyCorn",
+      "path": "Boost_CandyCorn.Boost_CandyCorn"
+    },
+    {
+      "id": "5141",
+      "name": "Candyfloss",
+      "upk_path": "Boost_wispysmoke_SF.upk",
+      "audio_bnk": "SFX_Boost_WispySmoke.bnk",
+      "quality": "Import",
+      "package": "Boost_wispysmoke",
+      "path": "Boost_wispysmoke.Boost_wispysmoke"
+    },
+    {
+      "id": "11938",
+      "name": "Champ Helix",
+      "upk_path": "boost_s19championsroad_SF.upk",
+      "audio_bnk": "SFX_Boost_S19ChampionsRoad.bnk",
+      "quality": "Import",
+      "package": "boost_s19championsroad",
+      "path": "boost_s19championsroad.boost_s19championsroad"
+    },
+    {
+      "id": "12376",
+      "name": "Champion's Gold",
+      "upk_path": "boost_goldbars_SF.upk",
+      "audio_bnk": "SFX_Boost_GoldBars.bnk",
+      "quality": "Limited",
+      "package": "boost_goldbars",
+      "path": "boost_goldbars.FX.boost_goldbars"
+    },
+    {
+      "id": "11029",
+      "name": "Chemergency",
+      "upk_path": "boost_plasmaenergy_bw_SF.upk",
+      "audio_bnk": "SFX_Boost_PlasmaEnergy.bnk",
+      "quality": "Import",
+      "package": "boost_plasmaenergy_bw",
+      "path": "boost_plasmaenergy_bw.boost_plasmaenergy_bw"
+    },
+    {
+      "id": "8354",
+      "name": "Chemergy",
+      "upk_path": "boost_plasmaenergy_SF.upk",
+      "audio_bnk": "SFX_Boost_PlasmaEnergy.bnk",
+      "quality": "Import",
+      "package": "boost_plasmaenergy",
+      "path": "boost_plasmaenergy.boost_plasmaenergy"
+    },
+    {
+      "id": "5824",
+      "name": "Chequered Flag",
+      "upk_path": "boost_checkeredflag_SF.upk",
+      "audio_bnk": "SFX_Boost_CheckeredFlag.bnk",
+      "quality": "Limited",
+      "package": "boost_checkeredflag",
+      "path": "boost_checkeredflag.boost_checkeredflag"
+    },
+    {
+      "id": "2789",
+      "name": "Cherry Blossom",
+      "upk_path": "boost_cherryblossom_SF.upk",
+      "audio_bnk": "SFX_Boost_CherryBlossom.bnk",
+      "quality": "Limited",
+      "package": "boost_cherryblossom",
+      "path": "boost_cherryblossom.boost_cherryblossom"
+    },
+    {
+      "id": "10480",
+      "name": "Chromophore",
+      "upk_path": "boost_solarbeam_SF.upk",
+      "audio_bnk": "SFX_Boost_SolarBeam.bnk",
+      "quality": "Limited",
+      "package": "boost_solarbeam",
+      "path": "boost_solarbeam.FX.boost_solarbeam"
+    },
+    {
+      "id": "2916",
+      "name": "Cirrus",
+      "upk_path": "boost_energyburst_SF.upk",
+      "audio_bnk": "SFX_Boost_EnergyBurst.bnk",
+      "quality": "Import",
+      "package": "boost_energyburst",
+      "path": "boost_energyburst.boost_energyburst"
+    },
+    {
+      "id": "10025",
+      "name": "Clashflash",
+      "upk_path": "boost_stylized_strike_SF.upk",
+      "audio_bnk": "SFX_Boost_StylizedStrike.bnk",
+      "quality": "Limited",
+      "package": "boost_stylized_strike",
+      "path": "boost_stylized_strike.boost_stylized_strike"
+    },
+    {
+      "id": "3126",
+      "name": "Cloudburst I",
+      "upk_path": "Boost_Intenz_Tier1_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "Boost_Intenz_Tier1",
+      "path": "Boost_Intenz_Tier1.Boost_Intenz_Tier1"
+    },
+    {
+      "id": "3127",
+      "name": "Cloudburst II",
+      "upk_path": "Boost_Intenz_Tier2_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "Boost_Intenz_Tier2",
+      "path": "Boost_Intenz_Tier2.Boost_Intenz_Tier2"
+    },
+    {
+      "id": "3128",
+      "name": "Cloudburst III",
+      "upk_path": "Boost_Intenz_Tier3_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "Boost_Intenz_Tier3",
+      "path": "Boost_Intenz_Tier3.Materials.Boost_Intenz_Tier3"
+    },
+    {
+      "id": "1469",
+      "name": "Cold Fusion",
+      "upk_path": "Boost_FusionEnergy_SF.upk",
+      "audio_bnk": "SFX_Boost_FusionEnergy.bnk",
+      "quality": "Limited",
+      "package": "Boost_FusionEnergy",
+      "path": "Boost_FusionEnergy.Boost_FusionEnergy"
+    },
+    {
+      "id": "11761",
+      "name": "Color Rush",
+      "upk_path": "boost_colortrip_SF.upk",
+      "audio_bnk": "SFX_Boost_Colortrip.bnk",
+      "quality": "Limited",
+      "package": "boost_colortrip",
+      "path": "boost_colortrip.Actors.boost_colortrip"
+    },
+    {
+      "id": "9396",
+      "name": "Colorful Koi",
+      "upk_path": "boost_koi_SF.upk",
+      "audio_bnk": "SFX_Boost_Koi.bnk",
+      "quality": "Limited",
+      "package": "boost_koi",
+      "path": "boost_koi.boost_koi"
+    },
+    {
+      "id": "2837",
+      "name": "Comet",
+      "upk_path": "boost_firelines_SF.upk",
+      "audio_bnk": "SFX_Boost_Firelines.bnk",
+      "quality": "Import",
+      "package": "boost_firelines",
+      "path": "boost_firelines.boost_firelines"
+    },
+    {
+      "id": "10906",
+      "name": "Comet BG",
+      "upk_path": "boost_firelines_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Firelines.bnk",
+      "quality": "Premium",
+      "package": "boost_firelines_psplus",
+      "path": "boost_firelines_psplus.boost_firelines_psplus"
+    },
+    {
+      "id": "34",
+      "name": "Confetti",
+      "upk_path": "Boost_Confetti_SF.upk",
+      "audio_bnk": "SFX_Boost_Confetti.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Confetti",
+      "path": "Boost_Confetti.Boost_Confetti"
+    },
+    {
+      "id": "11101",
+      "name": "Cool Spring",
+      "upk_path": "boost_lake_SF.upk",
+      "audio_bnk": "SFX_Boost_Lake.bnk",
+      "quality": "Import",
+      "package": "boost_lake",
+      "path": "boost_lake.boost_lake"
+    },
+    {
+      "id": "6942",
+      "name": "Corbital",
+      "upk_path": "boost_core_SF.upk",
+      "audio_bnk": "SFX_Boost_Core.bnk",
+      "quality": "Limited",
+      "package": "boost_core",
+      "path": "boost_core.boost_core"
+    },
+    {
+      "id": "11479",
+      "name": "Cosmic Cube",
+      "upk_path": "boost_modish_SF.upk",
+      "audio_bnk": "SFX_Boost_Modish.bnk",
+      "quality": "Import",
+      "package": "boost_modish",
+      "path": "boost_modish.boost_modish"
+    },
+    {
+      "id": "12123",
+      "name": "Crossfade",
+      "upk_path": "boost_chrome_SF.upk",
+      "audio_bnk": "SFX_Boost_Chrome.bnk",
+      "quality": "Import",
+      "package": "boost_chrome",
+      "path": "boost_chrome.boost_chrome"
+    },
+    {
+      "id": "8343",
+      "name": "Cryostream",
+      "upk_path": "Boost_IcyBreath_SF.upk",
+      "audio_bnk": "SFX_Boost_IcyBreath.bnk",
+      "quality": "Limited",
+      "package": "Boost_IcyBreath",
+      "path": "Boost_IcyBreath.FX.Boost_IcyBreath"
+    },
+    {
+      "id": "3042",
+      "name": "Cupid",
+      "upk_path": "boost_cupid_SF.upk",
+      "audio_bnk": "SFX_Boost_Cupid.bnk",
+      "quality": "Limited",
+      "package": "boost_cupid",
+      "path": "boost_cupid.boost_cupid"
+    },
+    {
+      "id": "10484",
+      "name": "Cure",
+      "upk_path": "boost_helix_SF.upk",
+      "audio_bnk": "SFX_Boost_Helix.bnk",
+      "quality": "Limited",
+      "package": "boost_helix",
+      "path": "boost_helix.FX.boost_helix"
+    },
+    {
+      "id": "10268",
+      "name": "Cyclops' Optic Blast",
+      "upk_path": "boost_xrays_SF.upk",
+      "audio_bnk": "SFX_Boost_XRays.bnk",
+      "quality": "Import",
+      "package": "boost_xrays",
+      "path": "boost_xrays.boost_xrays"
+    },
+    {
+      "id": "10456",
+      "name": "Dark Fire",
+      "upk_path": "boost_ParalyzingFear_SF.upk",
+      "audio_bnk": "SFX_Boost_ParalyzingFear.bnk",
+      "quality": "Import",
+      "package": "boost_ParalyzingFear",
+      "path": "boost_ParalyzingFear.boost_ParalyzingFear"
+    },
+    {
+      "id": "12715",
+      "name": "Dark Flame",
+      "upk_path": "boost_blackflame_SF.upk",
+      "audio_bnk": "SFX_Boost_BlackFlame.bnk",
+      "package": "boost_blackflame",
+      "path": "boost_blackflame.Actors.boost_blackflame"
+    },
+    {
+      "id": "1551",
+      "name": "Dark Matter",
+      "upk_path": "boost_darkmatter_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_darkmatter",
+      "path": "boost_darkmatter.boost_darkmatter"
+    },
+    {
+      "id": "9814",
+      "name": "Darksaber",
+      "upk_path": "boost_nightedge_SF.upk",
+      "audio_bnk": "SFX_Boost_NightEdge.bnk",
+      "quality": "Limited",
+      "package": "boost_nightedge",
+      "path": "boost_nightedge.boost_nightedge"
+    },
+    {
+      "id": "35",
+      "name": "Datastream",
+      "upk_path": "Boost_Digital_SF.upk",
+      "audio_bnk": "SFX_Boost_Digital.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Digital",
+      "path": "Boost_Digital.Boost_Digital"
+    },
+    {
+      "id": "5067",
+      "name": "Diecast Spark",
+      "upk_path": "boost_pops_SF.upk",
+      "audio_bnk": "SFX_Boost_Pops.bnk",
+      "quality": "Limited",
+      "package": "boost_pops",
+      "path": "boost_pops.boost_pops"
+    },
+    {
+      "id": "7806",
+      "name": "Dimensionator",
+      "upk_path": "boost_singularity_SF.upk",
+      "audio_bnk": "SFX_Boost_Singularity.bnk",
+      "quality": "Limited",
+      "package": "boost_singularity",
+      "path": "boost_singularity.boost_singularity"
+    },
+    {
+      "id": "11372",
+      "name": "Disco Ball",
+      "upk_path": "boost_disco_SF.upk",
+      "audio_bnk": "SFX_Boost_Disco.bnk",
+      "quality": "Import",
+      "package": "boost_disco",
+      "path": "boost_disco.boost_disco"
+    },
+    {
+      "id": "9564",
+      "name": "Documint",
+      "upk_path": "boost_filetransfer_SF.upk",
+      "audio_bnk": "SFX_Boost_FileTransfer.bnk",
+      "quality": "Limited",
+      "package": "boost_filetransfer",
+      "path": "boost_filetransfer.boost_filetransfer"
+    },
+    {
+      "id": "5847",
+      "name": "Dream Beam",
+      "upk_path": "boost_toony_beam_SF.upk",
+      "audio_bnk": "SFX_Boost_ToonyBeam.bnk",
+      "quality": "Limited",
+      "package": "boost_toony_beam",
+      "path": "boost_toony_beam.boost_toony_beam"
+    },
+    {
+      "id": "7681",
+      "name": "Dunker",
+      "upk_path": "boost_doughnut_SF.upk",
+      "audio_bnk": "SFX_Boost_Doughnut.bnk",
+      "quality": "Import",
+      "package": "boost_doughnut",
+      "path": "boost_doughnut.boost_doughnut"
+    },
+    {
+      "id": "7089",
+      "name": "E.V.",
+      "upk_path": "boost_elm_SF.upk",
+      "audio_bnk": "SFX_Boost_Elm.bnk",
+      "quality": "VeryRare",
+      "package": "boost_elm",
+      "path": "boost_elm.boost_elm"
+    },
+    {
+      "id": "10746",
+      "name": "Eclipse",
+      "upk_path": "boost_eclipse_SF.upk",
+      "audio_bnk": "SFX_Boost_Eclipse.bnk",
+      "quality": "Limited",
+      "package": "boost_eclipse",
+      "path": "boost_eclipse.FX.boost_eclipse"
+    },
+    {
+      "id": "4067",
+      "name": "Ectoplasm",
+      "upk_path": "boost_ep_SF.upk",
+      "audio_bnk": "SFX_Boost_EP.bnk",
+      "quality": "Limited",
+      "package": "boost_ep",
+      "path": "boost_ep.boost_ep"
+    },
+    {
+      "id": "10434",
+      "name": "Electrogalactic",
+      "upk_path": "boost_ElectroGalactic_SF.upk",
+      "audio_bnk": "SFX_Boost_ElectroGalactic.bnk",
+      "quality": "Limited",
+      "package": "boost_ElectroGalactic",
+      "path": "boost_ElectroGalactic.boost_ElectroGalactic"
+    },
+    {
+      "id": "11269",
+      "name": "Electrolic",
+      "upk_path": "boost_darkflame_SF.upk",
+      "audio_bnk": "SFX_Boost_DarkFlame.bnk",
+      "quality": "Exotic",
+      "package": "boost_darkflame",
+      "path": "boost_darkflame.boost_darkflame"
+    },
+    {
+      "id": "8405",
+      "name": "Elemental",
+      "upk_path": "boost_bender_SF.upk",
+      "audio_bnk": "SFX_Boost_Bender.bnk",
+      "quality": "Limited",
+      "package": "boost_bender",
+      "path": "boost_bender.boost_bender"
+    },
+    {
+      "id": "2899",
+      "name": "Enchanter",
+      "upk_path": "boost_energystrike_SF.upk",
+      "audio_bnk": "SFX_Boost_EnergyStrike.bnk",
+      "quality": "Import",
+      "package": "boost_energystrike",
+      "path": "boost_energystrike.boost_energystrike"
+    },
+    {
+      "id": "9900",
+      "name": "Enchanter Au",
+      "upk_path": "boost_energystrike_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_EnergyStrike.bnk",
+      "quality": "Premium",
+      "package": "boost_energystrike_psplus",
+      "path": "boost_energystrike_psplus.boost_energystrike_psplus"
+    },
+    {
+      "id": "5859",
+      "name": "Ethereal",
+      "upk_path": "boost_aurora_SF.upk",
+      "audio_bnk": "SFX_Boost_Aurora.bnk",
+      "quality": "Import",
+      "package": "boost_aurora",
+      "path": "boost_aurora.boost_aurora"
+    },
+    {
+      "id": "5090",
+      "name": "Faded Cosmos",
+      "upk_path": "boost_plum_white_SF.upk",
+      "audio_bnk": "SFX_Boost_Plum.bnk",
+      "quality": "Limited",
+      "package": "boost_plum_white",
+      "path": "boost_plum_white.boost_plum_white"
+    },
+    {
+      "id": "7563",
+      "name": "Fallout",
+      "upk_path": "boost_electrobeam_fg_SF.upk",
+      "audio_bnk": "SFX_Boost_ElectroBeam.bnk",
+      "quality": "Limited",
+      "package": "boost_electrobeam_fg",
+      "path": "boost_electrobeam_fg.boost_electrobeam_fg"
+    },
+    {
+      "id": "1090",
+      "name": "Feather",
+      "upk_path": "boost_feathers_SF.upk",
+      "audio_bnk": "SFX_Boost_Feathers.bnk",
+      "quality": "VeryRare",
+      "package": "boost_feathers",
+      "path": "boost_feathers.boost_feathers"
+    },
+    {
+      "id": "4452",
+      "name": "Fiber Optic I",
+      "upk_path": "boost_fiber_tier1_SF.upk",
+      "audio_bnk": "SFX_Boost_Fiber_Tier1.bnk",
+      "quality": "Limited",
+      "package": "boost_fiber_tier1",
+      "path": "boost_fiber_tier1.boost_fiber_tier1"
+    },
+    {
+      "id": "4298",
+      "name": "Fiber Optic II",
+      "upk_path": "boost_fiber_tier2_SF.upk",
+      "audio_bnk": "SFX_Boost_Fiber_Tier2.bnk",
+      "quality": "Limited",
+      "package": "boost_fiber_tier2",
+      "path": "boost_fiber_tier2.boost_fiber_tier2"
+    },
+    {
+      "id": "12762",
+      "name": "FIFA 2026",
+      "upk_path": "boost_spheregulp01_SF.upk",
+      "audio_bnk": "SFX_Boost_SphereGulp.bnk",
+      "package": "boost_spheregulp01",
+      "path": "boost_spheregulp01.boost_spheregulp01"
+    },
+    {
+      "id": "7779",
+      "name": "Fireball",
+      "upk_path": "boost_fireball_SF.upk",
+      "audio_bnk": "SFX_Boost_Fireball.bnk",
+      "quality": "Import",
+      "package": "boost_fireball",
+      "path": "boost_fireball.boost_fireball"
+    },
+    {
+      "id": "8358",
+      "name": "Firecrack",
+      "upk_path": "boost_psydrill_SF.upk",
+      "audio_bnk": "SFX_Boost_Psydrill.bnk",
+      "quality": "Limited",
+      "package": "boost_psydrill",
+      "path": "boost_psydrill.boost_psydrill"
+    },
+    {
+      "id": "9445",
+      "name": "Firewall",
+      "upk_path": "boost_interface_SF.upk",
+      "audio_bnk": "SFX_Boost_Interface.bnk",
+      "quality": "Limited",
+      "package": "boost_interface",
+      "path": "boost_interface.boost_interface"
+    },
+    {
+      "id": "3528",
+      "name": "Fireworks",
+      "upk_path": "boost_fireworks_SF.upk",
+      "audio_bnk": "SFX_Boost_Fireworks.bnk",
+      "quality": "Limited",
+      "package": "boost_fireworks",
+      "path": "boost_fireworks.boost_fireworks"
+    },
+    {
+      "id": "4994",
+      "name": "Fish",
+      "upk_path": "boost_fish_SF.upk",
+      "audio_bnk": "SFX_Boost_Fish.bnk",
+      "quality": "Limited",
+      "package": "boost_fish",
+      "path": "boost_fish.boost_fish"
+    },
+    {
+      "id": "5732",
+      "name": "Fissure",
+      "upk_path": "Boost_space_tear_SF.upk",
+      "audio_bnk": "SFX_Boost_SpaceTear.bnk",
+      "quality": "Import",
+      "package": "Boost_space_tear",
+      "path": "Boost_space_tear.Boost_space_tear"
+    },
+    {
+      "id": "4241",
+      "name": "Flamerate",
+      "upk_path": "boost_mangaflames_SF.upk",
+      "audio_bnk": "SFX_Boost_MangaFlames.bnk",
+      "quality": "Import",
+      "package": "boost_mangaflames",
+      "path": "boost_mangaflames.boost_mangaflames"
+    },
+    {
+      "id": "36",
+      "name": "Flamethrower",
+      "upk_path": "Boost_Flamethrower_SF.upk",
+      "audio_bnk": "SFX_Boost_FlameThrower.bnk",
+      "quality": "Common",
+      "package": "Boost_Flamethrower",
+      "path": "Boost_Flamethrower.Boost_Flamethrower"
+    },
+    {
+      "id": "37",
+      "name": "Flamethrower Blue",
+      "upk_path": "Boost_Flamethrower_Blue_SF.upk",
+      "audio_bnk": "SFX_Boost_FlameThrower.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Flamethrower_Blue",
+      "path": "Boost_Flamethrower_Blue.Boost_Flamethrower_Blue"
+    },
+    {
+      "id": "38",
+      "name": "Flamethrower Green",
+      "upk_path": "Boost_Flamethrower_Green_SF.upk",
+      "audio_bnk": "SFX_Boost_FlameThrower.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Flamethrower_Green",
+      "path": "Boost_Flamethrower_Green.Boost_Flamethrower_Green"
+    },
+    {
+      "id": "39",
+      "name": "Flamethrower Pink",
+      "upk_path": "Boost_Flamethrower_Pink_SF.upk",
+      "audio_bnk": "SFX_Boost_FlameThrower.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Flamethrower_Pink",
+      "path": "Boost_Flamethrower_Pink.Boost_Flamethrower_Pink"
+    },
+    {
+      "id": "40",
+      "name": "Flamethrower Purple",
+      "upk_path": "Boost_Flamethrower_Purple_SF.upk",
+      "audio_bnk": "SFX_Boost_FlameThrower.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Flamethrower_Purple",
+      "path": "Boost_Flamethrower_Purple.Boost_Flamethrower_Purple"
+    },
+    {
+      "id": "41",
+      "name": "Flamethrower Red",
+      "upk_path": "Boost_Flamethrower_Red_SF.upk",
+      "audio_bnk": "SFX_Boost_FlameThrower.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Flamethrower_Red",
+      "path": "Boost_Flamethrower_Red.Boost_Flamethrower_Red"
+    },
+    {
+      "id": "1318",
+      "name": "Flamethrower Yellow",
+      "upk_path": "Boost_Flamethrower_Yellow_SF.upk",
+      "audio_bnk": "SFX_Boost_FlameThrower.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Flamethrower_Yellow",
+      "path": "Boost_Flamethrower_Yellow.Boost_Flamethrower_Yellow"
+    },
+    {
+      "id": "11237",
+      "name": "Floeburner",
+      "upk_path": "boost_daikon_SF.upk",
+      "audio_bnk": "SFX_Boost_Daikon.bnk",
+      "quality": "Import",
+      "package": "boost_daikon",
+      "path": "boost_daikon.boost_daikon"
+    },
+    {
+      "id": "42",
+      "name": "Flowers",
+      "upk_path": "Boost_Flowers_SF.upk",
+      "audio_bnk": "SFX_Boost_Flower.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Flowers",
+      "path": "Boost_Flowers.Boost_Flowers"
+    },
+    {
+      "id": "10974",
+      "name": "Foliage",
+      "upk_path": "boost_forestspirit_SF.upk",
+      "audio_bnk": "SFX_Boost_ForestSpirit.bnk",
+      "quality": "Limited",
+      "package": "boost_forestspirit",
+      "path": "boost_forestspirit.boost_forestspirit"
+    },
+    {
+      "id": "11636",
+      "name": "Force Lightning",
+      "upk_path": "boost_evilornament_SF.upk",
+      "audio_bnk": "SFX_Boost_EvilOrnament.bnk",
+      "quality": "Limited",
+      "package": "boost_evilornament",
+      "path": "boost_evilornament.boost_evilornament"
+    },
+    {
+      "id": "5978",
+      "name": "ForceFlux",
+      "upk_path": "boost_electrobeam_SF.upk",
+      "audio_bnk": "SFX_Boost_ElectroBeam.bnk",
+      "quality": "Limited",
+      "package": "boost_electrobeam",
+      "path": "boost_electrobeam.boost_electrobeam"
+    },
+    {
+      "id": "5860",
+      "name": "Ford F-150 RLE",
+      "upk_path": "boost_drof_SF.upk",
+      "audio_bnk": "SFX_Boost_Drof.bnk",
+      "quality": "Import",
+      "package": "boost_drof",
+      "path": "boost_drof.boost_drof"
+    },
+    {
+      "id": "2394",
+      "name": "Fractal Fire",
+      "upk_path": "boost_abstractfire_SF.upk",
+      "audio_bnk": "SFX_Boost_AbstractFire.bnk",
+      "quality": "Import",
+      "package": "boost_abstractfire",
+      "path": "boost_abstractfire.boost_abstractfire"
+    },
+    {
+      "id": "12736",
+      "name": "Fractal Fire PW",
+      "upk_path": "boost_abstractfire_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_AbstractFire.bnk",
+      "package": "boost_abstractfire_psplus",
+      "path": "boost_abstractfire_psplus.boost_abstractfire_psplus"
+    },
+    {
+      "id": "10483",
+      "name": "Front Row",
+      "upk_path": "boost_aw_SF.upk",
+      "audio_bnk": "SFX_Boost_AW.bnk",
+      "quality": "Import",
+      "package": "boost_aw",
+      "path": "boost_aw.boost_aw"
+    },
+    {
+      "id": "1166",
+      "name": "Frostbite",
+      "upk_path": "boost_iceshards_SF.upk",
+      "audio_bnk": "SFX_Boost_IceShards.bnk",
+      "quality": "VeryRare",
+      "package": "boost_iceshards",
+      "path": "boost_iceshards.boost_iceshards"
+    },
+    {
+      "id": "10819",
+      "name": "Frozone's Super Blast",
+      "upk_path": "boost_hero_SF.upk",
+      "audio_bnk": "SFX_Boost_Hero.bnk",
+      "quality": "Import",
+      "package": "boost_hero",
+      "path": "boost_hero.boost_hero"
+    },
+    {
+      "id": "5894",
+      "name": "Funfetti",
+      "upk_path": "boost_unicorn_SF.upk",
+      "audio_bnk": "SFX_Boost_Unicorn.bnk",
+      "quality": "Import",
+      "package": "boost_unicorn",
+      "path": "boost_unicorn.boost_unicorn"
+    },
+    {
+      "id": "4053",
+      "name": "Fusion",
+      "upk_path": "boost_fusion_SF.upk",
+      "audio_bnk": "SFX_Boost_FusionEnergy.bnk",
+      "quality": "Limited",
+      "package": "boost_fusion",
+      "path": "boost_fusion.boost_fusion"
+    },
+    {
+      "id": "7781",
+      "name": "Fusion FR",
+      "upk_path": "boost_fusion_dark_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_fusion_dark",
+      "path": "boost_fusion_dark.boost_fusion_dark"
+    },
+    {
+      "id": "10355",
+      "name": "Gaseous",
+      "upk_path": "boost_neonsoul_SF.upk",
+      "audio_bnk": "SFX_Boost_Neonsoul.bnk",
+      "quality": "Limited",
+      "package": "boost_neonsoul",
+      "path": "boost_neonsoul.boost_neonsoul"
+    },
+    {
+      "id": "9064",
+      "name": "GB Flamerate",
+      "upk_path": "Boost_mangaflames_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_MangaFlames.bnk",
+      "quality": "Premium",
+      "package": "Boost_mangaflames_psplus",
+      "path": "Boost_mangaflames_psplus.Boost_mangaflames_psplus"
+    },
+    {
+      "id": "2712",
+      "name": "Geo Soul",
+      "upk_path": "boost_meteors_SF.upk",
+      "audio_bnk": "SFX_Boost_Meteors.bnk",
+      "quality": "Import",
+      "package": "boost_meteors",
+      "path": "boost_meteors.boost_meteors"
+    },
+    {
+      "id": "4802",
+      "name": "Glimmerslag I",
+      "upk_path": "boost_comet_SF.upk",
+      "audio_bnk": "SFX_Boost_Comet_T01.bnk",
+      "quality": "Limited",
+      "package": "boost_comet",
+      "path": "boost_comet.boost_comet_tier1"
+    },
+    {
+      "id": "4803",
+      "name": "Glimmerslag II",
+      "upk_path": "boost_comet_SF.upk",
+      "audio_bnk": "SFX_Boost_Comet_T01.bnk",
+      "quality": "Limited",
+      "package": "boost_comet",
+      "path": "boost_comet.boost_comet_tier2"
+    },
+    {
+      "id": "3808",
+      "name": "Glitch",
+      "upk_path": "boost_glitch_SF.upk",
+      "audio_bnk": "SFX_Boost_Glitch.bnk",
+      "quality": "Import",
+      "package": "boost_glitch",
+      "path": "boost_glitch.boost_glitch"
+    },
+    {
+      "id": "11959",
+      "name": "Glitch P+M",
+      "upk_path": "boost_glitchpsplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Glitch.bnk",
+      "quality": "Premium",
+      "package": "boost_glitchpsplus",
+      "path": "boost_glitchpsplus.boost_glitchpsplus"
+    },
+    {
+      "id": "11846",
+      "name": "Gold Crush",
+      "upk_path": "boost_aurum_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_aurum",
+      "path": "boost_aurum.boost_aurum"
+    },
+    {
+      "id": "5089",
+      "name": "Golden Cosmos",
+      "upk_path": "boost_plum_gold_SF.upk",
+      "audio_bnk": "SFX_Boost_Plum.bnk",
+      "quality": "Limited",
+      "package": "boost_plum_gold",
+      "path": "boost_plum_gold.boost_plum_gold"
+    },
+    {
+      "id": "43",
+      "name": "Grass",
+      "upk_path": "Boost_Grass_SF.upk",
+      "audio_bnk": "SFX_Boost_Grass.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Grass",
+      "path": "Boost_Grass.Boost_Grass"
+    },
+    {
+      "id": "12242",
+      "name": "Gryffindor Scarf",
+      "upk_path": "boost_numblte01_SF.upk",
+      "audio_bnk": "SFX_Boost_Numb.bnk",
+      "quality": "Limited",
+      "package": "boost_numblte01",
+      "path": "boost_numblte01.boost_numblte01"
+    },
+    {
+      "id": "9732",
+      "name": "Gusted",
+      "upk_path": "boost_icywisp_SF.upk",
+      "audio_bnk": "SFX_Boost_IcyWisp.bnk",
+      "quality": "Limited",
+      "package": "boost_icywisp",
+      "path": "boost_icywisp.boost_icywisp"
+    },
+    {
+      "id": "7213",
+      "name": "Hazy Flame",
+      "upk_path": "boost_toonflame_SF.upk",
+      "audio_bnk": "SFX_Boost_ToonFlame.bnk",
+      "quality": "Limited",
+      "package": "boost_toonflame",
+      "path": "boost_toonflame.boost_toonflame"
+    },
+    {
+      "id": "9695",
+      "name": "Heartline",
+      "upk_path": "boost_meteorillustrator_SF.upk",
+      "audio_bnk": "SFX_Boost_MeteorIllustrator.bnk",
+      "quality": "Limited",
+      "package": "boost_meteorillustrator",
+      "path": "boost_meteorillustrator.FX.boost_meteorillustrator"
+    },
+    {
+      "id": "1091",
+      "name": "Hearts",
+      "upk_path": "Boost_Hearts_SF.upk",
+      "audio_bnk": "SFX_Boost_Hearts.bnk",
+      "quality": "VeryRare",
+      "package": "Boost_Hearts",
+      "path": "Boost_Hearts.Boost_Hearts"
+    },
+    {
+      "id": "11153",
+      "name": "Heat Ray",
+      "upk_path": "boost_big_SF.upk",
+      "audio_bnk": "SFX_Boost_Big.bnk",
+      "quality": "Import",
+      "package": "boost_big",
+      "path": "boost_big.boost_big"
+    },
+    {
+      "id": "9756",
+      "name": "Heatquake",
+      "upk_path": "boost_laserbeam_SF.upk",
+      "audio_bnk": "SFX_Boost_Laserbeam.bnk",
+      "quality": "Import",
+      "package": "boost_laserbeam",
+      "path": "boost_laserbeam.boost_laserbeam"
+    },
+    {
+      "id": "1695",
+      "name": "Helios",
+      "upk_path": "boost_stream_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_stream",
+      "path": "boost_stream.boost_stream"
+    },
+    {
+      "id": "1694",
+      "name": "Hexphase",
+      "upk_path": "boost_hexfade_SF.upk",
+      "audio_bnk": "SFX_Boost_Hexfade.bnk",
+      "quality": "VeryRare",
+      "package": "boost_hexfade",
+      "path": "boost_hexfade.boost_hexfade"
+    },
+    {
+      "id": "10600",
+      "name": "Holo-Hype",
+      "upk_path": "boost_hologlass_SF.upk",
+      "audio_bnk": "SFX_Boost_Hologlass.bnk",
+      "quality": "Limited",
+      "package": "boost_hologlass",
+      "path": "boost_hologlass.boost_hologlass"
+    },
+    {
+      "id": "4783",
+      "name": "HoloData",
+      "upk_path": "boost_geotech_SF.upk",
+      "audio_bnk": "SFX_Boost_GeoTech.bnk",
+      "quality": "Limited",
+      "package": "boost_geotech",
+      "path": "boost_geotech.boost_geotech"
+    },
+    {
+      "id": "9723",
+      "name": "Hot Cocoa",
+      "upk_path": "boost_cocoasmoore_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_cocoasmoore",
+      "path": "boost_cocoasmoore.boost_cocoasmoore"
+    },
+    {
+      "id": "3263",
+      "name": "Hot Rod",
+      "upk_path": "boost_phleyms_SF.upk",
+      "audio_bnk": "SFX_Boost_Phleyms.bnk",
+      "quality": "Limited",
+      "package": "boost_phleyms",
+      "path": "boost_phleyms.boost_phleyms"
+    },
+    {
+      "id": "3493",
+      "name": "HRT Beat",
+      "upk_path": "boost_pixeltech_SF.upk",
+      "audio_bnk": "SFX_Boost_PixelTech.bnk",
+      "quality": "Limited",
+      "package": "boost_pixeltech",
+      "path": "boost_pixeltech.boost_pixeltech"
+    },
+    {
+      "id": "12269",
+      "name": "Hufflepuff Scarf",
+      "upk_path": "boost_numblte02_SF.upk",
+      "audio_bnk": "SFX_Boost_Numb.bnk",
+      "quality": "Limited",
+      "package": "boost_numblte02",
+      "path": "boost_numblte02.boost_numblte02"
+    },
+    {
+      "id": "69",
+      "name": "Hydro",
+      "upk_path": "Boost_Water_SF.upk",
+      "audio_bnk": "SFX_Boost_Water.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Water",
+      "path": "Boost_Water.Boost_Water"
+    },
+    {
+      "id": "1542",
+      "name": "Hypernova",
+      "upk_path": "Boost_Photon_SF.upk",
+      "audio_bnk": "SFX_Boost_Photon.bnk",
+      "quality": "Import",
+      "package": "Boost_Photon",
+      "path": "Boost_Photon.Boost_Photon"
+    },
+    {
+      "id": "5520",
+      "name": "Hypernova G1",
+      "upk_path": "boost_photon_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Photon.bnk",
+      "quality": "Premium",
+      "package": "boost_photon_psplus",
+      "path": "boost_photon_psplus.boost_photon_psplus"
+    },
+    {
+      "id": "11334",
+      "name": "In-Finite",
+      "upk_path": "boost_infinite_SF.upk",
+      "audio_bnk": "SFX_Boost_Infinite.bnk",
+      "quality": "Limited",
+      "package": "boost_infinite",
+      "path": "boost_infinite.boost_infinite"
+    },
+    {
+      "id": "5885",
+      "name": "Incantor",
+      "upk_path": "boost_magic_fire_SF.upk",
+      "audio_bnk": "SFX_Boost_MagicFire.bnk",
+      "quality": "Import",
+      "package": "boost_magic_fire",
+      "path": "boost_magic_fire.boost_magic_fire"
+    },
+    {
+      "id": "10545",
+      "name": "Incantor RD",
+      "upk_path": "boost_magic_fire_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_MagicFire.bnk",
+      "quality": "Premium",
+      "package": "boost_magic_fire_psplus",
+      "path": "boost_magic_fire_psplus.boost_magic_fire_psplus"
+    },
+    {
+      "id": "9358",
+      "name": "InfoSec",
+      "upk_path": "Boost_Glitched_SF.upk",
+      "audio_bnk": "SFX_Boost_Glitched.bnk",
+      "quality": "Limited",
+      "package": "Boost_Glitched",
+      "path": "Boost_Glitched.Boost_Glitched"
+    },
+    {
+      "id": "12716",
+      "name": "Infrared",
+      "upk_path": "boost_infraredglow_SF.upk",
+      "audio_bnk": "SFX_Boost_InfraredGlow.bnk",
+      "package": "boost_infraredglow",
+      "path": "boost_infraredglow.boost_infraredglow"
+    },
+    {
+      "id": "1452",
+      "name": "Ink",
+      "upk_path": "boost_ink_SF.upk",
+      "audio_bnk": "SFX_Boost_Ink.bnk",
+      "quality": "VeryRare",
+      "package": "boost_ink",
+      "path": "boost_ink.boost_ink"
+    },
+    {
+      "id": "9800",
+      "name": "Ink: Gilded",
+      "upk_path": "boost_ink02_gp_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_ink02_gp",
+      "path": "boost_ink02_gp.boost_ink02_gp"
+    },
+    {
+      "id": "1957",
+      "name": "Interdimensional GB",
+      "upk_path": "boost_rm_SF.upk",
+      "audio_bnk": "",
+      "quality": "Rare",
+      "package": "boost_rm",
+      "path": "boost_rm.boost_rm"
+    },
+    {
+      "id": "45",
+      "name": "Ion",
+      "upk_path": "Boost_LightTrail_SF.upk",
+      "audio_bnk": "",
+      "quality": "Rare",
+      "package": "Boost_LightTrail",
+      "path": "Boost_LightTrail.Boost_LightTrail"
+    },
+    {
+      "id": "46",
+      "name": "Ion Green",
+      "upk_path": "Boost_LightTrail_Green_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_LightTrail_Green",
+      "path": "Boost_LightTrail_Green.Boost_LightTrail_Green"
+    },
+    {
+      "id": "47",
+      "name": "Ion Pink",
+      "upk_path": "Boost_LightTrail_Pink_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_LightTrail_Pink",
+      "path": "Boost_LightTrail_Pink.Boost_LightTrail_Pink"
+    },
+    {
+      "id": "48",
+      "name": "Ion Purple",
+      "upk_path": "Boost_LightTrail_Purple_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_LightTrail_Purple",
+      "path": "Boost_LightTrail_Purple.Boost_LightTrail_Purple"
+    },
+    {
+      "id": "49",
+      "name": "Ion Red",
+      "upk_path": "Boost_LightTrail_Red_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_LightTrail_Red",
+      "path": "Boost_LightTrail_Red.Boost_LightTrail_Red"
+    },
+    {
+      "id": "50",
+      "name": "Ion Yellow",
+      "upk_path": "Boost_LightTrail_Yellow_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_LightTrail_Yellow",
+      "path": "Boost_LightTrail_Yellow.Boost_LightTrail_Yellow"
+    },
+    {
+      "id": "12254",
+      "name": "Jelly Power",
+      "upk_path": "boost_lionsmane01_SF.upk",
+      "audio_bnk": "SFX_Boost_LionsMane.bnk",
+      "quality": "Import",
+      "package": "boost_lionsmane01",
+      "path": "boost_lionsmane01.boost_lionsmane01"
+    },
+    {
+      "id": "9827",
+      "name": "Jellyfish",
+      "upk_path": "boost_jellyfish_SF.upk",
+      "audio_bnk": "SFX_Boost_Jellyfish.bnk",
+      "quality": "Limited",
+      "package": "boost_jellyfish",
+      "path": "boost_jellyfish.boost_jellyfish"
+    },
+    {
+      "id": "12488",
+      "name": "Jet Streamers",
+      "upk_path": "boost_decored_SF.upk",
+      "audio_bnk": "SFX_Boost_DecoRed.bnk",
+      "quality": "Limited",
+      "package": "boost_decored",
+      "path": "boost_decored.boost_decored"
+    },
+    {
+      "id": "7603",
+      "name": "Jet Wash",
+      "upk_path": "boost_stylizedflame_SF.upk",
+      "audio_bnk": "SFX_Boost_StylizedFlame.bnk",
+      "quality": "Import",
+      "package": "boost_stylizedflame",
+      "path": "boost_stylizedflame.boost_stylizedflame"
+    },
+    {
+      "id": "6762",
+      "name": "Joker",
+      "upk_path": "boost_clown_SF.upk",
+      "audio_bnk": "SFX_Boost_Clown.bnk",
+      "quality": "Limited",
+      "package": "boost_clown",
+      "path": "boost_clown.boost_clown"
+    },
+    {
+      "id": "12608",
+      "name": "Jordan Joga Sinistro",
+      "upk_path": "boost_luminousairplanelte01_SF.upk",
+      "audio_bnk": "SFX_Boost_LuminousAirplaneLTE01.bnk",
+      "quality": "Limited",
+      "package": "boost_luminousairplanelte01",
+      "path": "boost_luminousairplanelte01.boost_luminousairplanelte01"
+    },
+    {
+      "id": "10269",
+      "name": "Jubilee's Pyrotechnic Energy",
+      "upk_path": "boost_whisp_SF.upk",
+      "audio_bnk": "SFX_Boost_Whisp.bnk",
+      "quality": "Import",
+      "package": "boost_whisp",
+      "path": "boost_whisp.boost_whisp"
+    },
+    {
+      "id": "4188",
+      "name": "K.I.T.T.",
+      "upk_path": "boost_feline_SF.upk",
+      "audio_bnk": "SFX_Boost_Feline.bnk",
+      "quality": "Import",
+      "package": "boost_feline",
+      "path": "boost_feline.boost_feline"
+    },
+    {
+      "id": "4143",
+      "name": "Krackle",
+      "upk_path": "boost_edge_SF.upk",
+      "audio_bnk": "SFX_Boost_Edge.bnk",
+      "quality": "Import",
+      "package": "boost_edge",
+      "path": "boost_edge.boost_edge"
+    },
+    {
+      "id": "3798",
+      "name": "Lantern Lift",
+      "upk_path": "boost_lanterns_SF.upk",
+      "audio_bnk": "SFX_Boost_Lanterns.bnk",
+      "quality": "Limited",
+      "package": "boost_lanterns",
+      "path": "boost_lanterns.boost_lanterns"
+    },
+    {
+      "id": "8488",
+      "name": "Laser-Light",
+      "upk_path": "boost_linecolors_SF.upk",
+      "audio_bnk": "SFX_Boost_LineColors.bnk",
+      "quality": "Limited",
+      "package": "boost_linecolors",
+      "path": "boost_linecolors.boost_linecolors"
+    },
+    {
+      "id": "5600",
+      "name": "Lava",
+      "upk_path": "Boost_lava_jet_SF.upk",
+      "audio_bnk": "SFX_Boost_LavaJet.bnk",
+      "quality": "Limited",
+      "package": "Boost_lava_jet",
+      "path": "Boost_lava_jet.Boost_lava_jet"
+    },
+    {
+      "id": "5037",
+      "name": "League Legacy",
+      "upk_path": "boost_retroballs_SF.upk",
+      "audio_bnk": "SFX_Boost_RetroBalls.bnk",
+      "quality": "Limited",
+      "package": "boost_retroballs",
+      "path": "boost_retroballs.boost_retroballs"
+    },
+    {
+      "id": "11160",
+      "name": "Leek Beam",
+      "upk_path": "boost_aventurine_SF.upk",
+      "audio_bnk": "SFX_Boost_Aventurine.bnk",
+      "quality": "Import",
+      "package": "boost_aventurine",
+      "path": "boost_aventurine.boost_aventurine"
+    },
+    {
+      "id": "9559",
+      "name": "Lewis Hamilton - Street Legal",
+      "upk_path": "boost_zigzaglh_SF.upk",
+      "audio_bnk": "SFX_Boost_ZigZag.bnk",
+      "quality": "Exotic",
+      "package": "boost_zigzaglh",
+      "path": "boost_zigzaglh.boost_zigzaglh"
+    },
+    {
+      "id": "405",
+      "name": "Lightning",
+      "upk_path": "Boost_Lightning_SF.upk",
+      "audio_bnk": "SFX_Boost_Lightning.bnk",
+      "quality": "VeryRare",
+      "package": "Boost_Lightning",
+      "path": "Boost_Lightning.Boost_Lightning"
+    },
+    {
+      "id": "1473",
+      "name": "Lightning Yellow",
+      "upk_path": "boost_lightning_yellow_SF.upk",
+      "audio_bnk": "SFX_Boost_Lightning.bnk",
+      "quality": "VeryRare",
+      "package": "boost_lightning_yellow",
+      "path": "boost_lightning_yellow.boost_lightning_yellow"
+    },
+    {
+      "id": "11021",
+      "name": "Lunaria",
+      "upk_path": "boost_astralradiance_SF.upk",
+      "audio_bnk": "SFX_Boost_AstralRadiance.bnk",
+      "quality": "Limited",
+      "package": "boost_astralradiance",
+      "path": "boost_astralradiance.boost_astralradiance"
+    },
+    {
+      "id": "1638",
+      "name": "Magic Missile",
+      "upk_path": "boost_zti_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_zti",
+      "path": "boost_zti.boost_zti"
+    },
+    {
+      "id": "7701",
+      "name": "Magic Missile PS",
+      "upk_path": "boost_zti_psplus_SF.upk",
+      "audio_bnk": "",
+      "quality": "Premium",
+      "package": "boost_zti_psplus",
+      "path": "boost_zti_psplus.boost_zti_psplus"
+    },
+    {
+      "id": "1327",
+      "name": "Magmus",
+      "upk_path": "boost_lava_SF.upk",
+      "audio_bnk": "SFX_Boost_Lava.bnk",
+      "quality": "VeryRare",
+      "package": "boost_lava",
+      "path": "boost_lava.boost_lava"
+    },
+    {
+      "id": "5916",
+      "name": "Magmus GE",
+      "upk_path": "boost_lava_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Lava.bnk",
+      "quality": "Premium",
+      "package": "boost_lava_psplus",
+      "path": "boost_lava_psplus.boost_lava_psplus"
+    },
+    {
+      "id": "6111",
+      "name": "Magmus XS",
+      "upk_path": "boost_lava_xbg_SF.upk",
+      "audio_bnk": "SFX_Boost_Lava.bnk",
+      "quality": "Premium",
+      "package": "boost_lava_xbg",
+      "path": "boost_lava_xbg.boost_lava_xbg"
+    },
+    {
+      "id": "7807",
+      "name": "Mandala",
+      "upk_path": "boost_mandalas_SF.upk",
+      "audio_bnk": "SFX_Boost_Mandala.bnk",
+      "quality": "Limited",
+      "package": "boost_mandalas",
+      "path": "boost_mandalas.boost_mandalas"
+    },
+    {
+      "id": "10679",
+      "name": "Manga Magma",
+      "upk_path": "boost_paladin_SF.upk",
+      "audio_bnk": "SFX_Boost_Paladin.bnk",
+      "quality": "Limited",
+      "package": "boost_paladin",
+      "path": "boost_paladin.boost_paladin"
+    },
+    {
+      "id": "5761",
+      "name": "Manganese",
+      "upk_path": "boost_illgraph_SF.upk",
+      "audio_bnk": "SFX_Boost_Illgraph.bnk",
+      "quality": "Import",
+      "package": "boost_illgraph",
+      "path": "boost_illgraph.boost_illgraph"
+    },
+    {
+      "id": "5892",
+      "name": "Manhattan",
+      "upk_path": "boost_singleatom_SF.upk",
+      "audio_bnk": "SFX_Boost_SingleAtom.bnk",
+      "quality": "Exotic",
+      "package": "boost_singleatom",
+      "path": "boost_singleatom.boost_singleatom"
+    },
+    {
+      "id": "11600",
+      "name": "Misteek",
+      "upk_path": "boost_magical_SF.upk",
+      "audio_bnk": "SFX_Boost_Magical.bnk",
+      "quality": "Limited",
+      "package": "boost_magical",
+      "path": "boost_magical.boost_magical"
+    },
+    {
+      "id": "12240",
+      "name": "Mobile Tire Fire",
+      "upk_path": "boost_sprinkle_SF.upk",
+      "audio_bnk": "SFX_Boost_Sprinkle.bnk",
+      "quality": "Import",
+      "package": "boost_sprinkle",
+      "path": "boost_sprinkle.boost_sprinkle"
+    },
+    {
+      "id": "10093",
+      "name": "Molten",
+      "upk_path": "boost_magma_SF.upk",
+      "audio_bnk": "SFX_Boost_Magma.bnk",
+      "quality": "Import",
+      "package": "boost_magma",
+      "path": "boost_magma.boost_magma"
+    },
+    {
+      "id": "7577",
+      "name": "Monarch",
+      "upk_path": "boost_butterflies_SF.upk",
+      "audio_bnk": "SFX_Boost_Butterflies.bnk",
+      "quality": "Limited",
+      "package": "boost_butterflies",
+      "path": "boost_butterflies.boost_butterflies"
+    },
+    {
+      "id": "51",
+      "name": "Money",
+      "upk_path": "Boost_Money_SF.upk",
+      "audio_bnk": "SFX_Boost_Money.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Money",
+      "path": "Boost_Money.Boost_Money"
+    },
+    {
+      "id": "5057",
+      "name": "Monsoon",
+      "upk_path": "boost_monsoon_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_monsoon",
+      "path": "boost_monsoon.boost_monsoon"
+    },
+    {
+      "id": "5484",
+      "name": "Mood Slime",
+      "upk_path": "boost_sblo_SF.upk",
+      "audio_bnk": "SFX_Boost_Sblo.bnk",
+      "quality": "Limited",
+      "package": "boost_sblo",
+      "path": "boost_sblo.boost_sblo"
+    },
+    {
+      "id": "10303",
+      "name": "Mosher",
+      "upk_path": "boost_powerbeam_SF.upk",
+      "audio_bnk": "SFX_Boost_PowerBeam.bnk",
+      "quality": "Limited",
+      "package": "boost_powerbeam",
+      "path": "boost_powerbeam.boost_powerbeam"
+    },
+    {
+      "id": "12110",
+      "name": "Mystery Groove",
+      "upk_path": "boost_banjo_SF.upk",
+      "audio_bnk": "SFX_Boost_Banjo.bnk",
+      "quality": "Import",
+      "package": "boost_banjo",
+      "path": "boost_banjo.boost_banjo"
+    },
+    {
+      "id": "10649",
+      "name": "Mystic Fade",
+      "upk_path": "boost_techno_SF.upk",
+      "audio_bnk": "SFX_Boost_Techno.bnk",
+      "quality": "Import",
+      "package": "boost_techno",
+      "path": "boost_techno.boost_techno"
+    },
+    {
+      "id": "1736",
+      "name": "Neo-Thermal",
+      "upk_path": "boost_colorsmoke_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_colorsmoke",
+      "path": "boost_colorsmoke.boost_colorsmoke"
+    },
+    {
+      "id": "11112",
+      "name": "Neo-Thermal (T+O)",
+      "upk_path": "boost_neothermal_psplus_SF.upk",
+      "audio_bnk": "",
+      "quality": "Premium",
+      "package": "boost_neothermal_psplus",
+      "path": "boost_neothermal_psplus.boost_neothermal_psplus"
+    },
+    {
+      "id": "9354",
+      "name": "Neon Bomb",
+      "upk_path": "Boost_NeonTraces_SF.upk",
+      "audio_bnk": "SFX_Boost_NeonTraces.bnk",
+      "quality": "Limited",
+      "package": "Boost_NeonTraces",
+      "path": "Boost_NeonTraces.Boost_NeonTraces"
+    },
+    {
+      "id": "1498",
+      "name": "Netherworld",
+      "upk_path": "boost_bones_SF.upk",
+      "audio_bnk": "SFX_Boost_Bones.bnk",
+      "quality": "Limited",
+      "package": "boost_bones",
+      "path": "boost_bones.boost_bones"
+    },
+    {
+      "id": "5822",
+      "name": "NFL",
+      "upk_path": "boost_almond_SF.upk",
+      "audio_bnk": "SFX_Boost_Almond.bnk",
+      "quality": "Import",
+      "package": "boost_almond",
+      "path": "boost_almond.boost_almond"
+    },
+    {
+      "id": "2327",
+      "name": "Night Terror",
+      "upk_path": "boost_scaryfaces_SF.upk",
+      "audio_bnk": "SFX_Boost_ScaryFaces.bnk",
+      "quality": "Limited",
+      "package": "boost_scaryfaces",
+      "path": "boost_scaryfaces.boost_scaryfaces"
+    },
+    {
+      "id": "4282",
+      "name": "Ninja Star",
+      "upk_path": "boost_ninjastar_SF.upk",
+      "audio_bnk": "SFX_Boost_NinjaStar.bnk",
+      "quality": "Import",
+      "package": "boost_ninjastar",
+      "path": "boost_ninjastar.boost_ninjastar"
+    },
+    {
+      "id": "6034",
+      "name": "Ninja Star BL",
+      "upk_path": "boost_ninjastar_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_NinjaStar.bnk",
+      "quality": "Premium",
+      "package": "boost_ninjastar_psplus",
+      "path": "boost_ninjastar_psplus.boost_ninjastar_psplus"
+    },
+    {
+      "id": "384",
+      "name": "Nitrous",
+      "upk_path": "Boost_Nitrous_SF.upk",
+      "audio_bnk": "SFX_Boost_Nitrous.bnk",
+      "quality": "Rare",
+      "package": "Boost_Nitrous",
+      "path": "Boost_Nitrous.Boost_Nitrous"
+    },
+    {
+      "id": "544",
+      "name": "Nuts & Bolts",
+      "upk_path": "Boost_NutsBolts_SF.upk",
+      "audio_bnk": "SFX_Boost_NutsBolts.bnk",
+      "quality": "Rare",
+      "package": "Boost_NutsBolts",
+      "path": "Boost_NutsBolts.Boost_NutsBolts"
+    },
+    {
+      "id": "10481",
+      "name": "Octonox",
+      "upk_path": "boost_octo_SF.upk",
+      "audio_bnk": "SFX_Boost_Octo.bnk",
+      "quality": "Limited",
+      "package": "boost_octo",
+      "path": "boost_octo.FX.boost_octo"
+    },
+    {
+      "id": "9556",
+      "name": "Oogie's Worms",
+      "upk_path": "boost_ht_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_ht",
+      "path": "boost_ht.boost_ht"
+    },
+    {
+      "id": "626",
+      "name": "OutaTime",
+      "upk_path": "Boost_GreyCar_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "Boost_GreyCar",
+      "path": "Boost_GreyCar.Boost_GreyCar"
+    },
+    {
+      "id": "5852",
+      "name": "Oxalate",
+      "upk_path": "boost_tixy01_SF.upk",
+      "audio_bnk": "SFX_Boost_Tixy01.bnk",
+      "quality": "Import",
+      "package": "boost_tixy01",
+      "path": "boost_tixy01.boost_tixy01"
+    },
+    {
+      "id": "5149",
+      "name": "Party Horn",
+      "upk_path": "Boost_partyhorn_SF.upk",
+      "audio_bnk": "SFX_Boost_PartyHorn.bnk",
+      "quality": "Limited",
+      "package": "Boost_partyhorn",
+      "path": "Boost_partyhorn.Boost_partyhorn"
+    },
+    {
+      "id": "8844",
+      "name": "PG Candyfloss",
+      "upk_path": "Boost_wispysmoke_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_WispySmoke.bnk",
+      "quality": "Premium",
+      "package": "Boost_wispysmoke_psplus",
+      "path": "Boost_wispysmoke_psplus.Boost_wispysmoke_psplus"
+    },
+    {
+      "id": "6281",
+      "name": "Phase-R",
+      "upk_path": "boost_inky_SF.upk",
+      "audio_bnk": "SFX_Boost_Inky.bnk",
+      "quality": "Limited",
+      "package": "boost_inky",
+      "path": "boost_inky.boost_inky"
+    },
+    {
+      "id": "7737",
+      "name": "Phoenix Fire",
+      "upk_path": "boost_phoenix_SF.upk",
+      "audio_bnk": "SFX_Boost_Phoenix.bnk",
+      "quality": "Limited",
+      "package": "boost_phoenix",
+      "path": "boost_phoenix.boost_phoenix"
+    },
+    {
+      "id": "5418",
+      "name": "Phosphor",
+      "upk_path": "boost_Animatedlines_SF.upk",
+      "audio_bnk": "SFX_Boost_AnimatedLines.bnk",
+      "quality": "Import",
+      "package": "boost_Animatedlines",
+      "path": "boost_Animatedlines.boost_Animatedlines"
+    },
+    {
+      "id": "2820",
+      "name": "Pickle",
+      "upk_path": "boost_pickles_SF.upk",
+      "audio_bnk": "SFX_Boost_Pickles.bnk",
+      "quality": "Limited",
+      "package": "boost_pickles",
+      "path": "boost_pickles.boost_pickles"
+    },
+    {
+      "id": "7770",
+      "name": "Pinwheel",
+      "upk_path": "boost_pinwheel_SF.upk",
+      "audio_bnk": "SFX_Boost_Pinwheel.bnk",
+      "quality": "Limited",
+      "package": "boost_pinwheel",
+      "path": "boost_pinwheel.boost_pinwheel"
+    },
+    {
+      "id": "11041",
+      "name": "Pixel Dust",
+      "upk_path": "boost_voxellightning_SF.upk",
+      "audio_bnk": "SFX_Boost_VoxelLightning.bnk",
+      "quality": "Import",
+      "package": "boost_voxellightning",
+      "path": "boost_voxellightning.boost_voxellightning"
+    },
+    {
+      "id": "1092",
+      "name": "Pixel Fire",
+      "upk_path": "Boost_Pixels_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "Boost_Pixels",
+      "path": "Boost_Pixels.Boost_Pixels"
+    },
+    {
+      "id": "52",
+      "name": "Plasma",
+      "upk_path": "Boost_Plasma_SF.upk",
+      "audio_bnk": "SFX_Boost_Plasma.bnk",
+      "quality": "Rare",
+      "package": "Boost_Plasma",
+      "path": "Boost_Plasma.Boost_Plasma"
+    },
+    {
+      "id": "6742",
+      "name": "Poison Ivy",
+      "upk_path": "boost_pli_SF.upk",
+      "audio_bnk": "SFX_Boost_PLI.bnk",
+      "quality": "Limited",
+      "package": "boost_pli",
+      "path": "boost_pli.boost_pli"
+    },
+    {
+      "id": "1093",
+      "name": "Polygonal",
+      "upk_path": "Boost_Stylized_SF.upk",
+      "audio_bnk": "SFX_Boost_Stylized.bnk",
+      "quality": "VeryRare",
+      "package": "Boost_Stylized",
+      "path": "Boost_Stylized.Boost_Stylized"
+    },
+    {
+      "id": "5840",
+      "name": "Polygonal BL",
+      "upk_path": "boost_stylized_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Stylized.bnk",
+      "quality": "Premium",
+      "package": "boost_stylized_psplus",
+      "path": "boost_stylized_psplus.boost_stylized_psplus"
+    },
+    {
+      "id": "7841",
+      "name": "Polyhedral",
+      "upk_path": "boost_cosmicdice_SF.upk",
+      "audio_bnk": "SFX_Boost_CosmicDice.bnk",
+      "quality": "Import",
+      "package": "boost_cosmicdice",
+      "path": "boost_cosmicdice.boost_cosmicdice"
+    },
+    {
+      "id": "2879",
+      "name": "Popcorn",
+      "upk_path": "boost_popcorn_SF.upk",
+      "audio_bnk": "SFX_Boost_Popcorn.bnk",
+      "quality": "Limited",
+      "package": "boost_popcorn",
+      "path": "boost_popcorn.boost_popcorn"
+    },
+    {
+      "id": "10894",
+      "name": "PopHaze",
+      "upk_path": "boost_celestialspark_SF.upk",
+      "audio_bnk": "SFX_Boost_CelestialSpark.bnk",
+      "quality": "Import",
+      "package": "boost_celestialspark",
+      "path": "boost_celestialspark.boost_celestialspark"
+    },
+    {
+      "id": "651",
+      "name": "Portal - Conversion Gel",
+      "upk_path": "Boost_ConversionGel_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_ConversionGel",
+      "path": "Boost_ConversionGel.Boost_ConversionGel"
+    },
+    {
+      "id": "652",
+      "name": "Portal - Propulsion Gel",
+      "upk_path": "Boost_PropulsionGel_SF.upk",
+      "audio_bnk": "SFX_Boost_Propulsion.bnk",
+      "quality": "Legacy",
+      "package": "Boost_PropulsionGel",
+      "path": "Boost_PropulsionGel.Boost_PropulsionGel"
+    },
+    {
+      "id": "653",
+      "name": "Portal - Repulsion Gel",
+      "upk_path": "Boost_RepulsionGel_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_RepulsionGel",
+      "path": "Boost_RepulsionGel.Boost_RepulsionGel"
+    },
+    {
+      "id": "2054",
+      "name": "Power-Shot",
+      "upk_path": "boost_Powershot_SF.upk",
+      "audio_bnk": "SFX_Boost_Powershot.bnk",
+      "quality": "Import",
+      "package": "boost_Powershot",
+      "path": "boost_Powershot.boost_Powershot"
+    },
+    {
+      "id": "9369",
+      "name": "Power-Shot SKB",
+      "upk_path": "boost_powershot_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Powershot.bnk",
+      "quality": "Premium",
+      "package": "boost_powershot_psplus",
+      "path": "boost_powershot_psplus.boost_powershot_psplus"
+    },
+    {
+      "id": "1584",
+      "name": "Proton",
+      "upk_path": "boost_lightwave_SF.upk",
+      "audio_bnk": "SFX_Boost_LightWave.bnk",
+      "quality": "Import",
+      "package": "boost_lightwave",
+      "path": "boost_lightwave.boost_lightwave"
+    },
+    {
+      "id": "4048",
+      "name": "Proton Pack",
+      "upk_path": "boost_gpp_SF.upk",
+      "audio_bnk": "SFX_Boost_GPP.bnk",
+      "quality": "Import",
+      "package": "boost_gpp",
+      "path": "boost_gpp.boost_gpp"
+    },
+    {
+      "id": "5639",
+      "name": "Puff-e-plume",
+      "upk_path": "boost_puffysmoke_SF.upk",
+      "audio_bnk": "SFX_Boost_PuffySmoke.bnk",
+      "quality": "Limited",
+      "package": "boost_puffysmoke",
+      "path": "boost_puffysmoke.boost_puffysmoke"
+    },
+    {
+      "id": "10777",
+      "name": "PUMA Shoebox",
+      "upk_path": "boost_kitty_basic_SF.upk",
+      "audio_bnk": "SFX_Boost_Kitty_Basic.bnk",
+      "quality": "Import",
+      "package": "boost_kitty_basic",
+      "path": "boost_kitty_basic.boost_kitty_basic"
+    },
+    {
+      "id": "10790",
+      "name": "Pumpkin Bomb",
+      "upk_path": "boost_sticky02_SF.upk",
+      "audio_bnk": "SFX_Boost_Sticky02.bnk",
+      "quality": "Limited",
+      "package": "boost_sticky02",
+      "path": "boost_sticky02.boost_sticky02"
+    },
+    {
+      "id": "5893",
+      "name": "Pylon",
+      "upk_path": "boost_trafficcones_SF.upk",
+      "audio_bnk": "SFX_Boost_TrafficCones.bnk",
+      "quality": "Limited",
+      "package": "boost_trafficcones",
+      "path": "boost_trafficcones.boost_trafficcones"
+    },
+    {
+      "id": "8350",
+      "name": "Pyracron",
+      "upk_path": "boost_pulse_SF.upk",
+      "audio_bnk": "SFX_Boost_Pulse.bnk",
+      "quality": "Exotic",
+      "package": "boost_pulse",
+      "path": "boost_pulse.boost_pulse"
+    },
+    {
+      "id": "7905",
+      "name": "S7 - Bronze",
+      "upk_path": "boost_pyrite_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_pyrite",
+      "path": "boost_pyrite.Boost_S7_01"
+    },
+    {
+      "id": "7906",
+      "name": "S7 - Silver",
+      "upk_path": "boost_pyrite_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_pyrite",
+      "path": "boost_pyrite.Boost_S7_02"
+    },
+    {
+      "id": "7907",
+      "name": "S7 - Gold",
+      "upk_path": "boost_pyrite_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_pyrite",
+      "path": "boost_pyrite.Boost_S7_03"
+    },
+    {
+      "id": "7908",
+      "name": "S7 - Platinum",
+      "upk_path": "boost_pyrite_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_pyrite",
+      "path": "boost_pyrite.Boost_S7_04"
+    },
+    {
+      "id": "7909",
+      "name": "S7 - Diamond",
+      "upk_path": "boost_pyrite_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_pyrite",
+      "path": "boost_pyrite.boost_s7_05"
+    },
+    {
+      "id": "7910",
+      "name": "S7 - Champion",
+      "upk_path": "boost_pyrite_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_pyrite",
+      "path": "boost_pyrite.Boost_S7_06"
+    },
+    {
+      "id": "7911",
+      "name": "S7 - Grand Champion",
+      "upk_path": "boost_pyrite_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_pyrite",
+      "path": "boost_pyrite.Boost_S7_07"
+    },
+    {
+      "id": "7912",
+      "name": "S7 - Supersonic Legend",
+      "upk_path": "boost_pyrite_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_pyrite",
+      "path": "boost_pyrite.boost_s7_08"
+    },
+    {
+      "id": "7982",
+      "name": "Pyrotechnix",
+      "upk_path": "boost_patriot_SF.upk",
+      "audio_bnk": "SFX_Boost_Patriot.bnk",
+      "quality": "Limited",
+      "package": "boost_patriot",
+      "path": "boost_patriot.FX.boost_patriot"
+    },
+    {
+      "id": "5121",
+      "name": "Quasar",
+      "upk_path": "boost_quasar_SF.upk",
+      "audio_bnk": "SFX_Boost_Quasar.bnk",
+      "quality": "VeryRare",
+      "package": "boost_quasar",
+      "path": "boost_quasar.boost_quasar"
+    },
+    {
+      "id": "4340",
+      "name": "Racer Flames",
+      "upk_path": "boost_raceflames_SF.upk",
+      "audio_bnk": "SFX_Boost_RaceFlames.bnk",
+      "quality": "Limited",
+      "package": "boost_raceflames",
+      "path": "boost_raceflames.boost_raceflames"
+    },
+    {
+      "id": "4872",
+      "name": "Rad Rock",
+      "upk_path": "boost_crystal_SF.upk",
+      "audio_bnk": "SFX_Boost_Crystal.bnk",
+      "quality": "Limited",
+      "package": "boost_crystal",
+      "path": "boost_crystal.boost_crystal"
+    },
+    {
+      "id": "4498",
+      "name": "Radiant Gush",
+      "upk_path": "boost_glaucous_SF.upk",
+      "audio_bnk": "SFX_Boost_Glaucous.bnk",
+      "quality": "Limited",
+      "package": "boost_glaucous",
+      "path": "boost_glaucous.boost_glaucous"
+    },
+    {
+      "id": "59",
+      "name": "Rainbow",
+      "upk_path": "Boost_Rainbow_SF.upk",
+      "audio_bnk": "SFX_Boost_Rainbow.bnk",
+      "quality": "Rare",
+      "package": "Boost_Rainbow",
+      "path": "Boost_Rainbow.Boost_Rainbow"
+    },
+    {
+      "id": "10286",
+      "name": "Ramen Roller",
+      "upk_path": "boost_ramen_SF.upk",
+      "audio_bnk": "SFX_Boost_Ramen.bnk",
+      "quality": "Import",
+      "package": "boost_ramen",
+      "path": "boost_ramen.FX.boost_ramen"
+    },
+    {
+      "id": "12268",
+      "name": "Ravenclaw Scarf",
+      "upk_path": "boost_numblte03_SF.upk",
+      "audio_bnk": "SFX_Boost_Numb.bnk",
+      "quality": "Limited",
+      "package": "boost_numblte03",
+      "path": "boost_numblte03.boost_numblte03"
+    },
+    {
+      "id": "9593",
+      "name": "RCA",
+      "upk_path": "boost_rca_SF.upk",
+      "audio_bnk": "SFX_Boost_RCA.bnk",
+      "quality": "Limited",
+      "package": "boost_rca",
+      "path": "boost_rca.boost_rca"
+    },
+    {
+      "id": "3742",
+      "name": "Red Envelopes",
+      "upk_path": "boost_redenvelope_SF.upk",
+      "audio_bnk": "SFX_Boost_RedEnvelopes.bnk",
+      "quality": "Limited",
+      "package": "boost_redenvelope",
+      "path": "boost_redenvelope.boost_redenvelope"
+    },
+    {
+      "id": "10435",
+      "name": "Red Lightsaber",
+      "upk_path": "boost_lava02_SF.upk",
+      "audio_bnk": "SFX_Boost_Lava02.bnk",
+      "quality": "Import",
+      "package": "boost_lava02",
+      "path": "boost_lava02.boost_lava02"
+    },
+    {
+      "id": "10157",
+      "name": "Reheater",
+      "upk_path": "boost_bloodshot_SF.upk",
+      "audio_bnk": "SFX_Boost_Bloodshot.bnk",
+      "quality": "Import",
+      "package": "boost_bloodshot",
+      "path": "boost_bloodshot.FX.boost_bloodshot"
+    },
+    {
+      "id": "12306",
+      "name": "Remy's Taste",
+      "upk_path": "boost_courgette01_SF.upk",
+      "audio_bnk": "SFX_Boost_Courgette.bnk",
+      "quality": "Import",
+      "package": "boost_courgette01",
+      "path": "boost_courgette01.boost_courgette01"
+    },
+    {
+      "id": "12243",
+      "name": "Ribwich Fever",
+      "upk_path": "boost_sprinklelte03_SF.upk",
+      "audio_bnk": "SFX_Boost_SprinkleLTE03.bnk",
+      "quality": "Limited",
+      "package": "boost_sprinklelte03",
+      "path": "boost_sprinklelte03.boost_sprinklelte03"
+    },
+    {
+      "id": "8535",
+      "name": "Righteous Fail",
+      "upk_path": "boost_animesmoke_smh_SF.upk",
+      "audio_bnk": "SFX_Boost_AnimeSmoke.bnk",
+      "quality": "Import",
+      "package": "boost_animesmoke_smh",
+      "path": "boost_animesmoke_smh.boost_animesmoke_smh"
+    },
+    {
+      "id": "5023",
+      "name": "Righteous Gale",
+      "upk_path": "boost_animesmoke_SF.upk",
+      "audio_bnk": "SFX_Boost_AnimeSmoke.bnk",
+      "quality": "Import",
+      "package": "boost_animesmoke",
+      "path": "boost_animesmoke.boost_animesmoke"
+    },
+    {
+      "id": "10416",
+      "name": "RipRibbon",
+      "upk_path": "Boost_InfernoVortex_SF.upk",
+      "audio_bnk": "SFX_Boost_InfernoVortex.bnk",
+      "quality": "Limited",
+      "package": "Boost_InfernoVortex",
+      "path": "Boost_InfernoVortex.Boost_InfernoVortex"
+    },
+    {
+      "id": "11411",
+      "name": "RLCS Birmingham Major 2025",
+      "upk_path": "boost_rlcs2401_SF.upk",
+      "audio_bnk": "SFX_Boost_RLCS2401.bnk",
+      "quality": "Import",
+      "package": "boost_rlcs2401",
+      "path": "boost_rlcs2401.boost_rlcs2401"
+    },
+    {
+      "id": "9109",
+      "name": "RLCS Crystalline",
+      "upk_path": "boost_irid_SF.upk",
+      "audio_bnk": "SFX_Boost_Irid.bnk",
+      "quality": "Exotic",
+      "package": "boost_irid",
+      "path": "boost_irid.boost_irid"
+    },
+    {
+      "id": "11698",
+      "name": "RLCS Raleigh Major 2025",
+      "upk_path": "boost_rlcsraleigh_SF.upk",
+      "audio_bnk": "SFX_Boost_RLCSRaleigh.bnk",
+      "quality": "Import",
+      "package": "boost_rlcsraleigh",
+      "path": "boost_rlcsraleigh.boost_rlcsraleigh"
+    },
+    {
+      "id": "9980",
+      "name": "Rocketmancer",
+      "upk_path": "boost_necromancer_SF.upk",
+      "audio_bnk": "SFX_Boost_Necromancer.bnk",
+      "quality": "Import",
+      "package": "boost_necromancer",
+      "path": "boost_necromancer.boost_necromancer"
+    },
+    {
+      "id": "11003",
+      "name": "S16 - Bronze",
+      "upk_path": "boost_s16_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s16",
+      "path": "boost_s16.boost_s16"
+    },
+    {
+      "id": "5864",
+      "name": "S2 - Bronze",
+      "upk_path": "boost_s2_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s2",
+      "path": "boost_s2.boost_s2"
+    },
+    {
+      "id": "12246",
+      "name": "S20 Bronze",
+      "upk_path": "boost_s20_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s20",
+      "path": "boost_s20.Boost_S20_01"
+    },
+    {
+      "id": "12247",
+      "name": "S20 Silver",
+      "upk_path": "boost_s20_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s20",
+      "path": "boost_s20.Boost_S20_02"
+    },
+    {
+      "id": "12248",
+      "name": "S20 Gold",
+      "upk_path": "boost_s20_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s20",
+      "path": "boost_s20.Boost_S20_03"
+    },
+    {
+      "id": "12249",
+      "name": "S20 Platinum",
+      "upk_path": "boost_s20_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s20",
+      "path": "boost_s20.Boost_S20_04"
+    },
+    {
+      "id": "12250",
+      "name": "S20 Diamond",
+      "upk_path": "boost_s20_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s20",
+      "path": "boost_s20.Boost_S20_05"
+    },
+    {
+      "id": "12251",
+      "name": "S20 Champion",
+      "upk_path": "boost_s20_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s20",
+      "path": "boost_s20.Boost_S20_06"
+    },
+    {
+      "id": "12252",
+      "name": "S20 Grand Champion",
+      "upk_path": "boost_s20_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s20",
+      "path": "boost_s20.Boost_S20_07"
+    },
+    {
+      "id": "12253",
+      "name": "S20 Supersonic Legend",
+      "upk_path": "boost_s20_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s20",
+      "path": "boost_s20.Boost_S20_08"
+    },
+    {
+      "id": "44",
+      "name": "Sacred",
+      "upk_path": "Boost_HolyLight_SF.upk",
+      "audio_bnk": "SFX_Boost_HolyLight.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_HolyLight",
+      "path": "Boost_HolyLight.Boost_HolyLight"
+    },
+    {
+      "id": "10470",
+      "name": "Sakura",
+      "upk_path": "boost_sakura_SF.upk",
+      "audio_bnk": "SFX_Boost_Sakura.bnk",
+      "quality": "Limited",
+      "package": "boost_sakura",
+      "path": "boost_sakura.FX.boost_sakura"
+    },
+    {
+      "id": "664",
+      "name": "Sandstorm",
+      "upk_path": "Boost_SandStorm_SF.upk",
+      "audio_bnk": "SFX_Boost_Sandstorm.bnk",
+      "quality": "Import",
+      "package": "Boost_SandStorm",
+      "path": "Boost_SandStorm.Boost_SandStorm"
+    },
+    {
+      "id": "10299",
+      "name": "SARPBC",
+      "upk_path": "boost_retrotrails_SF.upk",
+      "audio_bnk": "SFX_Boost_Retrotrails.bnk",
+      "quality": "VeryRare",
+      "package": "boost_retrotrails",
+      "path": "boost_retrotrails.FX.boost_retrotrails"
+    },
+    {
+      "id": "2328",
+      "name": "Scary Pumpkin",
+      "upk_path": "boost_pumpkin_SF.upk",
+      "audio_bnk": "",
+      "quality": "VeryRare",
+      "package": "boost_pumpkin",
+      "path": "boost_pumpkin.boost_pumpkin"
+    },
+    {
+      "id": "12115",
+      "name": "Scooby Snacks",
+      "upk_path": "boost_hhbanjolte_SF.upk",
+      "audio_bnk": "SFX_Boost_HHBanjoLTE01.bnk",
+      "quality": "Limited",
+      "package": "boost_hhbanjolte",
+      "path": "boost_hhbanjolte.boost_hhbanjolte"
+    },
+    {
+      "id": "8359",
+      "name": "Sea Spray",
+      "upk_path": "boost_magicsplash_SF.upk",
+      "audio_bnk": "SFX_Boost_MagicSplash.bnk",
+      "quality": "Limited",
+      "package": "boost_magicsplash",
+      "path": "boost_magicsplash.boost_magicsplash"
+    },
+    {
+      "id": "11651",
+      "name": "Sear Cell",
+      "upk_path": "boost_darkmagic_SF.upk",
+      "audio_bnk": "SFX_Boost_DarkMagic.bnk",
+      "quality": "Limited",
+      "package": "boost_darkmagic",
+      "path": "boost_darkmagic.boost_darkmagic"
+    },
+    {
+      "id": "4160",
+      "name": "Season 11 - Bronze",
+      "upk_path": "boost_seasoneleven01_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_seasoneleven01",
+      "path": "boost_seasoneleven01.boost_seasoneleven01"
+    },
+    {
+      "id": "4165",
+      "name": "Season 11 - Champion",
+      "upk_path": "boost_seasoneleven06_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_seasoneleven06",
+      "path": "boost_seasoneleven06.boost_seasoneleven06"
+    },
+    {
+      "id": "4164",
+      "name": "Season 11 - Diamond",
+      "upk_path": "boost_seasoneleven05_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_seasoneleven05",
+      "path": "boost_seasoneleven05.boost_seasoneleven05"
+    },
+    {
+      "id": "4162",
+      "name": "Season 11 - Gold",
+      "upk_path": "boost_seasoneleven03_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_seasoneleven03",
+      "path": "boost_seasoneleven03.boost_seasoneleven03"
+    },
+    {
+      "id": "4166",
+      "name": "Season 11 - Grand Champion",
+      "upk_path": "boost_seasoneleven07_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_seasoneleven07",
+      "path": "boost_seasoneleven07.boost_seasoneleven07"
+    },
+    {
+      "id": "4163",
+      "name": "Season 11 - Platinum",
+      "upk_path": "boost_seasoneleven04_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_seasoneleven04",
+      "path": "boost_seasoneleven04.boost_seasoneleven04"
+    },
+    {
+      "id": "4161",
+      "name": "Season 11 - Silver",
+      "upk_path": "boost_seasoneleven02_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_seasoneleven02",
+      "path": "boost_seasoneleven02.boost_seasoneleven02"
+    },
+    {
+      "id": "1334",
+      "name": "Season 2 - Challenger",
+      "upk_path": "Boost_Challenger_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "Boost_Challenger",
+      "path": "Boost_Challenger.Archetype.Boost_Challenger"
+    },
+    {
+      "id": "1335",
+      "name": "Season 2 - Champion",
+      "upk_path": "Boost_Champion_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "Boost_Champion",
+      "path": "Boost_Champion.Archetype.Boost_Champion"
+    },
+    {
+      "id": "1336",
+      "name": "Season 2 - Prospect",
+      "upk_path": "Boost_Prospect_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "Boost_Prospect",
+      "path": "Boost_Prospect.Archetype.Boost_Prospect"
+    },
+    {
+      "id": "1337",
+      "name": "Season 2 - Star",
+      "upk_path": "Boost_Star_SF.upk",
+      "audio_bnk": "SFX_Boost_Star.bnk",
+      "quality": "Limited",
+      "package": "Boost_Star",
+      "path": "Boost_Star.Archetype.Boost_Star"
+    },
+    {
+      "id": "3384",
+      "name": "Season 8 - Bronze",
+      "upk_path": "boost_s8r_bsg_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s8r_bsg",
+      "path": "boost_s8r_bsg.boost_s8r_bsg"
+    },
+    {
+      "id": "3473",
+      "name": "Season 8 - Champion",
+      "upk_path": "boost_s8r_2_cgc_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s8r_2_cgc",
+      "path": "boost_s8r_2_cgc.boost_s8r_2_cgc"
+    },
+    {
+      "id": "3385",
+      "name": "Season 8 - Diamond",
+      "upk_path": "boost_s8r_cgc_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s8r_cgc",
+      "path": "boost_s8r_cgc.boost_s8r_cgc"
+    },
+    {
+      "id": "3386",
+      "name": "Season 8 - Gold",
+      "upk_path": "boost_s8r_dp_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s8r_dp",
+      "path": "boost_s8r_dp.boost_s8r_dp"
+    },
+    {
+      "id": "3474",
+      "name": "Season 8 - Platinum",
+      "upk_path": "boost_s8r_2_dp_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s8r_2_dp",
+      "path": "boost_s8r_2_dp.boost_s8r_2_dp"
+    },
+    {
+      "id": "3472",
+      "name": "Season 8 - Silver",
+      "upk_path": "boost_s8r_2_bsg_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s8r_2_bsg",
+      "path": "boost_s8r_2_bsg.boost_s8r_2_bsg"
+    },
+    {
+      "id": "7492",
+      "name": "Shield Breaker",
+      "upk_path": "boost_sphexe_SF.upk",
+      "audio_bnk": "SFX_Boost_Sphexe.bnk",
+      "quality": "Limited",
+      "package": "boost_sphexe",
+      "path": "boost_sphexe.boost_sphexe"
+    },
+    {
+      "id": "4604",
+      "name": "Shining Barrage I",
+      "upk_path": "boost_anime_SF.upk",
+      "audio_bnk": "SFX_Boost_Anime.bnk",
+      "quality": "Limited",
+      "package": "boost_anime",
+      "path": "boost_anime.boost_anime_tier1"
+    },
+    {
+      "id": "4605",
+      "name": "Shining Barrage II",
+      "upk_path": "boost_anime_SF.upk",
+      "audio_bnk": "SFX_Boost_Anime.bnk",
+      "quality": "Limited",
+      "package": "boost_anime",
+      "path": "boost_anime.boost_anime_tier2"
+    },
+    {
+      "id": "11713",
+      "name": "Skelly",
+      "upk_path": "boost_skullchromatic_SF.upk",
+      "audio_bnk": "SFX_Boost_SkullChromatic.bnk",
+      "quality": "Limited",
+      "package": "boost_skullchromatic",
+      "path": "boost_skullchromatic.boost_skullchromatic"
+    },
+    {
+      "id": "3957",
+      "name": "Slash Beam I",
+      "upk_path": "boost_blade_tier1_SF.upk",
+      "audio_bnk": "SFX_Boost_Blade_T01.bnk",
+      "quality": "Limited",
+      "package": "boost_blade_tier1",
+      "path": "boost_blade_tier1.boost_blade_tier1"
+    },
+    {
+      "id": "3958",
+      "name": "Slash Beam II",
+      "upk_path": "boost_blade_tier2_SF.upk",
+      "audio_bnk": "SFX_Boost_Blade_T02.bnk",
+      "quality": "Limited",
+      "package": "boost_blade_tier2",
+      "path": "boost_blade_tier2.boost_blade_tier2"
+    },
+    {
+      "id": "3959",
+      "name": "Slash Beam III",
+      "upk_path": "boost_blade_tier3_SF.upk",
+      "audio_bnk": "SFX_Boost_Blade_T03.bnk",
+      "quality": "Limited",
+      "package": "boost_blade_tier3",
+      "path": "boost_blade_tier3.boost_blade_tier3"
+    },
+    {
+      "id": "12668",
+      "name": "Slaymaker",
+      "upk_path": "boost_s22rlcs01_SF.upk",
+      "audio_bnk": "SFX_Boost_S22RLCS01.bnk",
+      "quality": "Import",
+      "package": "boost_s22rlcs01",
+      "path": "boost_s22rlcs01.FX.boost_s22rlcs01"
+    },
+    {
+      "id": "60",
+      "name": "Slime",
+      "upk_path": "Boost_Slime_SF.upk",
+      "audio_bnk": "SFX_Boost_Slime.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Slime",
+      "path": "Boost_Slime.Boost_Slime"
+    },
+    {
+      "id": "11695",
+      "name": "Slimefire",
+      "upk_path": "boost_slimefire_SF.upk",
+      "audio_bnk": "SFX_Boost_Slimefire.bnk",
+      "quality": "Limited",
+      "package": "boost_slimefire",
+      "path": "boost_slimefire.FX.boost_slimefire"
+    },
+    {
+      "id": "7372",
+      "name": "Slurpee",
+      "upk_path": "boost_slurp_SF.upk",
+      "audio_bnk": "SFX_Boost_Slurp.bnk",
+      "quality": "Limited",
+      "package": "boost_slurp",
+      "path": "boost_slurp.boost_slurp"
+    },
+    {
+      "id": "12238",
+      "name": "Slytherin Scarf",
+      "upk_path": "boost_numblte04_SF.upk",
+      "audio_bnk": "SFX_Boost_Numb.bnk",
+      "quality": "Limited",
+      "package": "boost_numblte04",
+      "path": "boost_numblte04.boost_numblte04"
+    },
+    {
+      "id": "9190",
+      "name": "Smoke Run",
+      "upk_path": "boost_smokerun_SF.upk",
+      "audio_bnk": "SFX_Boost_Smokerun.bnk",
+      "quality": "Limited",
+      "package": "boost_smokerun",
+      "path": "boost_smokerun.boost_smokerun"
+    },
+    {
+      "id": "61",
+      "name": "Snowflakes",
+      "upk_path": "Boost_Snow_SF.upk",
+      "audio_bnk": "SFX_Boost_Snow.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Snow",
+      "path": "Boost_Snow.Boost_Snow"
+    },
+    {
+      "id": "10174",
+      "name": "Sonic Boom",
+      "upk_path": "boost_pulsed_energy_SF.upk",
+      "audio_bnk": "SFX_Boost_PulsedEnergy.bnk",
+      "quality": "Import",
+      "package": "boost_pulsed_energy",
+      "path": "boost_pulsed_energy.FX.boost_pulsed_energy"
+    },
+    {
+      "id": "12017",
+      "name": "Sonic Invincibility",
+      "upk_path": "boost_goldenlychee01_SF.upk",
+      "audio_bnk": "SFX_Boost_GoldenLychee01.bnk",
+      "quality": "Import",
+      "package": "boost_goldenlychee01",
+      "path": "boost_goldenlychee01.boost_goldenlychee01"
+    },
+    {
+      "id": "12231",
+      "name": "Soul Reaper Rush",
+      "upk_path": "boost_blightshield01_SF.upk",
+      "audio_bnk": "SFX_Boost_BlightShield.bnk",
+      "quality": "Import",
+      "package": "boost_blightshield01",
+      "path": "boost_blightshield01.boost_blightshield01"
+    },
+    {
+      "id": "10387",
+      "name": "Soulmesh",
+      "upk_path": "boost_soulfire_SF.upk",
+      "audio_bnk": "SFX_Boost_SoulFire.bnk",
+      "quality": "Import",
+      "package": "boost_soulfire",
+      "path": "boost_soulfire.boost_soulfire"
+    },
+    {
+      "id": "11838",
+      "name": "Soundrave",
+      "upk_path": "boost_dragoncat_SF.upk",
+      "audio_bnk": "SFX_Boost_Dragoncat.bnk",
+      "quality": "Import",
+      "package": "boost_dragoncat",
+      "path": "boost_dragoncat.boost_dragoncat"
+    },
+    {
+      "id": "62",
+      "name": "Sparkles",
+      "upk_path": "Boost_Sparkles_SF.upk",
+      "audio_bnk": "SFX_Boost_Sparkle.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Sparkles",
+      "path": "Boost_Sparkles.Boost_Sparkles"
+    },
+    {
+      "id": "2782",
+      "name": "Speed Force",
+      "upk_path": "boost_sf_SF.upk",
+      "audio_bnk": "SFX_Boost_SF.bnk",
+      "quality": "Import",
+      "package": "boost_sf",
+      "path": "boost_sf.boost_sf"
+    },
+    {
+      "id": "6879",
+      "name": "Spirits",
+      "upk_path": "Boost_Spirits_SF.upk",
+      "audio_bnk": "SFX_Boost_Spirits.bnk",
+      "quality": "Import",
+      "package": "Boost_Spirits",
+      "path": "Boost_Spirits.Boost_Spirits"
+    },
+    {
+      "id": "9848",
+      "name": "Spiritus",
+      "upk_path": "Boost_RageUnleashed_SF.upk",
+      "audio_bnk": "SFX_Boost_RageUnleashed.bnk",
+      "package": "Boost_RageUnleashed",
+      "path": "Boost_RageUnleashed.FX.Boost_RageUnleashed"
+    },
+    {
+      "id": "7925",
+      "name": "Sprattle",
+      "upk_path": "boost_street_SF.upk",
+      "audio_bnk": "SFX_Boost_Street.bnk",
+      "quality": "Limited",
+      "package": "boost_street",
+      "path": "boost_street.boost_street"
+    },
+    {
+      "id": "2722",
+      "name": "Springtime Flowers",
+      "upk_path": "boost_floral_SF.upk",
+      "audio_bnk": "SFX_Boost_Floral.bnk",
+      "quality": "VeryRare",
+      "package": "boost_floral",
+      "path": "boost_floral.boost_floral"
+    },
+    {
+      "id": "11396",
+      "name": "Spriteful",
+      "upk_path": "boost_turbotechno_SF.upk",
+      "audio_bnk": "SFX_Boost_TurboTechno.bnk",
+      "quality": "Import",
+      "package": "boost_turbotechno",
+      "path": "boost_turbotechno.boost_turbotechno"
+    },
+    {
+      "id": "63",
+      "name": "Standard",
+      "upk_path": "Boost_Standard_SF.upk",
+      "audio_bnk": "SFX_Boost_Standard.bnk",
+      "quality": "Common",
+      "package": "Boost_Standard",
+      "path": "Boost_Standard.Boost_Standard"
+    },
+    {
+      "id": "64",
+      "name": "Standard Blue",
+      "upk_path": "Boost_Standard_Blue_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_Standard_Blue",
+      "path": "Boost_Standard_Blue.Boost_Standard_Blue"
+    },
+    {
+      "id": "1319",
+      "name": "Standard Green",
+      "upk_path": "Boost_Standard_Green_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_Standard_Green",
+      "path": "Boost_Standard_Green.Boost_Standard_Green"
+    },
+    {
+      "id": "65",
+      "name": "Standard Pink",
+      "upk_path": "Boost_Standard_Pink_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_Standard_Pink",
+      "path": "Boost_Standard_Pink.Boost_Standard_Pink"
+    },
+    {
+      "id": "66",
+      "name": "Standard Purple",
+      "upk_path": "Boost_Standard_Purple_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_Standard_Purple",
+      "path": "Boost_Standard_Purple.Boost_Standard_Purple"
+    },
+    {
+      "id": "67",
+      "name": "Standard Yellow",
+      "upk_path": "Boost_Standard_Yellow_SF.upk",
+      "audio_bnk": "",
+      "quality": "Legacy",
+      "package": "Boost_Standard_Yellow",
+      "path": "Boost_Standard_Yellow.Boost_Standard_Yellow"
+    },
+    {
+      "id": "5742",
+      "name": "Star Princess",
+      "upk_path": "boost_spell_streak_SF.upk",
+      "audio_bnk": "SFX_Boost_SpellStreak.bnk",
+      "quality": "Limited",
+      "package": "boost_spell_streak",
+      "path": "boost_spell_streak.boost_spell_streak"
+    },
+    {
+      "id": "10294",
+      "name": "Starlane",
+      "upk_path": "boost_daynight_SF.upk",
+      "audio_bnk": "SFX_Boost_DayNight.bnk",
+      "quality": "Limited",
+      "package": "boost_daynight",
+      "path": "boost_daynight.boost_daynight"
+    },
+    {
+      "id": "10537",
+      "name": "Starry",
+      "upk_path": "boost_popstar_SF.upk",
+      "audio_bnk": "SFX_Boost_Popstar.bnk",
+      "quality": "Import",
+      "package": "boost_popstar",
+      "path": "boost_popstar.FX.boost_popstar"
+    },
+    {
+      "id": "9699",
+      "name": "StarStud",
+      "upk_path": "boost_fallingstar_SF.upk",
+      "audio_bnk": "SFX_Boost_FallingStar.bnk",
+      "quality": "Limited",
+      "package": "boost_fallingstar",
+      "path": "boost_fallingstar.boost_fallingstar"
+    },
+    {
+      "id": "5934",
+      "name": "Startrack",
+      "upk_path": "boost_starbeam_SF.upk",
+      "audio_bnk": "SFX_Boost_Starbeam.bnk",
+      "quality": "Import",
+      "package": "boost_starbeam",
+      "path": "boost_starbeam.boost_starbeam"
+    },
+    {
+      "id": "9134",
+      "name": "Startrack: Noire",
+      "upk_path": "boost_starbeam_bw_SF.upk",
+      "audio_bnk": "SFX_Boost_Starbeam.bnk",
+      "quality": "Import",
+      "package": "boost_starbeam_bw",
+      "path": "boost_starbeam_bw.boost_starbeam_bw"
+    },
+    {
+      "id": "5701",
+      "name": "Stormroot",
+      "upk_path": "boost_trace_SF.upk",
+      "audio_bnk": "SFX_Boost_Trace.bnk",
+      "quality": "Exotic",
+      "package": "boost_trace",
+      "path": "boost_trace.boost_trace"
+    },
+    {
+      "id": "4539",
+      "name": "Stranger Things",
+      "upk_path": "boost_st_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_st",
+      "path": "boost_st.boost_st"
+    },
+    {
+      "id": "4372",
+      "name": "Streamer",
+      "upk_path": "boost_tw_SF.upk",
+      "audio_bnk": "SFX_Boost_TW.bnk",
+      "quality": "Limited",
+      "package": "boost_tw",
+      "path": "boost_tw.boost_tw"
+    },
+    {
+      "id": "12386",
+      "name": "Successory",
+      "upk_path": "boost_s21rlcs_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_s21rlcs",
+      "path": "boost_s21rlcs.boost_s21rlcs"
+    },
+    {
+      "id": "2904",
+      "name": "Sun Ray",
+      "upk_path": "boost_sunrays_SF.upk",
+      "audio_bnk": "SFX_Boost_SunRays.bnk",
+      "quality": "Import",
+      "package": "boost_sunrays",
+      "path": "boost_sunrays.boost_sunrays"
+    },
+    {
+      "id": "8492",
+      "name": "Sun Ray YNP",
+      "upk_path": "boost_sunrays_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_SunRays.bnk",
+      "quality": "Premium",
+      "package": "boost_sunrays_psplus",
+      "path": "boost_sunrays_psplus.FX.boost_sunrays_psplus"
+    },
+    {
+      "id": "3548",
+      "name": "Super Manga-Bolt I",
+      "upk_path": "boost_firemane_tier1_SF.upk",
+      "audio_bnk": "SFX_Boost_Firemane_T01.bnk",
+      "quality": "Limited",
+      "package": "boost_firemane_tier1",
+      "path": "boost_firemane_tier1.boost_firemane_tier1"
+    },
+    {
+      "id": "3549",
+      "name": "Super Manga-Bolt II",
+      "upk_path": "Boost_Firemane_Tier2_SF.upk",
+      "audio_bnk": "SFX_Boost_Firemane_T02.bnk",
+      "quality": "Limited",
+      "package": "Boost_Firemane_Tier2",
+      "path": "Boost_Firemane_Tier2.Boost_Firemane_Tier2"
+    },
+    {
+      "id": "3550",
+      "name": "Super Manga-Bolt III",
+      "upk_path": "Boost_Firemane_Tier3_SF.upk",
+      "audio_bnk": "SFX_Boost_Firemane_T03.bnk",
+      "quality": "Limited",
+      "package": "Boost_Firemane_Tier3",
+      "path": "Boost_Firemane_Tier3.Boost_Firemane_Tier3"
+    },
+    {
+      "id": "5112",
+      "name": "Supernova",
+      "upk_path": "boost_supernova_SF.upk",
+      "audio_bnk": "SFX_Boost_Supernova.bnk",
+      "quality": "Limited",
+      "package": "boost_supernova",
+      "path": "boost_supernova.boost_supernova"
+    },
+    {
+      "id": "9551",
+      "name": "Surrealist",
+      "upk_path": "boost_surrealrush_SF.upk",
+      "audio_bnk": "SFX_Boost_SurrealRush.bnk",
+      "quality": "Import",
+      "package": "boost_surrealrush",
+      "path": "boost_surrealrush.boost_surrealrush"
+    },
+    {
+      "id": "10324",
+      "name": "Swave",
+      "upk_path": "boost_light_ray_SF.upk",
+      "audio_bnk": "SFX_Boost_LightRays.bnk",
+      "quality": "Limited",
+      "package": "boost_light_ray",
+      "path": "boost_light_ray.boost_light_ray"
+    },
+    {
+      "id": "11810",
+      "name": "Synth-Sonic",
+      "upk_path": "boost_dragoncatLTE_SF.upk",
+      "audio_bnk": "SFX_Boost_DragoncatLTE.bnk",
+      "quality": "Limited",
+      "package": "boost_dragoncatLTE",
+      "path": "boost_dragoncatLTE.boost_dragoncatLTE"
+    },
+    {
+      "id": "10681",
+      "name": "Synthpop",
+      "upk_path": "boost_bluebolt_SF.upk",
+      "audio_bnk": "SFX_Boost_Bluebolt.bnk",
+      "quality": "Limited",
+      "package": "boost_bluebolt",
+      "path": "boost_bluebolt.FX.boost_bluebolt"
+    },
+    {
+      "id": "3331",
+      "name": "Synthwave",
+      "upk_path": "boost_retrotech_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_retrotech",
+      "path": "boost_retrotech.boost_retrotech"
+    },
+    {
+      "id": "1552",
+      "name": "Tachyon",
+      "upk_path": "boost_technotrail_SF.upk",
+      "audio_bnk": "SFX_Boost_TechnoTrail.bnk",
+      "quality": "Import",
+      "package": "boost_technotrail",
+      "path": "boost_technotrail.boost_technotrail"
+    },
+    {
+      "id": "1680",
+      "name": "Taco",
+      "upk_path": "boost_taco_SF.upk",
+      "audio_bnk": "SFX_Boost_Taco.bnk",
+      "quality": "VeryRare",
+      "package": "boost_taco",
+      "path": "boost_taco.boost_taco"
+    },
+    {
+      "id": "11380",
+      "name": "TCRI Ooze",
+      "upk_path": "boost_frog_SF.upk",
+      "audio_bnk": "SFX_Boost_Frog.bnk",
+      "quality": "Limited",
+      "package": "boost_frog",
+      "path": "boost_frog.boost_frog"
+    },
+    {
+      "id": "9470",
+      "name": "TechnoFlow",
+      "upk_path": "boost_electromusic_SF.upk",
+      "audio_bnk": "SFX_Boost_ElectroMusic.bnk",
+      "quality": "Limited",
+      "package": "boost_electromusic",
+      "path": "boost_electromusic.FX.boost_electromusic"
+    },
+    {
+      "id": "10413",
+      "name": "TekRay",
+      "upk_path": "Boost_TechRay_SF.upk",
+      "audio_bnk": "SFX_Boost_TechRay.bnk",
+      "quality": "Import",
+      "package": "Boost_TechRay",
+      "path": "Boost_TechRay.Boost_TechRay"
+    },
+    {
+      "id": "5120",
+      "name": "Terrorkinesis",
+      "upk_path": "Boost_Psionics_SF.upk",
+      "audio_bnk": "SFX_Boost_Psionics.bnk",
+      "quality": "Import",
+      "package": "Boost_Psionics",
+      "path": "Boost_Psionics.Boost_Psionics"
+    },
+    {
+      "id": "2765",
+      "name": "The Dark Knight's Tumbler",
+      "upk_path": "boost_berry_SF.upk",
+      "audio_bnk": "SFX_Boost_Berry.bnk",
+      "quality": "Import",
+      "package": "boost_berry",
+      "path": "boost_berry.boost_berry"
+    },
+    {
+      "id": "53",
+      "name": "Thermal",
+      "upk_path": "Boost_Propulsion_SF.upk",
+      "audio_bnk": "SFX_Boost_Propulsion.bnk",
+      "quality": "Uncommon",
+      "package": "Boost_Propulsion",
+      "path": "Boost_Propulsion.Boost_Propulsion"
+    },
+    {
+      "id": "54",
+      "name": "Thermal Blue",
+      "upk_path": "Boost_Propulsion_Blue_SF.upk",
+      "audio_bnk": "SFX_Boost_Propulsion.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Propulsion_Blue",
+      "path": "Boost_Propulsion_Blue.Boost_Propulsion_Blue"
+    },
+    {
+      "id": "55",
+      "name": "Thermal Green",
+      "upk_path": "Boost_Propulsion_Green_SF.upk",
+      "audio_bnk": "SFX_Boost_Propulsion.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Propulsion_Green",
+      "path": "Boost_Propulsion_Green.Boost_Propulsion_Green"
+    },
+    {
+      "id": "56",
+      "name": "Thermal Pink",
+      "upk_path": "Boost_Propulsion_Pink_SF.upk",
+      "audio_bnk": "SFX_Boost_Propulsion.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Propulsion_Pink",
+      "path": "Boost_Propulsion_Pink.Boost_Propulsion_Pink"
+    },
+    {
+      "id": "57",
+      "name": "Thermal Purple",
+      "upk_path": "Boost_Propulsion_Purple_SF.upk",
+      "audio_bnk": "SFX_Boost_Propulsion.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Propulsion_Purple",
+      "path": "Boost_Propulsion_Purple.Boost_Propulsion_Purple"
+    },
+    {
+      "id": "58",
+      "name": "Thermal Yellow",
+      "upk_path": "Boost_Propulsion_Yellow_SF.upk",
+      "audio_bnk": "SFX_Boost_Propulsion.bnk",
+      "quality": "Legacy",
+      "package": "Boost_Propulsion_Yellow",
+      "path": "Boost_Propulsion_Yellow.Boost_Propulsion_Yellow"
+    },
+    {
+      "id": "9734",
+      "name": "Thin Ice",
+      "upk_path": "boost_thinice_SF.upk",
+      "audio_bnk": "SFX_Boost_ThinIce.bnk",
+      "quality": "Import",
+      "package": "boost_thinice",
+      "path": "boost_thinice.boost_thinice"
+    },
+    {
+      "id": "11776",
+      "name": "Throwback",
+      "upk_path": "boost_retrostrips_SF.upk",
+      "audio_bnk": "SFX_Boost_Retrostrips.bnk",
+      "package": "boost_retrostrips",
+      "path": "boost_retrostrips.boost_retrostrips"
+    },
+    {
+      "id": "5645",
+      "name": "Timeline",
+      "upk_path": "boost_Clockwork_SF.upk",
+      "audio_bnk": "SFX_Boost_Clockwork.bnk",
+      "quality": "Limited",
+      "package": "boost_Clockwork",
+      "path": "boost_Clockwork.boost_Clockwork"
+    },
+    {
+      "id": "5095",
+      "name": "Toon Flame",
+      "upk_path": "boost_toonhotdark_SF.upk",
+      "audio_bnk": "SFX_Boost_ToonHotDark.bnk",
+      "quality": "Limited",
+      "package": "boost_toonhotdark",
+      "path": "boost_toonhotdark.boost_toonhotdark"
+    },
+    {
+      "id": "2654",
+      "name": "Toon Sketch",
+      "upk_path": "boost_mangaoutline_SF.upk",
+      "audio_bnk": "SFX_Boost_Manga.bnk",
+      "quality": "Import",
+      "package": "boost_mangaoutline",
+      "path": "boost_mangaoutline.boost_mangaoutline"
+    },
+    {
+      "id": "9771",
+      "name": "Toon Sketch: Gilded",
+      "upk_path": "boost_mangaoutline_gp_SF.upk",
+      "audio_bnk": "SFX_Boost_Manga.bnk",
+      "quality": "Import",
+      "package": "boost_mangaoutline_gp",
+      "path": "boost_mangaoutline_gp.boost_mangaoutline_gp"
+    },
+    {
+      "id": "1094",
+      "name": "Toon Smoke",
+      "upk_path": "Boost_Toon_SF.upk",
+      "audio_bnk": "SFX_Boost_Toon.bnk",
+      "quality": "VeryRare",
+      "package": "Boost_Toon",
+      "path": "Boost_Toon.Boost_Toon"
+    },
+    {
+      "id": "11837",
+      "name": "Tornado Boost",
+      "upk_path": "boost_mooncake_SF.upk",
+      "audio_bnk": "SFX_Boost_Mooncake.bnk",
+      "quality": "Import",
+      "package": "boost_mooncake",
+      "path": "boost_mooncake.Actors.boost_mooncake"
+    },
+    {
+      "id": "2880",
+      "name": "Torrent",
+      "upk_path": "boost_toonywater_SF.upk",
+      "audio_bnk": "SFX_Boost_Toon.bnk",
+      "quality": "VeryRare",
+      "package": "boost_toonywater",
+      "path": "boost_toonywater.boost_toonywater"
+    },
+    {
+      "id": "11705",
+      "name": "Torrent PK",
+      "upk_path": "boost_toonywater_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Toon.bnk",
+      "quality": "Premium",
+      "package": "boost_toonywater_psplus",
+      "path": "boost_toonywater_psplus.boost_toonywater_psplus"
+    },
+    {
+      "id": "8341",
+      "name": "TP",
+      "upk_path": "boost_toilettepaper_SF.upk",
+      "audio_bnk": "SFX_Boost_ToilettePaper.bnk",
+      "quality": "Import",
+      "package": "boost_toilettepaper",
+      "path": "boost_toilettepaper.boost_toilettepaper"
+    },
+    {
+      "id": "11791",
+      "name": "Trapperzoid",
+      "upk_path": "boost_crazyshapes_SF.upk",
+      "audio_bnk": "SFX_Boost_CrazyShapes.bnk",
+      "quality": "Limited",
+      "package": "boost_crazyshapes",
+      "path": "boost_crazyshapes.boost_crazyshapes"
+    },
+    {
+      "id": "1459",
+      "name": "Treasure",
+      "upk_path": "boost_treasures_SF.upk",
+      "audio_bnk": "SFX_Boost_Treasure.bnk",
+      "quality": "VeryRare",
+      "package": "boost_treasures",
+      "path": "boost_treasures.boost_treasures"
+    },
+    {
+      "id": "9317",
+      "name": "Tri-oomph",
+      "upk_path": "Boost_DigitalTrace_SF.upk",
+      "audio_bnk": "SFX_Boost_DigitalTrace.bnk",
+      "quality": "Limited",
+      "package": "Boost_DigitalTrace",
+      "path": "Boost_DigitalTrace.Boost_DigitalTrace"
+    },
+    {
+      "id": "11412",
+      "name": "Tri-oomph (R+T)",
+      "upk_path": "boost_digitaltrace_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_DigitalTrace.bnk",
+      "quality": "Premium",
+      "package": "boost_digitaltrace_psplus",
+      "path": "boost_digitaltrace_psplus.boost_digitaltrace_psplus"
+    },
+    {
+      "id": "5753",
+      "name": "Triangulate",
+      "upk_path": "boost_neonshapes_SF.upk",
+      "audio_bnk": "SFX_Boost_NeonShapes.bnk",
+      "quality": "Import",
+      "package": "boost_neonshapes",
+      "path": "boost_neonshapes.boost_neonshapes"
+    },
+    {
+      "id": "1158",
+      "name": "Trinity",
+      "upk_path": "boost_plexus_SF.upk",
+      "audio_bnk": "SFX_Boost_Plexus.bnk",
+      "quality": "Import",
+      "package": "boost_plexus",
+      "path": "boost_plexus.boost_plexus"
+    },
+    {
+      "id": "7913",
+      "name": "Trinity RBY",
+      "upk_path": "boost_plexus_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Plexus.bnk",
+      "quality": "Premium",
+      "package": "boost_plexus_psplus",
+      "path": "boost_plexus_psplus.boost_plexus_psplus"
+    },
+    {
+      "id": "2645",
+      "name": "Tsunami Beam",
+      "upk_path": "boost_bfooom_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_bfooom",
+      "path": "boost_bfooom.boost_bfooom"
+    },
+    {
+      "id": "12277",
+      "name": "Tsunami Beam G+G",
+      "upk_path": "boost_bfooompsplus_SF.upk",
+      "audio_bnk": "",
+      "quality": "Premium",
+      "package": "boost_bfooompsplus",
+      "path": "boost_bfooompsplus.boost_bfooompsplus"
+    },
+    {
+      "id": "10706",
+      "name": "Tsuzure",
+      "upk_path": "boost_goldenoutline_SF.upk",
+      "audio_bnk": "SFX_Boost_GoldenOutline.bnk",
+      "quality": "Import",
+      "package": "boost_goldenoutline",
+      "path": "boost_goldenoutline.boost_goldenoutline"
+    },
+    {
+      "id": "8192",
+      "name": "Twisted Tornado",
+      "upk_path": "boost_tornado_SF.upk",
+      "audio_bnk": "SFX_Boost_Tornado.bnk",
+      "quality": "Import",
+      "package": "boost_tornado",
+      "path": "boost_tornado.boost_tornado"
+    },
+    {
+      "id": "7367",
+      "name": "Uncanny",
+      "upk_path": "boost_krad_SF.upk",
+      "audio_bnk": "SFX_Boost_Krad.bnk",
+      "quality": "Limited",
+      "package": "boost_krad",
+      "path": "boost_krad.boost_krad"
+    },
+    {
+      "id": "6257",
+      "name": "Unicorn Juice",
+      "upk_path": "boost_unicornjuice_SF.upk",
+      "audio_bnk": "SFX_Boost_UnicornJuice.bnk",
+      "quality": "Exotic",
+      "package": "boost_unicornjuice",
+      "path": "boost_unicornjuice.boost_unicornjuice"
+    },
+    {
+      "id": "6110",
+      "name": "Union Beams",
+      "upk_path": "boost_drofb_SF.upk",
+      "audio_bnk": "SFX_Boost_Drof.bnk",
+      "quality": "Import",
+      "package": "boost_drofb",
+      "path": "boost_drofb.FX.boost_drofb"
+    },
+    {
+      "id": "11631",
+      "name": "Unstable Red Lightsaber",
+      "upk_path": "boost_evilornament02_SF.upk",
+      "audio_bnk": "SFX_Boost_EvilOrnament.bnk",
+      "quality": "Import",
+      "package": "boost_evilornament02",
+      "path": "boost_evilornament02.boost_evilornament02"
+    },
+    {
+      "id": "4330",
+      "name": "Vaporwave",
+      "upk_path": "boost_vaporwave_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_vaporwave",
+      "path": "boost_vaporwave.boost_vaporwave"
+    },
+    {
+      "id": "5253",
+      "name": "Vaporwave Remix",
+      "upk_path": "boost_vaporwave_anni_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "boost_vaporwave_anni",
+      "path": "boost_vaporwave_anni.boost_vaporwave_anni"
+    },
+    {
+      "id": "3114",
+      "name": "Virtual Wave",
+      "upk_path": "boost_techy_SF.upk",
+      "audio_bnk": "SFX_Boost_Techy.bnk",
+      "quality": "Import",
+      "package": "boost_techy",
+      "path": "boost_techy.boost_techy"
+    },
+    {
+      "id": "6124",
+      "name": "Virtual Wave",
+      "upk_path": "boost_techy_xbb_SF.upk",
+      "audio_bnk": "SFX_Boost_Techy.bnk",
+      "quality": "Import",
+      "package": "boost_techy_xbb",
+      "path": "boost_techy_xbb.boost_techy_xbb"
+    },
+    {
+      "id": "7561",
+      "name": "Virtual Wave Plus",
+      "upk_path": "boost_techy_psplus_SF.upk",
+      "audio_bnk": "SFX_Boost_Techy.bnk",
+      "quality": "Premium",
+      "package": "boost_techy_psplus",
+      "path": "boost_techy_psplus.boost_techy_psplus"
+    },
+    {
+      "id": "8473",
+      "name": "Volcano Crag",
+      "upk_path": "boost_molten_SF.upk",
+      "audio_bnk": "SFX_Boost_Molten.bnk",
+      "quality": "Limited",
+      "package": "boost_molten",
+      "path": "boost_molten.FX.boost_molten"
+    },
+    {
+      "id": "4242",
+      "name": "Voltron",
+      "upk_path": "boost_vt_SF.upk",
+      "audio_bnk": "SFX_Boost_VT.bnk",
+      "quality": "Limited",
+      "package": "boost_vt",
+      "path": "boost_vt.boost_vt"
+    },
+    {
+      "id": "9141",
+      "name": "Waned Flame",
+      "upk_path": "boost_stylizedflame_bw_SF.upk",
+      "audio_bnk": "SFX_Boost_StylizedFlame.bnk",
+      "quality": "Limited",
+      "package": "boost_stylizedflame_bw",
+      "path": "boost_stylizedflame_bw.boost_stylizedflame_bw"
+    },
+    {
+      "id": "3053",
+      "name": "Watermelon",
+      "upk_path": "boost_watermelon_SF.upk",
+      "audio_bnk": "SFX_Boost_Watermelon.bnk",
+      "quality": "Limited",
+      "package": "boost_watermelon",
+      "path": "boost_watermelon.boost_watermelon"
+    },
+    {
+      "id": "5774",
+      "name": "Wave Rave",
+      "upk_path": "Boost_energywave_SF.upk",
+      "audio_bnk": "SFX_Boost_EnergyWave.bnk",
+      "quality": "Exotic",
+      "package": "Boost_energywave",
+      "path": "Boost_energywave.Boost_energywave"
+    },
+    {
+      "id": "10783",
+      "name": "Web-Head",
+      "upk_path": "boost_sticky_01_SF.upk",
+      "audio_bnk": "SFX_Boost_Sticky01.bnk",
+      "quality": "Import",
+      "package": "boost_sticky_01",
+      "path": "boost_sticky_01.boost_sticky_01"
+    },
+    {
+      "id": "11643",
+      "name": "Whimsy Wisp",
+      "upk_path": "boost_geniesmoke_SF.upk",
+      "audio_bnk": "SFX_Boost_GenieSmoke.bnk",
+      "quality": "Import",
+      "package": "boost_geniesmoke",
+      "path": "boost_geniesmoke.boost_geniesmoke"
+    },
+    {
+      "id": "11079",
+      "name": "Wing Wraith",
+      "upk_path": "boost_splitenergy_SF.upk",
+      "audio_bnk": "SFX_Boost_SplitEnergy.bnk",
+      "quality": "Import",
+      "package": "boost_splitenergy",
+      "path": "boost_splitenergy.boost_splitenergy"
+    },
+    {
+      "id": "2442",
+      "name": "Winter Storm",
+      "upk_path": "boost_winter_SF.upk",
+      "audio_bnk": "",
+      "quality": "Import",
+      "package": "boost_winter",
+      "path": "boost_winter.boost_winter"
+    },
+    {
+      "id": "1550",
+      "name": "Xenosplash",
+      "upk_path": "boost_alienliquid_SF.upk",
+      "audio_bnk": "SFX_Boost_AlienLiquid.bnk",
+      "quality": "VeryRare",
+      "package": "boost_alienliquid",
+      "path": "boost_alienliquid.boost_alienliquid"
+    },
+    {
+      "id": "12452",
+      "name": "Xenosplash: O+B",
+      "upk_path": "boost_alienliquidpsplus_SF.upk",
+      "audio_bnk": "SFX_Boost_AlienLiquid.bnk",
+      "quality": "Premium",
+      "package": "boost_alienliquidpsplus",
+      "path": "boost_alienliquidpsplus.FX.boost_alienliquidpsplus"
+    },
+    {
+      "id": "635",
+      "name": "Xmas",
+      "upk_path": "Boost_Presents_SF.upk",
+      "audio_bnk": "",
+      "quality": "Limited",
+      "package": "Boost_Presents",
+      "path": "Boost_Presents.Boost_Presents"
+    },
+    {
+      "id": "4503",
+      "name": "Xmas Lights",
+      "upk_path": "boost_holidaylights_SF.upk",
+      "audio_bnk": "SFX_Boost_HolidayLights.bnk",
+      "quality": "Limited",
+      "package": "boost_holidaylights",
+      "path": "boost_holidaylights.boost_holidaylights"
+    },
+    {
+      "id": "10648",
+      "name": "YouVee",
+      "upk_path": "boost_spellwarm_SF.upk",
+      "audio_bnk": "SFX_Boost_SpellWarm.bnk",
+      "quality": "Limited",
+      "package": "boost_spellwarm",
+      "path": "boost_spellwarm.boost_spellwarm"
+    },
+    {
+      "id": "2478",
+      "name": "Yuletide",
+      "upk_path": "boost_holidaydeco_SF.upk",
+      "audio_bnk": "SFX_Boost_HolidayDeco.bnk",
+      "quality": "VeryRare",
+      "package": "boost_holidaydeco",
+      "path": "boost_holidaydeco.boost_holidaydeco"
+    }
+  ]
+}

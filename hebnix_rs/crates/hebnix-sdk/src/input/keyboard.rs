@@ -1,4 +1,6 @@
 //! hotkey detection via GetAsyncKeyState, windows only
+//
+// key names match the python keyboard lib ("tab", "f2", "ctrl", etc) so old configs still work
 
 use std::time::{Duration, Instant};
 

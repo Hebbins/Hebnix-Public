@@ -3,7 +3,7 @@
 //! dcomp (preferred): gpu-composited transparent window via DirectComposition
 //! (d3d11 + direct2d + premult alpha), same trick discord/game bar use, near
 //! zero cost, full #RRGGBBAA alpha. gdi (fallback when d3d11 init fails): the
-
+//! old layered color-key window (python W2SOverlay), opaque only, pure black =
 //! transparent.
 //!
 //! plugins draw via the free fns here (line, rect, ..) which dispatch to

@@ -161,6 +161,7 @@ impl PluginManager {
         };
 
         if enabled {
+            // Always reload fresh from disk, like the Python reload_plugin.
             Self::call_on_unload(&mut self.plugins[idx]);
             self.plugins[idx].runtime = None;
 
@@ -215,6 +216,7 @@ impl PluginManager {
     /// Recreate enabled plugin runtimes after an actual Steam/Epic transition.
     /// This intentionally emits no success messages; plugins simply receive the
     /// updated shared platform on their next `on_load` call.
+    #[cfg(not(feature = "lite"))]
     pub fn reload_enabled_silent(&mut self, config: &mut Config) {
         let enabled = self
             .plugins

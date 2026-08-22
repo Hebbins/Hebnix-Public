@@ -12,12 +12,12 @@ pub mod socket;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crossbeam_channel::Sender;
 
 use crate::messages::AppMsg;
-use crate::spoofer::proxy::Proxy;
 use crate::spoofer::rules::{
     NameRule, OwnedProductsRule, Rule, TITLE_HOST, TitleRule, TitleSettings,
 };
@@ -27,6 +27,7 @@ use crate::spoofer::socket::SocketProxy;
 pub const PROXY_HOST: &str = "127.0.0.1";
 pub const PROXY_PORT: u16 = 8080;
 pub const MAX_NAME_LENGTH: usize = 32;
+const REDIRECT_HOSTS: [&str; 3] = ["api.epicgames.dev", "api.rlpp.psynet.gg", TITLE_HOST];
 
 const INET_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
 
@@ -40,7 +41,6 @@ pub fn is_admin() -> bool {
 }
 
 pub const SKIP_ELEVATE_ARG: &str = "--no-elevate";
-
 pub fn spawn_elevated_relaunch() -> bool {
     use std::os::windows::process::CommandExt;
 
@@ -64,8 +64,6 @@ pub fn spawn_elevated_relaunch() -> bool {
 fn marker_path(base_dir: &Path) -> PathBuf {
     ca::dir(base_dir).join("proxy_backup.json")
 }
-
-pub const PROXY_BYPASS: &str = "<local>;*.epicgames.com;*.psyonix.com;*.live.psynet.gg";
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ProxyBackup {
@@ -123,39 +121,18 @@ fn apply_proxy(state: &ProxyBackup) -> Result<(), String> {
     Ok(())
 }
 
-pub fn enable_proxy(base_dir: &Path) -> Result<(), String> {
+fn restore_legacy_hebnix_proxy(base_dir: &Path) {
     let marker = marker_path(base_dir);
-    if !marker.is_file() {
-        let backup = read_current_proxy();
-        if let Ok(json) = serde_json::to_vec_pretty(&backup) {
-            let _ = std::fs::create_dir_all(ca::dir(base_dir));
-            let _ = std::fs::write(&marker, json);
-        }
-    }
-    apply_proxy(&ProxyBackup {
-        proxy_enable: Some(1),
-        proxy_server: Some(format!("{PROXY_HOST}:{PROXY_PORT}")),
-        proxy_override: Some(PROXY_BYPASS.to_string()),
-    })
-}
-
-pub fn disable_proxy(base_dir: &Path) {
-    let marker = marker_path(base_dir);
-    match std::fs::read(&marker)
-        .ok()
-        .and_then(|b| serde_json::from_slice::<ProxyBackup>(&b).ok())
-    {
-        Some(backup) => {
+    let current = read_current_proxy();
+    let ours = format!("{PROXY_HOST}:{PROXY_PORT}");
+    let legacy_hebnix_proxy = current.proxy_server.as_deref() == Some(&ours)
+        && current.proxy_enable.unwrap_or_default() != 0;
+    if legacy_hebnix_proxy {
+        if let Some(backup) = std::fs::read(&marker)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<ProxyBackup>(&bytes).ok())
+        {
             let _ = apply_proxy(&backup);
-        }
-        None => {
-            let current = read_current_proxy();
-            let ours = format!("{PROXY_HOST}:{PROXY_PORT}");
-            let _ = apply_proxy(&ProxyBackup {
-                proxy_enable: Some(0),
-                proxy_server: current.proxy_server.filter(|s| s != &ours),
-                proxy_override: current.proxy_override.filter(|s| s != PROXY_BYPASS),
-            });
         }
     }
     let _ = std::fs::remove_file(&marker);
@@ -164,9 +141,9 @@ pub fn disable_proxy(base_dir: &Path) {
 pub fn restore_if_crashed(base_dir: &Path) {
     if marker_path(base_dir).is_file() {
         tracing::warn!("stale spoofer proxy marker, restoring system proxy");
-        disable_proxy(base_dir);
+        restore_legacy_hebnix_proxy(base_dir);
     }
-    if hosts::is_redirected(TITLE_HOST) {
+    if hosts::has_redirects() {
         tracing::warn!("stale hosts redirect, clearing it");
         let _ = hosts::clear();
     }
@@ -190,9 +167,10 @@ pub struct SpooferManager {
     pub discovered_friends: Arc<Mutex<HashMap<String, String>>>,
     pub spoofed_ranks: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
     owned_products: Arc<Mutex<HashSet<i64>>>,
-    proxy: Mutex<Option<Proxy>>,
+    reverse_proxy: Mutex<Option<SocketProxy>>,
+    http_active: AtomicBool,
+    socket_active: AtomicBool,
     title_settings: Arc<Mutex<TitleSettings>>,
-    title_proxy: Mutex<Option<SocketProxy>>,
     skill_bridge: Mutex<Option<SkillBridge>>,
     crl: Mutex<Option<crl::CrlServer>>,
 }
@@ -224,13 +202,12 @@ impl SpooferManager {
     }
 
     fn maybe_stop_crl(&self) {
-        let name_up = self.proxy.lock().map(|p| p.is_some()).unwrap_or(false);
-        let title_up = self
-            .title_proxy
+        let proxy_up = self
+            .reverse_proxy
             .lock()
             .map(|p| p.is_some())
             .unwrap_or(false);
-        if name_up || title_up {
+        if proxy_up {
             return;
         }
         if let Ok(mut slot) = self.crl.lock() {
@@ -255,9 +232,10 @@ impl SpooferManager {
             discovered_friends: Arc::new(Mutex::new(HashMap::new())),
             spoofed_ranks: Arc::new(Mutex::new(HashMap::new())),
             owned_products: Arc::new(Mutex::new(owned_products)),
-            proxy: Mutex::new(None),
+            reverse_proxy: Mutex::new(None),
+            http_active: AtomicBool::new(false),
+            socket_active: AtomicBool::new(false),
             title_settings: Arc::new(Mutex::new(TitleSettings::default())),
-            title_proxy: Mutex::new(None),
             skill_bridge: Mutex::new(None),
             crl: Mutex::new(None),
         }
@@ -327,59 +305,38 @@ impl SpooferManager {
     }
 
     pub fn http_running(&self) -> bool {
-        self.proxy.lock().map(|p| p.is_some()).unwrap_or(false)
+        self.http_active.load(Ordering::Relaxed)
+            && self
+                .reverse_proxy
+                .lock()
+                .map(|proxy| proxy.is_some())
+                .unwrap_or(false)
     }
 
     pub fn socket_running(&self) -> bool {
-        self.title_proxy
-            .lock()
-            .map(|p| p.is_some())
-            .unwrap_or(false)
+        self.socket_active.load(Ordering::Relaxed)
+            && self
+                .reverse_proxy
+                .lock()
+                .map(|proxy| proxy.is_some())
+                .unwrap_or(false)
     }
 
     pub fn start_http(&self) -> Result<(), String> {
-        let mut slot = self.proxy.lock().map_err(|_| "proxy lock poisoned")?;
-        if slot.is_some() {
+        if self.http_active.load(Ordering::Relaxed) {
             return Ok(());
         }
-
-        let ca = Arc::new(ca::ensure(&self.base_dir)?);
-        if !ca::is_current_installed(&self.base_dir) {
-            return Err(
-                "certificate not installed. open Spoofer settings and click Install Certificate"
-                    .into(),
-            );
+        self.http_active.store(true, Ordering::Relaxed);
+        if let Err(error) = self.ensure_reverse_proxy() {
+            self.http_active.store(false, Ordering::Relaxed);
+            return Err(error);
         }
-
-        let rules: Arc<Vec<Box<dyn Rule>>> = Arc::new(vec![
-            Box::new(NameRule::new(Arc::clone(&self.spoofed_name))),
-            Box::new(crate::spoofer::rules::FriendsRule::new(
-                Arc::clone(&self.spoofed_friends),
-                Arc::clone(&self.discovered_friends),
-            )),
-            Box::new(OwnedProductsRule::new(
-                Arc::clone(&self.owned_products),
-                self.base_dir.join("owned_products.json"),
-            )),
-            Box::new(crate::spoofer::rules::RankRule::new(Arc::clone(
-                &self.spoofed_ranks,
-            ))),
-        ]);
-
-        self.ensure_crl(&ca);
-        let proxy = Proxy::start(ca, rules, self.tx.clone())?;
-        enable_proxy(&self.base_dir)?;
-        *slot = Some(proxy);
         Ok(())
     }
 
     pub fn stop_http(&self) {
-        disable_proxy(&self.base_dir);
-        if let Ok(mut slot) = self.proxy.lock() {
-            if let Some(proxy) = slot.take() {
-                proxy.stop();
-            }
-        }
+        self.http_active.store(false, Ordering::Relaxed);
+        self.stop_reverse_if_unused();
         self.maybe_stop_crl();
     }
 
@@ -404,11 +361,32 @@ impl SpooferManager {
     }
 
     pub fn start_socket(&self) -> Result<(), String> {
-        let mut slot = self.title_proxy.lock().map_err(|_| "title lock poisoned")?;
+        if self.socket_active.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        self.socket_active.store(true, Ordering::Relaxed);
+        if let Err(error) = self.ensure_reverse_proxy() {
+            self.socket_active.store(false, Ordering::Relaxed);
+            return Err(error);
+        }
+        Ok(())
+    }
+
+    pub fn stop_socket(&self) {
+        self.socket_active.store(false, Ordering::Relaxed);
+        self.stop_reverse_if_unused();
+        self.stop_skill_bridge();
+        self.maybe_stop_crl();
+    }
+
+    fn ensure_reverse_proxy(&self) -> Result<(), String> {
+        let mut slot = self
+            .reverse_proxy
+            .lock()
+            .map_err(|_| "reverse proxy lock poisoned")?;
         if slot.is_some() {
             return Ok(());
         }
-
         let ca = Arc::new(ca::ensure(&self.base_dir)?);
         if !ca::is_current_installed(&self.base_dir) {
             return Err(
@@ -419,38 +397,45 @@ impl SpooferManager {
         if !hosts::is_writable() {
             return Err("The hosts file needs administrator, restart Hebnix as admin".into());
         }
-
-        let ip = dns::resolve_a(TITLE_HOST)?;
+        let mut real_ips = HashMap::new();
+        for host in REDIRECT_HOSTS {
+            real_ips.insert(host.to_string(), dns::resolve_a(host)?);
+        }
         let rules: Arc<Vec<Box<dyn Rule>>> = Arc::new(vec![
+            Box::new(NameRule::new(Arc::clone(&self.spoofed_name))),
+            Box::new(crate::spoofer::rules::FriendsRule::new(
+                Arc::clone(&self.spoofed_friends),
+                Arc::clone(&self.discovered_friends),
+            )),
+            Box::new(OwnedProductsRule::new(
+                Arc::clone(&self.owned_products),
+                self.base_dir.join("owned_products.json"),
+            )),
             Box::new(TitleRule::new(Arc::clone(&self.title_settings))),
             Box::new(crate::spoofer::rules::RankRule::new(Arc::clone(
                 &self.spoofed_ranks,
             ))),
         ]);
-
         self.ensure_crl(&ca);
-        let proxy = SocketProxy::start(ca, rules, self.tx.clone(), TITLE_HOST.to_string(), ip)?;
-
-        if let Err(e) = hosts::redirect(TITLE_HOST) {
+        let proxy = SocketProxy::start(ca, rules, self.tx.clone(), real_ips)?;
+        if let Err(error) = hosts::set_redirects(&REDIRECT_HOSTS) {
             proxy.stop();
-            return Err(e);
+            return Err(error);
         }
-
         *slot = Some(proxy);
         Ok(())
     }
 
-    pub fn stop_socket(&self) {
-        // Remove the redirect before stopping the listener so Rocket League
-        // immediately resumes resolving config.psynet.gg normally.
+    fn stop_reverse_if_unused(&self) {
+        if self.http_active.load(Ordering::Relaxed) || self.socket_active.load(Ordering::Relaxed) {
+            return;
+        }
         let _ = hosts::clear();
-        if let Ok(mut slot) = self.title_proxy.lock() {
+        if let Ok(mut slot) = self.reverse_proxy.lock() {
             if let Some(proxy) = slot.take() {
                 proxy.stop();
             }
         }
-        self.stop_skill_bridge();
-        self.maybe_stop_crl();
     }
 
     /// Stops only runtime interception. It deliberately does not modify saved
@@ -458,9 +443,8 @@ impl SpooferManager {
     pub fn shutdown(&self) {
         self.stop_socket();
         self.stop_http();
-        // Clear a redirect even if the socket failed to start or its state was
-        // lost, and restore a proxy marker left by a partial startup.
+        // Clear a redirect even if the socket failed to start or its state was lost.
         let _ = hosts::clear();
-        disable_proxy(&self.base_dir);
+        hosts::flush_dns();
     }
 }

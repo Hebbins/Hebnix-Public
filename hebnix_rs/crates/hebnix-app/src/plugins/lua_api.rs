@@ -1223,6 +1223,22 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             None => Ok(LuaValue::Nil),
         })?,
     )?;
+    hebnix.set(
+        "rocket_league_window_rect",
+        lua.create_function(|lua, ()| {
+            let Some((left, top, right, bottom)) =
+                hebnix_sdk::process::get_rocket_league_window_rect()
+            else {
+                return Ok(LuaValue::Nil);
+            };
+            let rect = lua.create_table()?;
+            rect.set("left", left)?;
+            rect.set("top", top)?;
+            rect.set("right", right)?;
+            rect.set("bottom", bottom)?;
+            Ok(LuaValue::Table(rect))
+        })?,
+    )?;
 
     // Save file access (read-only). Blocking: decrypt + parse takes a
     // moment, so call from a button/on_load, not every frame.
@@ -1323,6 +1339,22 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         window.set(
             "is_open",
             lua.create_function(move |_, ()| Ok(host.window.borrow().open))?,
+        )?;
+    }
+    {
+        let host = Rc::clone(&host);
+        window.set(
+            "get_position",
+            lua.create_function(move |lua, ()| {
+                let position = host.window.borrow().last_pos;
+                let Some((x, y)) = position else {
+                    return Ok(LuaValue::Nil);
+                };
+                let result = lua.create_table()?;
+                result.set("x", x)?;
+                result.set("y", y)?;
+                Ok(LuaValue::Table(result))
+            })?,
         )?;
     }
     {
@@ -1985,7 +2017,7 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
             lua.create_function(
                 move |_, (key, label, min, max, default): (String, String, f32, f32, Option<f32>)| {
                     let mut value = host.store.borrow().get_number(&key, default.unwrap_or(min) as f64) as f32;
-
+                    
                     let changed = with_current_ui(|ui| {
                         let mut is_changed = false;
                         ui.horizontal(|ui| {
@@ -1994,7 +2026,7 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                         });
                         is_changed
                     }).unwrap_or(false);
-
+                    
                     if changed {
                         host.store.borrow_mut().set_number(&key, value as f64);
                     }

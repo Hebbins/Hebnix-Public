@@ -4,8 +4,7 @@
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
 
 use crossbeam_channel::Sender;
@@ -17,150 +16,6 @@ use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use crate::messages::AppMsg;
 use crate::spoofer::ca::Ca;
 use crate::spoofer::rules::{Body, Rule};
-
-pub const LISTEN_ADDR: &str = "127.0.0.1:8080";
-
-pub struct Proxy {
-    running: Arc<AtomicBool>,
-    addr: String,
-}
-
-impl Proxy {
-    pub fn start(
-        ca: Arc<Ca>,
-        rules: Arc<Vec<Box<dyn Rule>>>,
-        tx: Sender<AppMsg>,
-    ) -> Result<Self, String> {
-        let addr = LISTEN_ADDR.to_string();
-        let listener = TcpListener::bind(&addr).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::PermissionDenied
-                || e.kind() == std::io::ErrorKind::AddrInUse
-            {
-                format!("cant bind {addr}, something else is using it: {e}")
-            } else {
-                format!("cant bind {addr}: {e}")
-            }
-        })?;
-        let running = Arc::new(AtomicBool::new(true));
-
-        let resolver = Arc::new(CertResolver::new(ca));
-        let server_config = build_server_config(resolver)?;
-        let upstream = build_upstream_agent(None);
-
-        {
-            let running = Arc::clone(&running);
-            let addr_clone = addr.clone();
-            std::thread::Builder::new()
-                .name("spoofer-proxy".into())
-                .spawn(move || {
-                    accept_loop(
-                        listener,
-                        &running,
-                        &server_config,
-                        &upstream,
-                        &rules,
-                        &tx,
-                        &addr_clone,
-                    )
-                })
-                .map_err(|e| format!("cant spawn proxy thread: {e}"))?;
-        }
-
-        Ok(Self { running, addr })
-    }
-
-    pub fn stop(&self) {
-        self.running.store(false, Ordering::SeqCst);
-        let target = self.addr.replace("0.0.0.0", "127.0.0.1");
-        let _ = TcpStream::connect(target);
-    }
-}
-
-fn accept_loop(
-    listener: TcpListener,
-    running: &AtomicBool,
-    server_config: &Arc<ServerConfig>,
-    upstream: &ureq::Agent,
-    rules: &Arc<Vec<Box<dyn Rule>>>,
-    tx: &Sender<AppMsg>,
-    addr: &str,
-) {
-    tracing::info!("spoofer proxy listening on {addr}");
-    for stream in listener.incoming() {
-        if !running.load(Ordering::Relaxed) {
-            break;
-        }
-        let Ok(stream) = stream else { continue };
-
-        let server_config = Arc::clone(server_config);
-        let upstream = upstream.clone();
-        let rules = Arc::clone(rules);
-        let tx = tx.clone();
-        std::thread::spawn(move || {
-            if let Err(e) = handle_client(stream, &server_config, &upstream, &rules, &tx) {
-                tracing::debug!("proxy conn ended: {e}");
-            }
-        });
-    }
-    tracing::info!("spoofer proxy stopped");
-}
-
-fn handle_client(
-    mut client: TcpStream,
-    server_config: &Arc<ServerConfig>,
-    upstream: &ureq::Agent,
-    rules: &Arc<Vec<Box<dyn Rule>>>,
-    tx: &Sender<AppMsg>,
-) -> Result<(), String> {
-    let head = read_request_head(&mut client)?;
-    let line = head.lines().next().unwrap_or("");
-    let mut parts = line.split_whitespace();
-    let method = parts.next().unwrap_or("");
-    let target = parts.next().unwrap_or("");
-
-    if method != "CONNECT" {
-        tracing::debug!("skip plain http {method} {target}");
-        return Ok(());
-    }
-
-    let host = target.split(':').next().unwrap_or(target).to_string();
-    let intercept = rules.iter().any(|r| r.matches_host(&host));
-    tracing::debug!(
-        "CONNECT {host} ({})",
-        if intercept { "mitm" } else { "tunnel" }
-    );
-
-    client
-        .write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-        .map_err(|e| format!("connect reply: {e}"))?;
-
-    if intercept {
-        let conn = ServerConnection::new(Arc::clone(server_config))
-            .map_err(|e| format!("tls conn: {e}"))?;
-        let tls = StreamOwned::new(conn, client);
-        serve_one(tls, upstream, rules, tx, &host)
-    } else {
-        tunnel(client, target)
-    }
-}
-
-fn tunnel(client: TcpStream, target: &str) -> Result<(), String> {
-    let upstream =
-        TcpStream::connect(target).map_err(|e| format!("tunnel connect {target}: {e}"))?;
-    let mut c_read = client;
-    let mut c_write = c_read.try_clone().map_err(|e| e.to_string())?;
-    let mut u_read = upstream;
-    let mut u_write = u_read.try_clone().map_err(|e| e.to_string())?;
-
-    let up = std::thread::spawn(move || {
-        let _ = std::io::copy(&mut c_read, &mut u_write);
-        let _ = u_write.shutdown(std::net::Shutdown::Write);
-    });
-    let _ = std::io::copy(&mut u_read, &mut c_write);
-    let _ = c_write.shutdown(std::net::Shutdown::Write);
-    let _ = up.join();
-    Ok(())
-}
 
 pub fn serve_one(
     mut tls: StreamOwned<ServerConnection, TcpStream>,
@@ -302,27 +157,6 @@ pub struct HttpRequest {
     pub body: Vec<u8>,
 }
 
-pub fn read_request_head(stream: &mut TcpStream) -> Result<String, String> {
-    let mut buf = Vec::new();
-    let mut byte = [0u8; 1];
-    loop {
-        let n = stream
-            .read(&mut byte)
-            .map_err(|e| format!("read head: {e}"))?;
-        if n == 0 {
-            break;
-        }
-        buf.push(byte[0]);
-        if buf.ends_with(b"\r\n\r\n") {
-            break;
-        }
-        if buf.len() > 16384 {
-            return Err("request head too long".into());
-        }
-    }
-    String::from_utf8(buf).map_err(|_| "request head not utf8".into())
-}
-
 pub fn read_http_request<S: Read>(stream: &mut S) -> Result<HttpRequest, String> {
     let mut buf = Vec::new();
     let mut tmp = [0u8; 4096];
@@ -413,25 +247,27 @@ pub fn build_server_config(resolver: Arc<CertResolver>) -> Result<Arc<ServerConf
     Ok(Arc::new(config))
 }
 
-pub fn build_upstream_agent(pin: Option<(String, std::net::Ipv4Addr)>) -> ureq::Agent {
+pub fn build_upstream_agent_pins(pins: HashMap<String, std::net::Ipv4Addr>) -> ureq::Agent {
     let builder = ureq::AgentBuilder::new()
         .try_proxy_from_env(false)
         .timeout(std::time::Duration::from_secs(15));
-
-    match pin {
-        None => builder.build(),
-        Some((host, ip)) => builder
-            .resolver(move |netloc: &str| {
-                let (name, port) = netloc.rsplit_once(':').unwrap_or((netloc, "443"));
-                if name.eq_ignore_ascii_case(&host) {
-                    let port: u16 = port.parse().unwrap_or(443);
-                    return Ok(vec![std::net::SocketAddr::from((ip, port))]);
-                }
-                use std::net::ToSocketAddrs;
-                netloc.to_socket_addrs().map(|i| i.collect())
-            })
-            .build(),
+    if pins.is_empty() {
+        return builder.build();
     }
+    builder
+        .resolver(move |netloc: &str| {
+            let (name, port) = netloc.rsplit_once(':').unwrap_or((netloc, "443"));
+            if let Some(ip) = pins
+                .iter()
+                .find_map(|(host, ip)| name.eq_ignore_ascii_case(host).then_some(*ip))
+            {
+                let port: u16 = port.parse().unwrap_or(443);
+                return Ok(vec![std::net::SocketAddr::from((ip, port))]);
+            }
+            use std::net::ToSocketAddrs;
+            netloc.to_socket_addrs().map(|i| i.collect())
+        })
+        .build()
 }
 
 pub struct CertResolver {

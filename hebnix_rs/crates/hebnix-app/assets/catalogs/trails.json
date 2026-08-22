@@ -1,0 +1,1301 @@
+{
+  "base_upk_path": "SS_Default_T_SF.upk",
+  "trails": [
+    {
+      "id": "9851",
+      "name": "2.5D",
+      "upk_path": "ss_lp_fire_SF.upk",
+      "thumbnail": "SS_LP_Fire_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_lp_fire",
+      "path": "ss_lp_fire.FX.ss_lp_fire"
+    },
+    {
+      "id": "8436",
+      "name": "Aerated",
+      "upk_path": "SS_GreenAir_SF.upk",
+      "thumbnail": "SS_GreenAir_T_SF.upk",
+      "quality": "Limited",
+      "package": "SS_GreenAir",
+      "path": "SS_GreenAir.SS_GreenAir"
+    },
+    {
+      "id": "2779",
+      "name": "Batmobile (1989)",
+      "upk_path": "ss_eggplant_SF.upk",
+      "thumbnail": "SS_Eggplant_T_SF.upk",
+      "quality": "Common",
+      "package": "ss_eggplant",
+      "path": "ss_eggplant.ss_eggplant"
+    },
+    {
+      "id": "1964",
+      "name": "Batmobile (2016)",
+      "upk_path": "ss_darkcar_SF.upk",
+      "thumbnail": "SS_DarkCar_T_SF.upk",
+      "quality": "Common",
+      "package": "ss_darkcar",
+      "path": "ss_darkcar.ss_darkcar"
+    },
+    {
+      "id": "7422",
+      "name": "Batmobile (2022)",
+      "upk_path": "ss_tomb_SF.upk",
+      "thumbnail": "SS_Tomb_T_SF.upk",
+      "quality": "Common",
+      "package": "ss_tomb",
+      "path": "ss_tomb.ss_tomb"
+    },
+    {
+      "id": "10043",
+      "name": "Battlebout",
+      "upk_path": "ss_rapid_rush_SF.upk",
+      "thumbnail": "SS_Rapid_Rush_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_rapid_rush",
+      "path": "ss_rapid_rush.FX.ss_rapid_rush"
+    },
+    {
+      "id": "3220",
+      "name": "Binary",
+      "upk_path": "ss_binary_SF.upk",
+      "thumbnail": "SS_Binary_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_binary",
+      "path": "ss_binary.ss_binary"
+    },
+    {
+      "id": "9679",
+      "name": "Binary P+G",
+      "upk_path": "ss_binary_psplus_SF.upk",
+      "thumbnail": "SS_Binary_psplus_T_SF.upk",
+      "quality": "Premium",
+      "package": "ss_binary_psplus",
+      "path": "ss_binary_psplus.ss_binary_psplus"
+    },
+    {
+      "id": "1899",
+      "name": "Blazer",
+      "upk_path": "SS_ToonFlames_SF.upk",
+      "thumbnail": "SS_ToonFlames_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "SS_ToonFlames",
+      "path": "SS_ToonFlames.SS_ToonFlames"
+    },
+    {
+      "id": "5314",
+      "name": "Blue Rocks",
+      "upk_path": "ss_ToonRocks_psplus_SF.upk",
+      "thumbnail": "SS_ToonRocks_psplus_T_SF.upk",
+      "quality": "Premium",
+      "package": "ss_ToonRocks_psplus",
+      "path": "ss_ToonRocks_psplus.ss_ToonRocks_psplus"
+    },
+    {
+      "id": "7366",
+      "name": "Braided",
+      "upk_path": "ss_braid_SF.upk",
+      "thumbnail": "ss_braid_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_braid",
+      "path": "ss_braid.ss_braid"
+    },
+    {
+      "id": "5856",
+      "name": "Broadbolt",
+      "upk_path": "ss_glitchbolt_SF.upk",
+      "thumbnail": "SS_GlitchBolt_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_glitchbolt",
+      "path": "ss_glitchbolt.ss_glitchbolt"
+    },
+    {
+      "id": "8615",
+      "name": "Bubble Gum",
+      "upk_path": "ss_bubblegum_SF.upk",
+      "thumbnail": "SS_BubbleGum_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_bubblegum",
+      "path": "ss_bubblegum.FX.ss_bubblegum"
+    },
+    {
+      "id": "2400",
+      "name": "Candy Cane",
+      "upk_path": "ss_redwhite_SF.upk",
+      "thumbnail": "SS_RedWhite_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_redwhite",
+      "path": "ss_redwhite.ss_redwhite"
+    },
+    {
+      "id": "8748",
+      "name": "Chemergy",
+      "upk_path": "SS_PlasmaEnergy_SF.upk",
+      "thumbnail": "SS_PlasmaEnergy_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "SS_PlasmaEnergy",
+      "path": "SS_PlasmaEnergy.SS_PlasmaEnergy"
+    },
+    {
+      "id": "10479",
+      "name": "Chromophore",
+      "upk_path": "SS_SolarBeam_SF.upk",
+      "thumbnail": "SS_SolarBeam_T_SF.upk",
+      "quality": "Limited",
+      "package": "SS_SolarBeam",
+      "path": "SS_SolarBeam.FX.SS_SolarBeam"
+    },
+    {
+      "id": "10053",
+      "name": "Clam Jam",
+      "upk_path": "ss_pearldream_SF.upk",
+      "thumbnail": "SS_PearlDream_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pearldream",
+      "path": "ss_pearldream.ss_pearldream"
+    },
+    {
+      "id": "10509",
+      "name": "Clashflash",
+      "upk_path": "ss_stylized_strike_SF.upk",
+      "thumbnail": "SS_Stylized_Strike_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_stylized_strike",
+      "path": "ss_stylized_strike.ss_stylized_strike"
+    },
+    {
+      "id": "1948",
+      "name": "Classic",
+      "upk_path": "ss_default_SF.upk",
+      "thumbnail": "SS_Default_T_SF.upk",
+      "quality": "Common",
+      "package": "ss_default",
+      "path": "ss_default.ss_default"
+    },
+    {
+      "id": "6998",
+      "name": "Corbital",
+      "upk_path": "ss_core_SF.upk",
+      "thumbnail": "SS_Core_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_core",
+      "path": "ss_core.ss_core"
+    },
+    {
+      "id": "7182",
+      "name": "Cubix",
+      "upk_path": "ss_pyrite_SF.upk",
+      "thumbnail": "ss_pyrite_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_pyrite",
+      "path": "ss_pyrite.ss_pyrite"
+    },
+    {
+      "id": "1966",
+      "name": "DeLorean Time Machine",
+      "upk_path": "SS_GreyCar_SF.upk",
+      "thumbnail": "SS_GreyCar_T_SF.upk",
+      "quality": "Common",
+      "package": "SS_GreyCar",
+      "path": "SS_GreyCar.SS_GreyCar"
+    },
+    {
+      "id": "7962",
+      "name": "Dimensionator",
+      "upk_path": "ss_singularity_SF.upk",
+      "thumbnail": "SS_Singularity_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_singularity",
+      "path": "ss_singularity.ss_singularity"
+    },
+    {
+      "id": "3342",
+      "name": "Discotheque",
+      "upk_path": "ss_strobe_SF.upk",
+      "thumbnail": "SS_Strobe_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_strobe",
+      "path": "ss_strobe.ss_strobe"
+    },
+    {
+      "id": "9657",
+      "name": "Documint",
+      "upk_path": "ss_filetransfer_SF.upk",
+      "thumbnail": "SS_FileTransfer_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_filetransfer",
+      "path": "ss_filetransfer.ss_filetransfer"
+    },
+    {
+      "id": "5817",
+      "name": "Dream Beam",
+      "upk_path": "ss_toony_beam_SF.upk",
+      "thumbnail": "SS_Toony_Beam_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_toony_beam",
+      "path": "ss_toony_beam.ss_toony_beam"
+    },
+    {
+      "id": "10156",
+      "name": "Drift Smoke",
+      "upk_path": "ss_driftsmoke_SF.upk",
+      "thumbnail": "SS_DriftSmoke_T_SF.upk",
+      "quality": "Rare",
+      "package": "ss_driftsmoke",
+      "path": "ss_driftsmoke.ss_driftsmoke"
+    },
+    {
+      "id": "7700",
+      "name": "Dunker",
+      "upk_path": "ss_doughnut_SF.upk",
+      "thumbnail": "SS_Doughnut_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_doughnut",
+      "path": "ss_doughnut.ss_doughnut"
+    },
+    {
+      "id": "6078",
+      "name": "Dust Cloud",
+      "upk_path": "ss_sand_SF.upk",
+      "thumbnail": "SS_Sand_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_sand",
+      "path": "ss_sand.ss_sand"
+    },
+    {
+      "id": "2850",
+      "name": "EKG-OMG",
+      "upk_path": "ss_heartbeat_SF.upk",
+      "thumbnail": "ss_heartbeat_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_heartbeat",
+      "path": "ss_heartbeat.ss_heartbeat"
+    },
+    {
+      "id": "5703",
+      "name": "EL-E-DEE",
+      "upk_path": "ss_pixelatedcautiontape_SF.upk",
+      "thumbnail": "SS_PixelatedCautionTape_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelatedcautiontape",
+      "path": "ss_pixelatedcautiontape.ss_pixelatedcautiontape"
+    },
+    {
+      "id": "10710",
+      "name": "Electrogalactic",
+      "upk_path": "ss_electrogalactic_SF.upk",
+      "thumbnail": "SS_ElectroGalactic_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_electrogalactic",
+      "path": "ss_electrogalactic.ss_electrogalactic"
+    },
+    {
+      "id": "8443",
+      "name": "Elemental",
+      "upk_path": "ss_bender_SF.upk",
+      "thumbnail": "SS_Bender_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_bender",
+      "path": "ss_bender.ss_bender"
+    },
+    {
+      "id": "10406",
+      "name": "Energy Binders",
+      "upk_path": "ss_lava2_SF.upk",
+      "thumbnail": "SS_Lava2_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_lava2",
+      "path": "ss_lava2.ss_lava2"
+    },
+    {
+      "id": "2704",
+      "name": "EQ",
+      "upk_path": "ss_equalizer_SF.upk",
+      "thumbnail": "SS_Equalizer_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_equalizer",
+      "path": "ss_equalizer.ss_equalizer"
+    },
+    {
+      "id": "5857",
+      "name": "Ethereal",
+      "upk_path": "ss_aurora_SF.upk",
+      "thumbnail": "SS_Aurora_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_aurora",
+      "path": "ss_aurora.ss_aurora"
+    },
+    {
+      "id": "5081",
+      "name": "Excavator",
+      "upk_path": "SS_Ground_Cracks_SF.upk",
+      "thumbnail": "SS_Ground_Cracks_T_SF.upk",
+      "quality": "Limited",
+      "package": "SS_Ground_Cracks",
+      "path": "SS_Ground_Cracks.SS_Ground_Cracks"
+    },
+    {
+      "id": "9319",
+      "name": "Firewall",
+      "upk_path": "ss_interface_SF.upk",
+      "thumbnail": "SS_Interface_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_interface",
+      "path": "ss_interface.ss_interface"
+    },
+    {
+      "id": "9909",
+      "name": "Fish",
+      "upk_path": "ss_fish_SF.upk",
+      "thumbnail": "SS_Fish_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_fish",
+      "path": "ss_fish.ss_fish"
+    },
+    {
+      "id": "5487",
+      "name": "Fissure",
+      "upk_path": "ss_space_tear_SF.upk",
+      "thumbnail": "SS_Space_Tear_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_space_tear",
+      "path": "ss_space_tear.ss_space_tear"
+    },
+    {
+      "id": "5521",
+      "name": "Flame Chain",
+      "upk_path": "ss_chains_SF.upk",
+      "thumbnail": "SS_Chains_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_chains",
+      "path": "ss_chains.ss_chains"
+    },
+    {
+      "id": "2724",
+      "name": "Flowers",
+      "upk_path": "ss_flowergrow_SF.upk",
+      "thumbnail": "SS_FlowerGrow_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_flowergrow",
+      "path": "ss_flowergrow.ss_flowergrow"
+    },
+    {
+      "id": "1900",
+      "name": "Friction",
+      "upk_path": "SS_ToonSparks_SF.upk",
+      "thumbnail": "SS_ToonSparks_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "SS_ToonSparks",
+      "path": "SS_ToonSparks.SS_ToonSparks"
+    },
+    {
+      "id": "5763",
+      "name": "Funfetti",
+      "upk_path": "ss_unicorn_SF.upk",
+      "thumbnail": "ss_Unicorn_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_unicorn",
+      "path": "ss_unicorn.ss_unicorn"
+    },
+    {
+      "id": "9425",
+      "name": "Futurist",
+      "upk_path": "ss_cybersecurity_SF.upk",
+      "thumbnail": "SS_CyberSecurity_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_cybersecurity",
+      "path": "ss_cybersecurity.ss_cybersecurity"
+    },
+    {
+      "id": "10708",
+      "name": "Gaseous",
+      "upk_path": "ss_neonsoul_SF.upk",
+      "thumbnail": "SS_NeonSoul_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_neonsoul",
+      "path": "ss_neonsoul.ss_neonsoul"
+    },
+    {
+      "id": "8875",
+      "name": "Glister",
+      "upk_path": "ss_fireflies_SF.upk",
+      "thumbnail": "SS_Fireflies_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_fireflies",
+      "path": "ss_fireflies.ss_fireflies"
+    },
+    {
+      "id": "4011",
+      "name": "Hack Swerve I",
+      "upk_path": "ss_blade_tier1_SF.upk",
+      "thumbnail": "SS_Blade_Tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_blade_tier1",
+      "path": "ss_blade_tier1.ss_blade_tier1"
+    },
+    {
+      "id": "4012",
+      "name": "Hack Swerve II",
+      "upk_path": "ss_blade_tier2_SF.upk",
+      "thumbnail": "SS_Blade_Tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_blade_tier2",
+      "path": "ss_blade_tier2.ss_blade_tier2"
+    },
+    {
+      "id": "3954",
+      "name": "Hack Swerve III",
+      "upk_path": "ss_blade_tier3_SF.upk",
+      "thumbnail": "SS_Blade_Tier3_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_blade_tier3",
+      "path": "ss_blade_tier3.ss_blade_tier3"
+    },
+    {
+      "id": "2357",
+      "name": "Hallowtide",
+      "upk_path": "ss_orangeblack_SF.upk",
+      "thumbnail": "SS_OrangeBlack_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_orangeblack",
+      "path": "ss_orangeblack.ss_orangeblack"
+    },
+    {
+      "id": "9852",
+      "name": "Heatquake",
+      "upk_path": "ss_laserbeam_SF.upk",
+      "thumbnail": "SS_LaserBeam_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_laserbeam",
+      "path": "ss_laserbeam.ss_laserbeam"
+    },
+    {
+      "id": "4820",
+      "name": "Hex Fade",
+      "upk_path": "ss_hexfade_SF.upk",
+      "thumbnail": "ss_hexfade_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_hexfade",
+      "path": "ss_hexfade.ss_hexfade"
+    },
+    {
+      "id": "4785",
+      "name": "HoloData",
+      "upk_path": "ss_geotech_SF.upk",
+      "thumbnail": "SS_geotech_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_geotech",
+      "path": "ss_geotech.ss_geotech"
+    },
+    {
+      "id": "2047",
+      "name": "Hot Rocks",
+      "upk_path": "ss_Toonrocks_SF.upk",
+      "thumbnail": "SS_ToonRocks_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_Toonrocks",
+      "path": "ss_Toonrocks.ss_Toonrocks"
+    },
+    {
+      "id": "5844",
+      "name": "Incantor",
+      "upk_path": "ss_magic_fire_SF.upk",
+      "thumbnail": "SS_Magic_Fire_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_magic_fire",
+      "path": "ss_magic_fire.ss_magic_fire"
+    },
+    {
+      "id": "9371",
+      "name": "InfoSec",
+      "upk_path": "ss_glitched_SF.upk",
+      "thumbnail": "SS_Glitched_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_glitched",
+      "path": "ss_glitched.ss_glitched"
+    },
+    {
+      "id": "7799",
+      "name": "Jet Wash",
+      "upk_path": "ss_stylizedflame_SF.upk",
+      "thumbnail": "SS_StylizedFlame_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_stylizedflame",
+      "path": "ss_stylizedflame.ss_stylizedflame"
+    },
+    {
+      "id": "3222",
+      "name": "Laser Wave I",
+      "upk_path": "ss_charged_Tier1_SF.upk",
+      "thumbnail": "SS_Charged_Tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_charged_Tier1",
+      "path": "ss_charged_Tier1.ss_charged_Tier1"
+    },
+    {
+      "id": "3223",
+      "name": "Laser Wave II",
+      "upk_path": "ss_charged_Tier2_SF.upk",
+      "thumbnail": "SS_Charged_Tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_charged_Tier2",
+      "path": "ss_charged_Tier2.ss_charged_Tier2"
+    },
+    {
+      "id": "3224",
+      "name": "Laser Wave III",
+      "upk_path": "ss_charged_Tier3_SF.upk",
+      "thumbnail": "SS_Charged_Tier3_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_charged_Tier3",
+      "path": "ss_charged_Tier3.ss_charged_Tier3"
+    },
+    {
+      "id": "8564",
+      "name": "Laser-Light",
+      "upk_path": "ss_linecolors_SF.upk",
+      "thumbnail": "SS_LineColors_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_linecolors",
+      "path": "ss_linecolors.ss_linecolors"
+    },
+    {
+      "id": "9560",
+      "name": "Lewis Hamilton - Street Legal",
+      "upk_path": "ss_zigzag_lh_SF.upk",
+      "thumbnail": "SS_ZigZag_LH_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_zigzag_lh",
+      "path": "ss_zigzag_lh.ss_zigzag_lh"
+    },
+    {
+      "id": "1974",
+      "name": "Lightning",
+      "upk_path": "ss_Lightning_SF.upk",
+      "thumbnail": "SS_Lightning_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_Lightning",
+      "path": "ss_Lightning.ss_Lightning"
+    },
+    {
+      "id": "5483",
+      "name": "Lightning Plus",
+      "upk_path": "SS_Lightning_psplus_SF.upk",
+      "thumbnail": "ss_Lightning_PSPlus_T_SF.upk",
+      "quality": "Premium",
+      "package": "SS_Lightning_psplus",
+      "path": "SS_Lightning_psplus.SS_Lightning_psplus"
+    },
+    {
+      "id": "9711",
+      "name": "Lightning: Gilded",
+      "upk_path": "SS_Lightning_GP_SF.upk",
+      "thumbnail": "ss_Lightning_GP_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "SS_Lightning_GP",
+      "path": "SS_Lightning_GP.SS_Lightning_GP"
+    },
+    {
+      "id": "1898",
+      "name": "Lightspeed",
+      "upk_path": "SS_ScifiStreak_SF.upk",
+      "thumbnail": "SS_ScifiStreak_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "SS_ScifiStreak",
+      "path": "SS_ScifiStreak.SS_ScifiStreak"
+    },
+    {
+      "id": "2695",
+      "name": "Luminous",
+      "upk_path": "SS_LuminousSparks_SF.upk",
+      "thumbnail": "SS_LuminousSparks_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "SS_LuminousSparks",
+      "path": "SS_LuminousSparks.SS_LuminousSparks"
+    },
+    {
+      "id": "7990",
+      "name": "Mandala",
+      "upk_path": "ss_mandalas_SF.upk",
+      "thumbnail": "SS_Mandalas_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_mandalas",
+      "path": "ss_mandalas.ss_mandalas"
+    },
+    {
+      "id": "10223",
+      "name": "Marvel Crackle",
+      "upk_path": "ss_kirby_SF.upk",
+      "thumbnail": "SS_Kirby_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_kirby",
+      "path": "ss_kirby.ss_kirby"
+    },
+    {
+      "id": "10420",
+      "name": "Molten",
+      "upk_path": "SS_Magma_SF.upk",
+      "thumbnail": "SS_Magma_T_SF.upk",
+      "quality": "Import",
+      "package": "SS_Magma",
+      "path": "SS_Magma.SS_Magma"
+    },
+    {
+      "id": "10516",
+      "name": "Mosher",
+      "upk_path": "ss_powerbeam_SF.upk",
+      "thumbnail": "SS_PowerBeam_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_powerbeam",
+      "path": "ss_powerbeam.ss_powerbeam"
+    },
+    {
+      "id": "5614",
+      "name": "Mudder",
+      "upk_path": "ss_mud_SF.upk",
+      "thumbnail": "SS_Mud_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_mud",
+      "path": "ss_mud.ss_mud"
+    },
+    {
+      "id": "10716",
+      "name": "Mystic Fade",
+      "upk_path": "ss_techno_SF.upk",
+      "thumbnail": "SS_Techno_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_techno",
+      "path": "ss_techno.ss_techno"
+    },
+    {
+      "id": "6015",
+      "name": "NASCAR",
+      "upk_path": "ss_nct_SF.upk",
+      "thumbnail": "SS_nct_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_nct",
+      "path": "ss_nct.ss_nct"
+    },
+    {
+      "id": "9415",
+      "name": "Neon Bomb",
+      "upk_path": "SS_NeonTraces_SF.upk",
+      "thumbnail": "SS_NeonTraces_T_SF.upk",
+      "quality": "Limited",
+      "package": "SS_NeonTraces",
+      "path": "SS_NeonTraces.SS_NeonTraces"
+    },
+    {
+      "id": "10469",
+      "name": "Octonox",
+      "upk_path": "ss_octo_SF.upk",
+      "thumbnail": "SS_Octo_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_octo",
+      "path": "ss_octo.FX.ss_octo"
+    },
+    {
+      "id": "5960",
+      "name": "Oxalate",
+      "upk_path": "ss_tixy01_SF.upk",
+      "thumbnail": "SS_TIXY01_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_tixy01",
+      "path": "ss_tixy01.ss_tixy01"
+    },
+    {
+      "id": "7741",
+      "name": "Phoenix Fire",
+      "upk_path": "ss_phoenix_SF.upk",
+      "thumbnail": "ss_phoenix_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_phoenix",
+      "path": "ss_phoenix.ss_phoenix"
+    },
+    {
+      "id": "8191",
+      "name": "Pinwheel",
+      "upk_path": "ss_pinwheel_SF.upk",
+      "thumbnail": "SS_Pinwheel_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pinwheel",
+      "path": "ss_pinwheel.ss_pinwheel"
+    },
+    {
+      "id": "5587",
+      "name": "Pixel Pointer",
+      "upk_path": "ss_pixelatedarrows_SF.upk",
+      "thumbnail": "SS_PixelatedArrows_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelatedarrows",
+      "path": "ss_pixelatedarrows.ss_pixelatedarrows"
+    },
+    {
+      "id": "9091",
+      "name": "S10 - Bronze",
+      "upk_path": "ss_pixelated_SF.upk",
+      "thumbnail": "SS_Pixelated_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelated",
+      "path": "ss_pixelated.SS_Pix_01_SR"
+    },
+    {
+      "id": "9092",
+      "name": "S10 - Silver",
+      "upk_path": "ss_pixelated_SF.upk",
+      "thumbnail": "SS_Pixelated_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelated",
+      "path": "ss_pixelated.SS_Pix_02_SR"
+    },
+    {
+      "id": "9093",
+      "name": "S10 - Gold",
+      "upk_path": "ss_pixelated_SF.upk",
+      "thumbnail": "SS_Pixelated_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelated",
+      "path": "ss_pixelated.SS_Pix_03_SR"
+    },
+    {
+      "id": "9094",
+      "name": "S10 - Platinum",
+      "upk_path": "ss_pixelated_SF.upk",
+      "thumbnail": "SS_Pixelated_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelated",
+      "path": "ss_pixelated.SS_Pix_04_SR"
+    },
+    {
+      "id": "9095",
+      "name": "S10 - Diamond",
+      "upk_path": "ss_pixelated_SF.upk",
+      "thumbnail": "SS_Pixelated_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelated",
+      "path": "ss_pixelated.SS_Pix_05_SR"
+    },
+    {
+      "id": "9096",
+      "name": "S10 - Champion",
+      "upk_path": "ss_pixelated_SF.upk",
+      "thumbnail": "SS_Pixelated_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelated",
+      "path": "ss_pixelated.SS_Pix_06_SR"
+    },
+    {
+      "id": "9097",
+      "name": "S10 - Grand Champion",
+      "upk_path": "ss_pixelated_SF.upk",
+      "thumbnail": "SS_Pixelated_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelated",
+      "path": "ss_pixelated.SS_Pix_07_SR"
+    },
+    {
+      "id": "9098",
+      "name": "S10 - Supersonic Legend",
+      "upk_path": "ss_pixelated_SF.upk",
+      "thumbnail": "SS_Pixelated_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_pixelated",
+      "path": "ss_pixelated.SS_Pix_08_SR"
+    },
+    {
+      "id": "8263",
+      "name": "Polyhedral",
+      "upk_path": "ss_cosmicdice_SF.upk",
+      "thumbnail": "SS_CosmicDice_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_cosmicdice",
+      "path": "ss_cosmicdice.ss_cosmicdice"
+    },
+    {
+      "id": "10454",
+      "name": "Psypher",
+      "upk_path": "ss_neocypher_SF.upk",
+      "thumbnail": "SS_NeoCypher_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_neocypher",
+      "path": "ss_neocypher.FX.ss_neocypher"
+    },
+    {
+      "id": "10795",
+      "name": "PUMA Run",
+      "upk_path": "ss_kitty_rare_SF.upk",
+      "thumbnail": "SS_Kitty_Rare_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_kitty_rare",
+      "path": "ss_kitty_rare.ss_kitty_rare"
+    },
+    {
+      "id": "4944",
+      "name": "Rad Rock",
+      "upk_path": "ss_crystal_SF.upk",
+      "thumbnail": "SS_Crystal_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_crystal",
+      "path": "ss_crystal.ss_crystal"
+    },
+    {
+      "id": "2737",
+      "name": "Rainbow",
+      "upk_path": "ss_rainbow_SF.upk",
+      "thumbnail": "SS_Rainbow_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_rainbow",
+      "path": "ss_rainbow.ss_rainbow"
+    },
+    {
+      "id": "9850",
+      "name": "Reheater",
+      "upk_path": "ss_bloodshot_SF.upk",
+      "thumbnail": "SS_Bloodshot_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_bloodshot",
+      "path": "ss_bloodshot.FX.ss_bloodshot"
+    },
+    {
+      "id": "5033",
+      "name": "Righteous Gale",
+      "upk_path": "ss_animesmoke_SF.upk",
+      "thumbnail": "SS_animesmoke_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_animesmoke",
+      "path": "ss_animesmoke.ss_animesmoke"
+    },
+    {
+      "id": "10141",
+      "name": "Rocketmancer",
+      "upk_path": "ss_necromancer_SF.upk",
+      "thumbnail": "SS_Necromancer_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_necromancer",
+      "path": "ss_necromancer.ss_necromancer"
+    },
+    {
+      "id": "5706",
+      "name": "Rockets Jr.",
+      "upk_path": "ss_sticker_rocket_SF.upk",
+      "thumbnail": "SS_Sticker_Rocket_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_sticker_rocket",
+      "path": "ss_sticker_rocket.ss_sticker_rocket"
+    },
+    {
+      "id": "6888",
+      "name": "RTV",
+      "upk_path": "ss_gbrc_SF.upk",
+      "thumbnail": "SS_GBRC_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_gbrc",
+      "path": "ss_gbrc.ss_gbrc"
+    },
+    {
+      "id": "3743",
+      "name": "Ruckus",
+      "upk_path": "ss_cnsparks_SF.upk",
+      "thumbnail": "SS_CNSparks_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_cnsparks",
+      "path": "ss_cnsparks.ss_cnsparks"
+    },
+    {
+      "id": "5917",
+      "name": "Rumble Strip",
+      "upk_path": "ss_apexstripes_SF.upk",
+      "thumbnail": "ss_apexstripes_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_apexstripes",
+      "path": "ss_apexstripes.ss_apexstripes"
+    },
+    {
+      "id": "10467",
+      "name": "Sakura",
+      "upk_path": "ss_sakura_SF.upk",
+      "thumbnail": "SS_Sakura_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_sakura",
+      "path": "ss_sakura.FX.ss_sakura"
+    },
+    {
+      "id": "5082",
+      "name": "SARPBC",
+      "upk_path": "ss_retrotrails_SF.upk",
+      "thumbnail": "SS_Retrotrails_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_retrotrails",
+      "path": "ss_retrotrails.ss_retrotrails"
+    },
+    {
+      "id": "8803",
+      "name": "Sea Spray",
+      "upk_path": "ss_magicsplash_SF.upk",
+      "thumbnail": "SS_MagicSplash_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_magicsplash",
+      "path": "ss_magicsplash.ss_magicsplash"
+    },
+    {
+      "id": "7954",
+      "name": "Seared",
+      "upk_path": "ss_fireball_SF.upk",
+      "thumbnail": "SS_Fireball_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_fireball",
+      "path": "ss_fireball.ss_fireball"
+    },
+    {
+      "id": "5755",
+      "name": "Shark Attack",
+      "upk_path": "ss_sharkfin_SF.upk",
+      "thumbnail": "SS_Sharkfin_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_sharkfin",
+      "path": "ss_sharkfin.ss_sharkfin"
+    },
+    {
+      "id": "7504",
+      "name": "Shield Breaker",
+      "upk_path": "ss_sphexe_SF.upk",
+      "thumbnail": "SS_Sphexe_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_sphexe",
+      "path": "ss_sphexe.ss_sphexe"
+    },
+    {
+      "id": "5464",
+      "name": "Smokesketch",
+      "upk_path": "ss_2d_smoke_SF.upk",
+      "thumbnail": "SS_2D_Smoke_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_2d_smoke",
+      "path": "ss_2d_smoke.ss_2d_smoke"
+    },
+    {
+      "id": "9216",
+      "name": "Smoketrail",
+      "upk_path": "ss_smokerun_SF.upk",
+      "thumbnail": "SS_SmokeRun_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_smokerun",
+      "path": "ss_smokerun.ss_smokerun"
+    },
+    {
+      "id": "9947",
+      "name": "Sonic Boom",
+      "upk_path": "ss_pulsed_energy_SF.upk",
+      "thumbnail": "SS_Pulsed_Energy_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_pulsed_energy",
+      "path": "ss_pulsed_energy.FX.ss_pulsed_energy"
+    },
+    {
+      "id": "5455",
+      "name": "Sparklet",
+      "upk_path": "ss_trailblazer_SF.upk",
+      "thumbnail": "SS_TrailBlazer_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_trailblazer",
+      "path": "ss_trailblazer.ss_trailblazer"
+    },
+    {
+      "id": "7927",
+      "name": "Sprattle",
+      "upk_path": "ss_Krylo_SF.upk",
+      "thumbnail": "SS_Krylo_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_Krylo",
+      "path": "ss_Krylo.ss_Krylo"
+    },
+    {
+      "id": "5743",
+      "name": "Star Princess",
+      "upk_path": "ss_spell_streak_SF.upk",
+      "thumbnail": "SS_Spell_Streak_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_spell_streak",
+      "path": "ss_spell_streak.ss_spell_streak"
+    },
+    {
+      "id": "10478",
+      "name": "Starry",
+      "upk_path": "ss_popstar_SF.upk",
+      "thumbnail": "SS_PopStar_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_popstar",
+      "path": "ss_popstar.FX.ss_popstar"
+    },
+    {
+      "id": "5943",
+      "name": "Startrack",
+      "upk_path": "ss_starbeam_SF.upk",
+      "thumbnail": "SS_StarBeam_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_starbeam",
+      "path": "ss_starbeam.ss_starbeam"
+    },
+    {
+      "id": "10625",
+      "name": "Surrealist",
+      "upk_path": "ss_surrealrush_SF.upk",
+      "thumbnail": "SS_SurrealRush_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_surrealrush",
+      "path": "ss_surrealrush.ss_surrealrush"
+    },
+    {
+      "id": "5631",
+      "name": "Synthwave",
+      "upk_path": "ss_synthwave_SF.upk",
+      "thumbnail": "SS_SynthWave_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_synthwave",
+      "path": "ss_synthwave.ss_synthwave"
+    },
+    {
+      "id": "3575",
+      "name": "Tachyon I",
+      "upk_path": "ss_beyond_tier1_SF.upk",
+      "thumbnail": "SS_Beyond_Tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_beyond_tier1",
+      "path": "ss_beyond_tier1.ss_beyond_tier1"
+    },
+    {
+      "id": "3576",
+      "name": "Tachyon II",
+      "upk_path": "ss_beyond_tier2_SF.upk",
+      "thumbnail": "SS_Beyond_Tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_beyond_tier2",
+      "path": "ss_beyond_tier2.ss_beyond_tier2"
+    },
+    {
+      "id": "3577",
+      "name": "Tachyon III",
+      "upk_path": "SS_Beyond_Tier3_SF.upk",
+      "thumbnail": "SS_Beyond_Tier3_T_SF.upk",
+      "quality": "Limited",
+      "package": "SS_Beyond_Tier3",
+      "path": "SS_Beyond_Tier3.SS_Beyond_Tier3"
+    },
+    {
+      "id": "5526",
+      "name": "Tarnation",
+      "upk_path": "ss_ink_brush_SF.upk",
+      "thumbnail": "SS_Ink_Brush_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_ink_brush",
+      "path": "ss_ink_brush.ss_ink_brush"
+    },
+    {
+      "id": "2777",
+      "name": "The Dark Knight's Tumbler",
+      "upk_path": "ss_berry_SF.upk",
+      "thumbnail": "SS_Berry_T_SF.upk",
+      "quality": "Common",
+      "package": "ss_berry",
+      "path": "ss_berry.ss_berry"
+    },
+    {
+      "id": "1996",
+      "name": "Season 4 - Bronze",
+      "upk_path": "ss_tier_01_SF.upk",
+      "thumbnail": "SS_Tier_01_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_tier_01",
+      "path": "ss_tier_01.SS_Tier_01_Bronze"
+    },
+    {
+      "id": "1997",
+      "name": "Season 4 - Silver",
+      "upk_path": "ss_tier_01_SF.upk",
+      "thumbnail": "SS_Tier_01_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_tier_01",
+      "path": "ss_tier_01.SS_Tier_01_Silver"
+    },
+    {
+      "id": "1998",
+      "name": "Season 4 - Gold",
+      "upk_path": "ss_tier_02_SF.upk",
+      "thumbnail": "SS_Tier_02_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_tier_02",
+      "path": "ss_tier_02.SS_Tier_02_Gold"
+    },
+    {
+      "id": "1999",
+      "name": "Season 4 - Platinum",
+      "upk_path": "ss_tier_02_SF.upk",
+      "thumbnail": "SS_Tier_02_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_tier_02",
+      "path": "ss_tier_02.SS_Tier_02_Platinum"
+    },
+    {
+      "id": "4229",
+      "name": "Rally Tracks II",
+      "upk_path": "ss_tiretracks_SF.upk",
+      "thumbnail": "SS_TireTracks_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_tiretracks",
+      "path": "ss_tiretracks.ss_tiretracks_tier2"
+    },
+    {
+      "id": "4338",
+      "name": "Rally Tracks I",
+      "upk_path": "ss_tiretracks_SF.upk",
+      "thumbnail": "SS_TireTracks_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_tiretracks",
+      "path": "ss_tiretracks.ss_tiretracks_tier1"
+    },
+    {
+      "id": "2925",
+      "name": "Toon Hydro",
+      "upk_path": "ss_toonwater_SF.upk",
+      "thumbnail": "SS_ToonWater_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_toonwater",
+      "path": "ss_toonwater.ss_toonwater"
+    },
+    {
+      "id": "5674",
+      "name": "Toon Sketch",
+      "upk_path": "ss_mangaoutline_SF.upk",
+      "thumbnail": "ss_mangaoutline_T_SF.upk",
+      "quality": "Import",
+      "package": "ss_mangaoutline",
+      "path": "ss_mangaoutline.ss_mangaoutline"
+    },
+    {
+      "id": "8438",
+      "name": "TP",
+      "upk_path": "ss_toilettepaper_SF.upk",
+      "thumbnail": "SS_ToilettePaper_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_toilettepaper",
+      "path": "ss_toilettepaper.ss_toilettepaper"
+    },
+    {
+      "id": "5747",
+      "name": "Triangulate",
+      "upk_path": "ss_neon_shapes_SF.upk",
+      "thumbnail": "SS_Neon_Shapes_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_neon_shapes",
+      "path": "ss_neon_shapes.ss_neon_shapes"
+    },
+    {
+      "id": "5167",
+      "name": "Truth Beam",
+      "upk_path": "ss_electrobeam_SF.upk",
+      "thumbnail": "ss_ElectroBeam_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_electrobeam",
+      "path": "ss_electrobeam.ss_electrobeam"
+    },
+    {
+      "id": "8351",
+      "name": "Twisted Tornado",
+      "upk_path": "ss_tornado_SF.upk",
+      "thumbnail": "SS_Tornado_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_tornado",
+      "path": "ss_tornado.ss_tornado"
+    },
+    {
+      "id": "5465",
+      "name": "Twisty-Sweet",
+      "upk_path": "ss_candy_SF.upk",
+      "thumbnail": "SS_Candy_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_candy",
+      "path": "ss_candy.ss_candy"
+    },
+    {
+      "id": "4507",
+      "name": "Vaporstream",
+      "upk_path": "ss_glaucous_SF.upk",
+      "thumbnail": "ss_glaucous_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_glaucous",
+      "path": "ss_glaucous.ss_glaucous"
+    },
+    {
+      "id": "9162",
+      "name": "Waned Flame",
+      "upk_path": "ss_stylizedflame_bw_SF.upk",
+      "thumbnail": "SS_StylizedFlame_BW_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_stylizedflame_bw",
+      "path": "ss_stylizedflame_bw.ss_stylizedflame_bw"
+    },
+    {
+      "id": "5754",
+      "name": "Warp Wave",
+      "upk_path": "ss_energy_wave_SF.upk",
+      "thumbnail": "SS_Energy_Wave_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_energy_wave",
+      "path": "ss_energy_wave.ss_energy_wave"
+    },
+    {
+      "id": "3561",
+      "name": "Winter Storm",
+      "upk_path": "ss_frost_SF.upk",
+      "thumbnail": "SS_Frost_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_frost",
+      "path": "ss_frost.ss_frost"
+    },
+    {
+      "id": "5421",
+      "name": "Wonder Stream",
+      "upk_path": "ss_animated_lines_SF.upk",
+      "thumbnail": "SS_Animated_Lines_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_animated_lines",
+      "path": "ss_animated_lines.ss_animated_lines"
+    },
+    {
+      "id": "4480",
+      "name": "Xmas Lights",
+      "upk_path": "ss_holidaylights_SF.upk",
+      "thumbnail": "ss_holidaylights_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_holidaylights",
+      "path": "ss_holidaylights.ss_holidaylights"
+    },
+    {
+      "id": "8969",
+      "name": "Yarnball",
+      "upk_path": "ss_stringyball_SF.upk",
+      "thumbnail": "SS_StringyBall_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_stringyball",
+      "path": "ss_stringyball.FX.ss_stringyball"
+    },
+    {
+      "id": "4686",
+      "name": "Yokai",
+      "upk_path": "ss_anime_SF.upk",
+      "thumbnail": "ss_anime_T_SF.upk",
+      "quality": "Limited",
+      "package": "ss_anime",
+      "path": "ss_anime.ss_anime"
+    },
+    {
+      "id": "2359",
+      "name": "Zigzag",
+      "upk_path": "ss_zigzag_SF.upk",
+      "thumbnail": "SS_ZigZag_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "ss_zigzag",
+      "path": "ss_zigzag.ss_zigzag"
+    }
+  ]
+}

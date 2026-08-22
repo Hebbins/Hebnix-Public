@@ -1,5 +1,6 @@
 //! steam session ticket via steam_api64.dll
-
+//!
+// ported from the C++ eos_client flow (python one was flaky): load the dll,
 // SteamAPI_Init, grab ISteamUser via the flat C api, then GetAuthSessionTicket
 // for RL's appid (252950). hex ticket gets POSTed to epic oauth later.
 //
@@ -162,7 +163,7 @@ fn ensure_init(state: &mut Option<SteamState>) -> Result<(), String> {
 
 /// fresh steam auth session ticket (uppercase hex) + the steamid
 // GetAuthSessionTicket has a short cooldown so we retry with 1s/2s backoff like
-
+// the python impl did.
 pub fn get_ticket() -> Result<(String, String), String> {
     let mut guard = STATE.lock().unwrap();
     ensure_init(&mut guard)?;

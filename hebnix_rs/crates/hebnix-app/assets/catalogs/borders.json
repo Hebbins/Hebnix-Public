@@ -1,0 +1,1319 @@
+{
+  "base_upk_path": "AvatarBorder_Default_T_SF.upk",
+  "borders": [
+    {
+      "id": "9239",
+      "name": "8th Birthday",
+      "upk_path": "avatarborder_anniv23_SF.upk",
+      "thumbnail": "AvatarBorder_Anniv23_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_anniv23",
+      "path": "avatarborder_anniv23.avatarborder_anniv23"
+    },
+    {
+      "id": "6902",
+      "name": "Agent 007",
+      "upk_path": "avatarborder_barrel_SF.upk",
+      "thumbnail": "AvatarBorder_Barrel_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_barrel",
+      "path": "avatarborder_barrel.avatarborder_barrel"
+    },
+    {
+      "id": "10475",
+      "name": "Alan Walker",
+      "upk_path": "avatarborder_law_SF.upk",
+      "thumbnail": "AvatarBorder_Law_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_law",
+      "path": "avatarborder_law.avatarborder_law"
+    },
+    {
+      "id": "4617",
+      "name": "Avatrack",
+      "upk_path": "avatarborder_racetrack1_SF.upk",
+      "thumbnail": "AvatarBorder_Racetrack1_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_racetrack1",
+      "path": "avatarborder_racetrack1.avatarborder_racetrack1"
+    },
+    {
+      "id": "6901",
+      "name": "Batman 1989",
+      "upk_path": "avatarborder_nambt_SF.upk",
+      "thumbnail": "AvatarBorder_Nambt_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_nambt",
+      "path": "avatarborder_nambt.avatarborder_nambt"
+    },
+    {
+      "id": "3112",
+      "name": "Beach Day",
+      "upk_path": "avatarborder_summer_SF.upk",
+      "thumbnail": "AvatarBorder_Summer_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_summer",
+      "path": "avatarborder_summer.avatarborder_summer"
+    },
+    {
+      "id": "4696",
+      "name": "Blabberwockey",
+      "upk_path": "AvatarBorder_WeirdCritter_SF.upk",
+      "thumbnail": "AvatarBorder_WeirdCritter_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_WeirdCritter",
+      "path": "AvatarBorder_WeirdCritter.AvatarBorder_WeirdCritter"
+    },
+    {
+      "id": "5290",
+      "name": "Booyah",
+      "upk_path": "avatarborder_sugar_SF.upk",
+      "thumbnail": "AvatarBorder_sugar_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_sugar",
+      "path": "avatarborder_sugar.avatarborder_sugar"
+    },
+    {
+      "id": "3108",
+      "name": "Braid Brigade",
+      "upk_path": "avatarborder_braidedrope_SF.upk",
+      "thumbnail": "AvatarBorder_BraidedRope_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_braidedrope",
+      "path": "avatarborder_braidedrope.avatarborder_braidedrope"
+    },
+    {
+      "id": "7684",
+      "name": "Contestor",
+      "upk_path": "AvatarBorder_Sapphire_SF.upk",
+      "thumbnail": "AvatarBorder_Sapphire_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_Sapphire",
+      "path": "AvatarBorder_Sapphire.AvatarBorder_Sapphire"
+    },
+    {
+      "id": "9701",
+      "name": "Creep Jar",
+      "upk_path": "avatarborder_spookyjars_SF.upk",
+      "thumbnail": "AvatarBorder_SpookyJars_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_spookyjars",
+      "path": "avatarborder_spookyjars.avatarborder_spookyjars"
+    },
+    {
+      "id": "9682",
+      "name": "Creepy Cat",
+      "upk_path": "avatarborder_spookycemetery_SF.upk",
+      "thumbnail": "AvatarBorder_SpookyCemetery_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_spookycemetery",
+      "path": "avatarborder_spookycemetery.avatarborder_spookycemetery"
+    },
+    {
+      "id": "4002",
+      "name": "Crown",
+      "upk_path": "AvatarBorder_Crown_SF.upk",
+      "thumbnail": "AvatarBorder_Crown_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_Crown",
+      "path": "AvatarBorder_Crown.AvatarBorder_Crown"
+    },
+    {
+      "id": "9500",
+      "name": "CRT",
+      "upk_path": "AvatarBorder_RetroScreen_SF.upk",
+      "thumbnail": "AvatarBorder_RetroScreen_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_RetroScreen",
+      "path": "AvatarBorder_RetroScreen.AvatarBorder_RetroScreen"
+    },
+    {
+      "id": "4893",
+      "name": "CutCorner",
+      "upk_path": "avatarborder_metropolis_SF.upk",
+      "thumbnail": "AvatarBorder_Metropolis_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "avatarborder_metropolis",
+      "path": "avatarborder_metropolis.avatarborder_metropolis"
+    },
+    {
+      "id": "3110",
+      "name": "Cutesy Critter",
+      "upk_path": "avatarborder_cutecritter_SF.upk",
+      "thumbnail": "AvatarBorder_CuteCritter_T_SF.upk",
+      "quality": "Rare",
+      "package": "avatarborder_cutecritter",
+      "path": "avatarborder_cutecritter.avatarborder_cutecritter"
+    },
+    {
+      "id": "4003",
+      "name": "Damaged",
+      "upk_path": "AvatarBorder_Shattered_SF.upk",
+      "thumbnail": "AvatarBorder_Shattered_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_Shattered",
+      "path": "AvatarBorder_Shattered.AvatarBorder_Shattered"
+    },
+    {
+      "id": "7752",
+      "name": "Deco",
+      "upk_path": "AvatarBorder_DecoArt_SF.upk",
+      "thumbnail": "AvatarBorder_DecoArt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_DecoArt",
+      "path": "AvatarBorder_DecoArt.AvatarBorder_DecoArt"
+    },
+    {
+      "id": "3085",
+      "name": "Default",
+      "upk_path": "AvatarBorder_Default_SF.upk",
+      "thumbnail": "AvatarBorder_Default_T_SF.upk",
+      "quality": "Common",
+      "package": "AvatarBorder_Default",
+      "path": "AvatarBorder_Default.AvatarBorder_Default"
+    },
+    {
+      "id": "4720",
+      "name": "Dolphino",
+      "upk_path": "AvatarBorder_DolphinAndSpray_SF.upk",
+      "thumbnail": "AvatarBorder_DolphinAndSpray_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_DolphinAndSpray",
+      "path": "AvatarBorder_DolphinAndSpray.AvatarBorder_DolphinAndSpray"
+    },
+    {
+      "id": "8526",
+      "name": "Dragon Claw",
+      "upk_path": "avatarborder_dragonmarks_SF.upk",
+      "thumbnail": "AvatarBorder_DragonMarks_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_dragonmarks",
+      "path": "avatarborder_dragonmarks.avatarborder_dragonmarks"
+    },
+    {
+      "id": "3347",
+      "name": "Dragon's Breath Ca",
+      "upk_path": "avatarborder_ink_orange_SF.upk",
+      "thumbnail": "AvatarBorder_Ink_Orange_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_ink_orange",
+      "path": "avatarborder_ink_orange.avatarborder_ink_orange"
+    },
+    {
+      "id": "3345",
+      "name": "Dragon's Breath Cu",
+      "upk_path": "avatarborder_ink_blue_SF.upk",
+      "thumbnail": "AvatarBorder_Ink_Blue_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_ink_blue",
+      "path": "avatarborder_ink_blue.avatarborder_ink_blue"
+    },
+    {
+      "id": "3348",
+      "name": "Dragon's Breath K",
+      "upk_path": "avatarborder_ink_purple_SF.upk",
+      "thumbnail": "AvatarBorder_Ink_Purple_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_ink_purple",
+      "path": "avatarborder_ink_purple.avatarborder_ink_purple"
+    },
+    {
+      "id": "3359",
+      "name": "Dragon's Breath Li",
+      "upk_path": "avatarborder_ink_red_SF.upk",
+      "thumbnail": "AvatarBorder_Ink_Red_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_ink_red",
+      "path": "avatarborder_ink_red.avatarborder_ink_red"
+    },
+    {
+      "id": "10875",
+      "name": "Eyevatar",
+      "upk_path": "avatarborder_glowingeyes_SF.upk",
+      "thumbnail": "AvatarBorder_GlowingEyes_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_glowingeyes",
+      "path": "avatarborder_glowingeyes.avatarborder_glowingeyes"
+    },
+    {
+      "id": "3864",
+      "name": "Fire Main",
+      "upk_path": "avatarborder_chinamapmonster_SF.upk",
+      "thumbnail": "AvatarBorder_ChinaMapMonster_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_chinamapmonster",
+      "path": "avatarborder_chinamapmonster.avatarborder_chinamapmonster"
+    },
+    {
+      "id": "4954",
+      "name": "Fixer Frame",
+      "upk_path": "avatarborder_Cyberstreet_SF.upk",
+      "thumbnail": "AvatarBorder_Cyberstreet_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_Cyberstreet",
+      "path": "avatarborder_Cyberstreet.avatarborder_Cyberstreet"
+    },
+    {
+      "id": "3176",
+      "name": "Flame",
+      "upk_path": "avatarborder_flames_SF.upk",
+      "thumbnail": "AvatarBorder_Flames_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_flames",
+      "path": "avatarborder_flames.avatarborder_flames"
+    },
+    {
+      "id": "9811",
+      "name": "Floppy Disk",
+      "upk_path": "avatarborder_retrofloppy_SF.upk",
+      "thumbnail": "AvatarBorder_RetroFloppy_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_retrofloppy",
+      "path": "avatarborder_retrofloppy.avatarborder_retrofloppy"
+    },
+    {
+      "id": "3177",
+      "name": "Free Ride",
+      "upk_path": "AvatarBorder_OctaneTech_SF.upk",
+      "thumbnail": "AvatarBorder_OctaneTech_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_OctaneTech",
+      "path": "AvatarBorder_OctaneTech.AvatarBorder_OctaneTech"
+    },
+    {
+      "id": "9830",
+      "name": "Fridged",
+      "upk_path": "avatarborder_frostyfest23_SF.upk",
+      "thumbnail": "AvatarBorder_FrostyFest23_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_frostyfest23",
+      "path": "avatarborder_frostyfest23.avatarborder_frostyfest23"
+    },
+    {
+      "id": "5288",
+      "name": "Frosted Cake",
+      "upk_path": "avatarborder_5thanniversary_SF.upk",
+      "thumbnail": "AvatarBorder_5thAnniversary_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_5thanniversary",
+      "path": "avatarborder_5thanniversary.avatarborder_5thanniversary"
+    },
+    {
+      "id": "9066",
+      "name": "Gauged",
+      "upk_path": "AvatarBorder_GaugeCluster_SF.upk",
+      "thumbnail": "AvatarBorder_GaugeCluster_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_GaugeCluster",
+      "path": "AvatarBorder_GaugeCluster.AvatarBorder_GaugeCluster"
+    },
+    {
+      "id": "4300",
+      "name": "Ghostbusters",
+      "upk_path": "avatarborder_october_SF.upk",
+      "thumbnail": "AvatarBorder_October_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_october",
+      "path": "avatarborder_october.avatarborder_october"
+    },
+    {
+      "id": "10801",
+      "name": "Gnaw'd",
+      "upk_path": "avatarborder_monsterteeth_SF.upk",
+      "thumbnail": "AvatarBorder_MonsterTeeth_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_monsterteeth",
+      "path": "avatarborder_monsterteeth.avatarborder_monsterteeth"
+    },
+    {
+      "id": "7410",
+      "name": "Gone Fishin'",
+      "upk_path": "avatarborder_hook_SF.upk",
+      "thumbnail": "AvatarBorder_Hook_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_hook",
+      "path": "avatarborder_hook.avatarborder_hook"
+    },
+    {
+      "id": "6923",
+      "name": "Gravitron",
+      "upk_path": "avatarborder_gravityray_SF.upk",
+      "thumbnail": "AvatarBorder_GravityRay_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_gravityray",
+      "path": "avatarborder_gravityray.avatarborder_gravityray"
+    },
+    {
+      "id": "8841",
+      "name": "Greenery",
+      "upk_path": "avatarborder_hedge_SF.upk",
+      "thumbnail": "AvatarBorder_Hedge_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_hedge",
+      "path": "avatarborder_hedge.avatarborder_hedge"
+    },
+    {
+      "id": "3814",
+      "name": "Happy Holidays",
+      "upk_path": "avatarborder_Christmas2018_SF.upk",
+      "thumbnail": "AvatarBorder_Christmas2018_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_Christmas2018",
+      "path": "avatarborder_Christmas2018.avatarborder_Christmas2018"
+    },
+    {
+      "id": "5896",
+      "name": "Happy Victory",
+      "upk_path": "avatarborder_victory_SF.upk",
+      "thumbnail": "AvatarBorder_Victory_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_victory",
+      "path": "avatarborder_victory.avatarborder_victory"
+    },
+    {
+      "id": "10923",
+      "name": "Hexstatic",
+      "upk_path": "AvatarBorder_RLCS24_SF.upk",
+      "thumbnail": "AvatarBorder_RLCS24_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_RLCS24",
+      "path": "AvatarBorder_RLCS24.AvatarBorder_RLCS24"
+    },
+    {
+      "id": "10558",
+      "name": "High Tide",
+      "upk_path": "avatarborder_eggwave_SF.upk",
+      "thumbnail": "AvatarBorder_EggWave_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_eggwave",
+      "path": "avatarborder_eggwave.avatarborder_eggwave"
+    },
+    {
+      "id": "5919",
+      "name": "HNY",
+      "upk_path": "avatarborder_savethebees_SF.upk",
+      "thumbnail": "AvatarBorder_SaveTheBees_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_savethebees",
+      "path": "avatarborder_savethebees.avatarborder_savethebees"
+    },
+    {
+      "id": "6195",
+      "name": "Howdy",
+      "upk_path": "avatarborder_renegade_SF.upk",
+      "thumbnail": "AvatarBorder_Renegade_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_renegade",
+      "path": "avatarborder_renegade.avatarborder_renegade"
+    },
+    {
+      "id": "5641",
+      "name": "Iced Out",
+      "upk_path": "AvatarBorder_Frosty_SF.upk",
+      "thumbnail": "AvatarBorder_Frosty_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_Frosty",
+      "path": "AvatarBorder_Frosty.AvatarBorder_Frosty"
+    },
+    {
+      "id": "8695",
+      "name": "INSPECTION",
+      "upk_path": "AvatarBorder_jetset_SF.upk",
+      "thumbnail": "AvatarBorder_jetset_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_jetset",
+      "path": "AvatarBorder_jetset.AvatarBorder_jetset"
+    },
+    {
+      "id": "6900",
+      "name": "Joker",
+      "upk_path": "avatarborder_jokes_SF.upk",
+      "thumbnail": "AvatarBorder_Jokes_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_jokes",
+      "path": "avatarborder_jokes.avatarborder_jokes"
+    },
+    {
+      "id": "3349",
+      "name": "Jolted",
+      "upk_path": "avatarborder_lightning_SF.upk",
+      "thumbnail": "AvatarBorder_Lightning_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_lightning",
+      "path": "avatarborder_lightning.avatarborder_lightning"
+    },
+    {
+      "id": "7915",
+      "name": "Laced Up",
+      "upk_path": "avatarborder_shoelace_SF.upk",
+      "thumbnail": "AvatarBorder_Shoelace_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_shoelace",
+      "path": "avatarborder_shoelace.avatarborder_shoelace"
+    },
+    {
+      "id": "8525",
+      "name": "Lofi Girl Headphones",
+      "upk_path": "AvatarBorder_ChillBeat_SF.upk",
+      "thumbnail": "AvatarBorder_Chillbeat_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_ChillBeat",
+      "path": "AvatarBorder_ChillBeat.AvatarBorder_ChillBeat"
+    },
+    {
+      "id": "9067",
+      "name": "Mosaic",
+      "upk_path": "AvatarBorder_Mural_SF.upk",
+      "thumbnail": "AvatarBorder_Mural_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_Mural",
+      "path": "AvatarBorder_Mural.AvatarBorder_Mural"
+    },
+    {
+      "id": "5550",
+      "name": "Neontech",
+      "upk_path": "avatarborder_neontech_SF.upk",
+      "thumbnail": "AvatarBorder_NeonTech_T_SF.upk",
+      "quality": "Rare",
+      "package": "avatarborder_neontech",
+      "path": "avatarborder_neontech.avatarborder_neontech"
+    },
+    {
+      "id": "5834",
+      "name": "NFL",
+      "upk_path": "avatarborder_football_SF.upk",
+      "thumbnail": "AvatarBorder_Football_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "avatarborder_football",
+      "path": "avatarborder_football.avatarborder_football"
+    },
+    {
+      "id": "7409",
+      "name": "Nomster",
+      "upk_path": "avatarborder_fluffy_SF.upk",
+      "thumbnail": "AvatarBorder_Fluffy_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_fluffy",
+      "path": "avatarborder_fluffy.avatarborder_fluffy"
+    },
+    {
+      "id": "8832",
+      "name": "Oasis",
+      "upk_path": "avatarborder_oasis_SF.upk",
+      "thumbnail": "AvatarBorder_Oasis_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_oasis",
+      "path": "avatarborder_oasis.avatarborder_oasis"
+    },
+    {
+      "id": "5289",
+      "name": "Ombre",
+      "upk_path": "avatarborder_ombre_SF.upk",
+      "thumbnail": "AvatarBorder_ombre_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_ombre",
+      "path": "avatarborder_ombre.avatarborder_ombre"
+    },
+    {
+      "id": "3350",
+      "name": "Paladin",
+      "upk_path": "avatarborder_paladin_SF.upk",
+      "thumbnail": "AvatarBorder_Paladin_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_paladin",
+      "path": "avatarborder_paladin.avatarborder_paladin"
+    },
+    {
+      "id": "8686",
+      "name": "Parallel",
+      "upk_path": "avatarborder_bh_tajfrancis_SF.upk",
+      "thumbnail": "AvatarBorder_BH_TajFrancis_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "avatarborder_bh_tajfrancis",
+      "path": "avatarborder_bh_tajfrancis.avatarborder_bh_tajfrancis"
+    },
+    {
+      "id": "3344",
+      "name": "Phantastic",
+      "upk_path": "avatarborder_colorful_SF.upk",
+      "thumbnail": "AvatarBorder_Colorful_T_SF.upk",
+      "quality": "Rare",
+      "package": "avatarborder_colorful",
+      "path": "avatarborder_colorful.avatarborder_colorful"
+    },
+    {
+      "id": "7687",
+      "name": "Precious Metal",
+      "upk_path": "AvatarBorder_Blings_SF.upk",
+      "thumbnail": "AvatarBorder_Blings_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_Blings",
+      "path": "AvatarBorder_Blings.AvatarBorder_Blings"
+    },
+    {
+      "id": "5566",
+      "name": "Pulsator",
+      "upk_path": "avatarborder_pulsingorbit_SF.upk",
+      "thumbnail": "AvatarBorder_PulsingOrbit_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_pulsingorbit",
+      "path": "avatarborder_pulsingorbit.avatarborder_pulsingorbit"
+    },
+    {
+      "id": "4891",
+      "name": "Rio",
+      "upk_path": "avatarborder_aztec_SF.upk",
+      "thumbnail": "AvatarBorder_Aztec_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_aztec",
+      "path": "avatarborder_aztec.avatarborder_aztec"
+    },
+    {
+      "id": "9383",
+      "name": "RLCS Crystalline",
+      "upk_path": "avatarborder_rlcs23_SF.upk",
+      "thumbnail": "AvatarBorder_RLCS23_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_rlcs23",
+      "path": "avatarborder_rlcs23.avatarborder_rlcs23"
+    },
+    {
+      "id": "8527",
+      "name": "Royalty",
+      "upk_path": "avatarborder_stiles_SF.upk",
+      "thumbnail": "AvatarBorder_Stiles_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_stiles",
+      "path": "avatarborder_stiles.avatarborder_stiles"
+    },
+    {
+      "id": "10858",
+      "name": "S15 - Bronze",
+      "upk_path": "avatarborder_s15bronze_SF.upk",
+      "thumbnail": "AvatarBorder_S15Bronze_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s15bronze",
+      "path": "avatarborder_s15bronze.avatarborder_s15bronze"
+    },
+    {
+      "id": "10859",
+      "name": "S15 - Champion",
+      "upk_path": "avatarborder_s15champion_SF.upk",
+      "thumbnail": "AvatarBorder_S15Champion_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s15champion",
+      "path": "avatarborder_s15champion.avatarborder_s15champion"
+    },
+    {
+      "id": "10860",
+      "name": "S15 - Diamond",
+      "upk_path": "avatarborder_s15diamond_SF.upk",
+      "thumbnail": "AvatarBorder_S15Diamond_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s15diamond",
+      "path": "avatarborder_s15diamond.avatarborder_s15diamond"
+    },
+    {
+      "id": "10861",
+      "name": "S15 - Gold",
+      "upk_path": "avatarborder_s15gold_SF.upk",
+      "thumbnail": "AvatarBorder_S15Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s15gold",
+      "path": "avatarborder_s15gold.avatarborder_s15gold"
+    },
+    {
+      "id": "10862",
+      "name": "S15 - Grand Champion",
+      "upk_path": "avatarborder_s15grandchampion_SF.upk",
+      "thumbnail": "AvatarBorder_S15GrandChampion_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s15grandchampion",
+      "path": "avatarborder_s15grandchampion.avatarborder_s15grandchampion"
+    },
+    {
+      "id": "10863",
+      "name": "S15 - Platinum",
+      "upk_path": "avatarborder_s15platinum_SF.upk",
+      "thumbnail": "AvatarBorder_S15Platinum_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s15platinum",
+      "path": "avatarborder_s15platinum.avatarborder_s15platinum"
+    },
+    {
+      "id": "10864",
+      "name": "S15 - Silver",
+      "upk_path": "avatarborder_s15silver_SF.upk",
+      "thumbnail": "AvatarBorder_S15Silver_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s15silver",
+      "path": "avatarborder_s15silver.avatarborder_s15silver"
+    },
+    {
+      "id": "10865",
+      "name": "S15 - Supersonic Legend",
+      "upk_path": "avatarborder_s15supersoniclegend_SF.upk",
+      "thumbnail": "AvatarBorder_S15SupersonicLegend_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s15supersoniclegend",
+      "path": "avatarborder_s15supersoniclegend.avatarborder_s15supersoniclegend"
+    },
+    {
+      "id": "4560",
+      "name": "Scoops Ahoy",
+      "upk_path": "avatarborder_scoopsahoy_SF.upk",
+      "thumbnail": "AvatarBorder_ScoopsAhoy_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_scoopsahoy",
+      "path": "avatarborder_scoopsahoy.avatarborder_scoopsahoy"
+    },
+    {
+      "id": "4234",
+      "name": "SDTV",
+      "upk_path": "avatarborder_80sTV_SF.upk",
+      "thumbnail": "AvatarBorder_80sTV_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_80sTV",
+      "path": "avatarborder_80sTV.avatarborder_80sTV"
+    },
+    {
+      "id": "5270",
+      "name": "Season 14 - Bronze",
+      "upk_path": "avatarborder_s14rewardbronze_SF.upk",
+      "thumbnail": "AvatarBorder_S14RewardBronze_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s14rewardbronze",
+      "path": "avatarborder_s14rewardbronze.avatarborder_s14rewardbronze"
+    },
+    {
+      "id": "5271",
+      "name": "Season 14 - Champion",
+      "upk_path": "avatarborder_s14rewardchampion_SF.upk",
+      "thumbnail": "AvatarBorder_S14RewardChampion_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s14rewardchampion",
+      "path": "avatarborder_s14rewardchampion.avatarborder_s14rewardchampion"
+    },
+    {
+      "id": "5272",
+      "name": "Season 14 - Diamond",
+      "upk_path": "avatarborder_s14rewarddiamond_SF.upk",
+      "thumbnail": "AvatarBorder_S14RewardDiamond_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s14rewarddiamond",
+      "path": "avatarborder_s14rewarddiamond.avatarborder_s14rewarddiamond"
+    },
+    {
+      "id": "5273",
+      "name": "Season 14 - Gold",
+      "upk_path": "avatarborder_s14rewardgold_SF.upk",
+      "thumbnail": "AvatarBorder_S14RewardGold_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s14rewardgold",
+      "path": "avatarborder_s14rewardgold.avatarborder_s14rewardgold"
+    },
+    {
+      "id": "5274",
+      "name": "Season 14 - Grand Champion",
+      "upk_path": "avatarborder_s14rewardgrandchampion_SF.upk",
+      "thumbnail": "AvatarBorder_S14RewardGrandChampion_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s14rewardgrandchampion",
+      "path": "avatarborder_s14rewardgrandchampion.avatarborder_s14rewardgrandchampion"
+    },
+    {
+      "id": "5275",
+      "name": "Season 14 - Platinum",
+      "upk_path": "avatarborder_s14rewardplatinum_SF.upk",
+      "thumbnail": "AvatarBorder_S14RewardPlatinum_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s14rewardplatinum",
+      "path": "avatarborder_s14rewardplatinum.avatarborder_s14rewardplatinum"
+    },
+    {
+      "id": "5276",
+      "name": "Season 14 - Silver",
+      "upk_path": "avatarborder_s14rewardsilver_SF.upk",
+      "thumbnail": "AvatarBorder_S14RewardSilver_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_s14rewardsilver",
+      "path": "avatarborder_s14rewardsilver.avatarborder_s14rewardsilver"
+    },
+    {
+      "id": "10248",
+      "name": "Shark Bite",
+      "upk_path": "avatarborder_lily_SF.upk",
+      "thumbnail": "AvatarBorder_Lily_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_lily",
+      "path": "avatarborder_lily.avatarborder_lily"
+    },
+    {
+      "id": "3863",
+      "name": "Shen",
+      "upk_path": "avatarborder_chinamapdragon_SF.upk",
+      "thumbnail": "AvatarBorder_ChinaMapDragon_T_SF.upk",
+      "quality": "Rare",
+      "package": "avatarborder_chinamapdragon",
+      "path": "avatarborder_chinamapdragon.avatarborder_chinamapdragon"
+    },
+    {
+      "id": "5549",
+      "name": "Sidechain",
+      "upk_path": "avatarborder_chaintinted_SF.upk",
+      "thumbnail": "AvatarBorder_ChainTinted_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_chaintinted",
+      "path": "avatarborder_chaintinted.avatarborder_chaintinted"
+    },
+    {
+      "id": "10559",
+      "name": "Skatefish",
+      "upk_path": "avatarborder_skatefish_SF.upk",
+      "thumbnail": "AvatarBorder_SkateFish_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_skatefish",
+      "path": "avatarborder_skatefish.avatarborder_skatefish"
+    },
+    {
+      "id": "10301",
+      "name": "Snorkel",
+      "upk_path": "avatarborder_rose_SF.upk",
+      "thumbnail": "AvatarBorder_Rose_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_rose",
+      "path": "avatarborder_rose.avatarborder_rose"
+    },
+    {
+      "id": "3816",
+      "name": "Snowman",
+      "upk_path": "avatarborder_snowman_SF.upk",
+      "thumbnail": "AvatarBorder_Snowman_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_snowman",
+      "path": "avatarborder_snowman.avatarborder_snowman"
+    },
+    {
+      "id": "8022",
+      "name": "Spray'd",
+      "upk_path": "avatarborder_spray_paint_SF.upk",
+      "thumbnail": "AvatarBorder_Spray_Paint_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_spray_paint",
+      "path": "avatarborder_spray_paint.avatarborder_spray_paint"
+    },
+    {
+      "id": "3865",
+      "name": "Spring Pagoda",
+      "upk_path": "avatarborder_springfestival_SF.upk",
+      "thumbnail": "AvatarBorder_SpringFestival_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_springfestival",
+      "path": "avatarborder_springfestival.avatarborder_springfestival"
+    },
+    {
+      "id": "8691",
+      "name": "Sunniya",
+      "upk_path": "avatarborder_bh_geneva_SF.upk",
+      "thumbnail": "AvatarBorder_BH_Geneva_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "avatarborder_bh_geneva",
+      "path": "avatarborder_bh_geneva.avatarborder_bh_geneva"
+    },
+    {
+      "id": "7411",
+      "name": "Teddy",
+      "upk_path": "avatarborder_teddy_SF.upk",
+      "thumbnail": "AvatarBorder_Teddy_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_teddy",
+      "path": "avatarborder_teddy.avatarborder_teddy"
+    },
+    {
+      "id": "4892",
+      "name": "Thermoplastic",
+      "upk_path": "avatarborder_Carnival_SF.upk",
+      "thumbnail": "AvatarBorder_Carnival_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_Carnival",
+      "path": "avatarborder_Carnival.avatarborder_Carnival"
+    },
+    {
+      "id": "9030",
+      "name": "Tight Corner",
+      "upk_path": "AvatarBorder_racing_SF.upk",
+      "thumbnail": "AvatarBorder_racing_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "AvatarBorder_racing",
+      "path": "AvatarBorder_racing.AvatarBorder_racing"
+    },
+    {
+      "id": "3082",
+      "name": "Tranquility",
+      "upk_path": "avatarborder_CherryBlossomTree_SF.upk",
+      "thumbnail": "AvatarBorder_CherryBlossomTree_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_CherryBlossomTree",
+      "path": "avatarborder_CherryBlossomTree.avatarborder_CherryBlossomTree"
+    },
+    {
+      "id": "5546",
+      "name": "Trick or Treat",
+      "upk_path": "avatarborder_spookysampson_SF.upk",
+      "thumbnail": "AvatarBorder_SpookySampson_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_spookysampson",
+      "path": "avatarborder_spookysampson.avatarborder_spookysampson"
+    },
+    {
+      "id": "3178",
+      "name": "Twinkle Box",
+      "upk_path": "AvatarBorder_Wispy_SF.upk",
+      "thumbnail": "AvatarBorder_Wispy_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_Wispy",
+      "path": "AvatarBorder_Wispy.AvatarBorder_Wispy"
+    },
+    {
+      "id": "6196",
+      "name": "Wanted",
+      "upk_path": "avatarborder_wanted_SF.upk",
+      "thumbnail": "AvatarBorder_Wanted_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_wanted",
+      "path": "avatarborder_wanted.avatarborder_wanted"
+    },
+    {
+      "id": "5551",
+      "name": "WAVatar",
+      "upk_path": "avatarborder_speaker_SF.upk",
+      "thumbnail": "AvatarBorder_Speaker_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_speaker",
+      "path": "avatarborder_speaker.avatarborder_speaker"
+    },
+    {
+      "id": "9812",
+      "name": "Windowed",
+      "upk_path": "avatarborder_retroui_SF.upk",
+      "thumbnail": "AvatarBorder_RetroUI_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_retroui",
+      "path": "avatarborder_retroui.avatarborder_retroui"
+    },
+    {
+      "id": "4810",
+      "name": "Witchhat",
+      "upk_path": "avatarborder_witchhat_SF.upk",
+      "thumbnail": "AvatarBorder_WitchHat_T_SF.upk",
+      "quality": "Limited",
+      "package": "avatarborder_witchhat",
+      "path": "avatarborder_witchhat.avatarborder_witchhat"
+    },
+    {
+      "id": "3245",
+      "name": "XP Level 100",
+      "upk_path": "AvatarBorder_XPTier4_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier4_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier4",
+      "path": "AvatarBorder_XPTier4.AvatarBorder_XPTier4"
+    },
+    {
+      "id": "3282",
+      "name": "XP Level 1000",
+      "upk_path": "AvatarBorder_XPTier4Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier4Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier4Gold",
+      "path": "AvatarBorder_XPTier4Gold.AvatarBorder_XPTier4Gold"
+    },
+    {
+      "id": "3285",
+      "name": "XP Level 1050",
+      "upk_path": "AvatarBorder_XPTier5Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier5Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier5Gold",
+      "path": "AvatarBorder_XPTier5Gold.AvatarBorder_XPTier5Gold"
+    },
+    {
+      "id": "3288",
+      "name": "XP Level 1100",
+      "upk_path": "AvatarBorder_XPTier6Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier6Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier6Gold",
+      "path": "AvatarBorder_XPTier6Gold.AvatarBorder_XPTier6Gold"
+    },
+    {
+      "id": "3291",
+      "name": "XP Level 1150",
+      "upk_path": "AvatarBorder_XPTier7Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier7Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier7Gold",
+      "path": "AvatarBorder_XPTier7Gold.AvatarBorder_XPTier7Gold"
+    },
+    {
+      "id": "3294",
+      "name": "XP Level 1200",
+      "upk_path": "AvatarBorder_XPTier8Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier8Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier8Gold",
+      "path": "AvatarBorder_XPTier8Gold.AvatarBorder_XPTier8Gold"
+    },
+    {
+      "id": "3246",
+      "name": "XP Level 125",
+      "upk_path": "AvatarBorder_XPTier5_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier5_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier5",
+      "path": "AvatarBorder_XPTier5.AvatarBorder_XPTier5"
+    },
+    {
+      "id": "3297",
+      "name": "XP Level 1250",
+      "upk_path": "AvatarBorder_XPTier9Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier9Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier9Gold",
+      "path": "AvatarBorder_XPTier9Gold.AvatarBorder_XPTier9Gold"
+    },
+    {
+      "id": "3267",
+      "name": "XP Level 1300",
+      "upk_path": "AvatarBorder_XPTier10Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier10Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier10Gold",
+      "path": "AvatarBorder_XPTier10Gold.AvatarBorder_XPTier10Gold"
+    },
+    {
+      "id": "3270",
+      "name": "XP Level 1350",
+      "upk_path": "AvatarBorder_XPTier11Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier11Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier11Gold",
+      "path": "AvatarBorder_XPTier11Gold.AvatarBorder_XPTier11Gold"
+    },
+    {
+      "id": "3274",
+      "name": "XP Level 1400",
+      "upk_path": "AvatarBorder_XPTier1Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier1Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier1Onyx",
+      "path": "AvatarBorder_XPTier1Onyx.AvatarBorder_XPTier1Onyx"
+    },
+    {
+      "id": "3277",
+      "name": "XP Level 1450",
+      "upk_path": "AvatarBorder_XPTier2Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier2Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier2Onyx",
+      "path": "AvatarBorder_XPTier2Onyx.AvatarBorder_XPTier2Onyx"
+    },
+    {
+      "id": "3247",
+      "name": "XP Level 150",
+      "upk_path": "AvatarBorder_XPTier6_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier6_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier6",
+      "path": "AvatarBorder_XPTier6.AvatarBorder_XPTier6"
+    },
+    {
+      "id": "3280",
+      "name": "XP Level 1500",
+      "upk_path": "AvatarBorder_XPTier3Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier3Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier3Onyx",
+      "path": "AvatarBorder_XPTier3Onyx.AvatarBorder_XPTier3Onyx"
+    },
+    {
+      "id": "3283",
+      "name": "XP Level 1550",
+      "upk_path": "AvatarBorder_XPTier4Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier4Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier4Onyx",
+      "path": "AvatarBorder_XPTier4Onyx.AvatarBorder_XPTier4Onyx"
+    },
+    {
+      "id": "3286",
+      "name": "XP Level 1600",
+      "upk_path": "AvatarBorder_XPTier5Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier5Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier5Onyx",
+      "path": "AvatarBorder_XPTier5Onyx.AvatarBorder_XPTier5Onyx"
+    },
+    {
+      "id": "3289",
+      "name": "XP Level 1650",
+      "upk_path": "AvatarBorder_XPTier6Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier6Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier6Onyx",
+      "path": "AvatarBorder_XPTier6Onyx.AvatarBorder_XPTier6Onyx"
+    },
+    {
+      "id": "3292",
+      "name": "XP Level 1700",
+      "upk_path": "AvatarBorder_XPTier7Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier7Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier7Onyx",
+      "path": "AvatarBorder_XPTier7Onyx.AvatarBorder_XPTier7Onyx"
+    },
+    {
+      "id": "3248",
+      "name": "XP Level 175",
+      "upk_path": "AvatarBorder_XPTier7_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier7_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier7",
+      "path": "AvatarBorder_XPTier7.AvatarBorder_XPTier7"
+    },
+    {
+      "id": "3295",
+      "name": "XP Level 1750",
+      "upk_path": "AvatarBorder_XPTier8Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier8Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier8Onyx",
+      "path": "AvatarBorder_XPTier8Onyx.AvatarBorder_XPTier8Onyx"
+    },
+    {
+      "id": "3298",
+      "name": "XP Level 1800",
+      "upk_path": "AvatarBorder_XPTier9Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier9Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier9Onyx",
+      "path": "AvatarBorder_XPTier9Onyx.AvatarBorder_XPTier9Onyx"
+    },
+    {
+      "id": "3268",
+      "name": "XP Level 1850",
+      "upk_path": "AvatarBorder_XPTier10Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier10Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier10Onyx",
+      "path": "AvatarBorder_XPTier10Onyx.AvatarBorder_XPTier10Onyx"
+    },
+    {
+      "id": "3271",
+      "name": "XP Level 1900",
+      "upk_path": "AvatarBorder_XPTier11Onyx_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier11Onyx_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier11Onyx",
+      "path": "AvatarBorder_XPTier11Onyx.AvatarBorder_XPTier11Onyx"
+    },
+    {
+      "id": "3249",
+      "name": "XP Level 200",
+      "upk_path": "AvatarBorder_XPTier8_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier8_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier8",
+      "path": "AvatarBorder_XPTier8.AvatarBorder_XPTier8"
+    },
+    {
+      "id": "3250",
+      "name": "XP Level 225",
+      "upk_path": "AvatarBorder_XPTier9_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier9_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier9",
+      "path": "AvatarBorder_XPTier9.AvatarBorder_XPTier9"
+    },
+    {
+      "id": "3240",
+      "name": "XP Level 25",
+      "upk_path": "AvatarBorder_XPTier1_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier1",
+      "path": "AvatarBorder_XPTier1.AvatarBorder_XPTier1"
+    },
+    {
+      "id": "3241",
+      "name": "XP Level 250",
+      "upk_path": "AvatarBorder_XPTier10_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier10_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier10",
+      "path": "AvatarBorder_XPTier10.AvatarBorder_XPTier10"
+    },
+    {
+      "id": "3242",
+      "name": "XP Level 275",
+      "upk_path": "AvatarBorder_XPTier11_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier11_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier11",
+      "path": "AvatarBorder_XPTier11.AvatarBorder_XPTier11"
+    },
+    {
+      "id": "3272",
+      "name": "XP Level 300",
+      "upk_path": "AvatarBorder_XPTier1Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier1Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier1Cobalt",
+      "path": "AvatarBorder_XPTier1Cobalt.AvatarBorder_XPTier1Cobalt"
+    },
+    {
+      "id": "3275",
+      "name": "XP Level 350",
+      "upk_path": "AvatarBorder_XPTier2Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier2Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier2Cobalt",
+      "path": "AvatarBorder_XPTier2Cobalt.AvatarBorder_XPTier2Cobalt"
+    },
+    {
+      "id": "3278",
+      "name": "XP Level 400",
+      "upk_path": "AvatarBorder_XPTier3Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier3Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier3Cobalt",
+      "path": "AvatarBorder_XPTier3Cobalt.AvatarBorder_XPTier3Cobalt"
+    },
+    {
+      "id": "3281",
+      "name": "XP Level 450",
+      "upk_path": "AvatarBorder_XPTier4Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier4Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier4Cobalt",
+      "path": "AvatarBorder_XPTier4Cobalt.AvatarBorder_XPTier4Cobalt"
+    },
+    {
+      "id": "3243",
+      "name": "XP Level 50",
+      "upk_path": "AvatarBorder_XPTier2_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier2",
+      "path": "AvatarBorder_XPTier2.AvatarBorder_XPTier2"
+    },
+    {
+      "id": "3284",
+      "name": "XP Level 500",
+      "upk_path": "AvatarBorder_XPTier5Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier5Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier5Cobalt",
+      "path": "AvatarBorder_XPTier5Cobalt.AvatarBorder_XPTier5Cobalt"
+    },
+    {
+      "id": "3287",
+      "name": "XP Level 550",
+      "upk_path": "AvatarBorder_XPTier6Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier6Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier6Cobalt",
+      "path": "AvatarBorder_XPTier6Cobalt.AvatarBorder_XPTier6Cobalt"
+    },
+    {
+      "id": "3290",
+      "name": "XP Level 600",
+      "upk_path": "AvatarBorder_XPTier7Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier7Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier7Cobalt",
+      "path": "AvatarBorder_XPTier7Cobalt.AvatarBorder_XPTier7Cobalt"
+    },
+    {
+      "id": "3293",
+      "name": "XP Level 650",
+      "upk_path": "AvatarBorder_XPTier8Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier8Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier8Cobalt",
+      "path": "AvatarBorder_XPTier8Cobalt.AvatarBorder_XPTier8Cobalt"
+    },
+    {
+      "id": "3296",
+      "name": "XP Level 700",
+      "upk_path": "AvatarBorder_XPTier9Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier9Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier9Cobalt",
+      "path": "AvatarBorder_XPTier9Cobalt.AvatarBorder_XPTier9Cobalt"
+    },
+    {
+      "id": "3244",
+      "name": "XP Level 75",
+      "upk_path": "AvatarBorder_XPTier3_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier3_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier3",
+      "path": "AvatarBorder_XPTier3.AvatarBorder_XPTier3"
+    },
+    {
+      "id": "3266",
+      "name": "XP Level 750",
+      "upk_path": "AvatarBorder_XPTier10Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier10Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier10Cobalt",
+      "path": "AvatarBorder_XPTier10Cobalt.AvatarBorder_XPTier10Cobalt"
+    },
+    {
+      "id": "3269",
+      "name": "XP Level 800",
+      "upk_path": "AvatarBorder_XPTier11Cobalt_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier11Cobalt_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier11Cobalt",
+      "path": "AvatarBorder_XPTier11Cobalt.AvatarBorder_XPTier11Cobalt"
+    },
+    {
+      "id": "3273",
+      "name": "XP Level 850",
+      "upk_path": "AvatarBorder_XPTier1Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier1Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier1Gold",
+      "path": "AvatarBorder_XPTier1Gold.AvatarBorder_XPTier1Gold"
+    },
+    {
+      "id": "3276",
+      "name": "XP Level 900",
+      "upk_path": "AvatarBorder_XPTier2Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier2Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier2Gold",
+      "path": "AvatarBorder_XPTier2Gold.AvatarBorder_XPTier2Gold"
+    },
+    {
+      "id": "3279",
+      "name": "XP Level 950",
+      "upk_path": "AvatarBorder_XPTier3Gold_SF.upk",
+      "thumbnail": "AvatarBorder_XPTier3Gold_T_SF.upk",
+      "quality": "Limited",
+      "package": "AvatarBorder_XPTier3Gold",
+      "path": "AvatarBorder_XPTier3Gold.AvatarBorder_XPTier3Gold"
+    },
+    {
+      "id": "8711",
+      "name": "Yasuke",
+      "upk_path": "avatarborder_bh_yasuke_SF.upk",
+      "thumbnail": "AvatarBorder_BH_Yasuke_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "avatarborder_bh_yasuke",
+      "path": "avatarborder_bh_yasuke.avatarborder_bh_yasuke"
+    }
+  ]
+}

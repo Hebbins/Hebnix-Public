@@ -1,3 +1,4 @@
+//! read-only process memory scanner (windows), port of hebnix.eos._memory
 //!
 //! finds the eg1~eyJ... bearer token inside EpicGamesLauncher.exe without
 //! injection. toolhelp snapshot + VirtualQueryEx/ReadProcessMemory walk over

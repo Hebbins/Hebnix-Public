@@ -1,3 +1,4 @@
+//! gdi fallback overlay: the old layered color-key window (python W2SOverlay).
 //! only used when d3d11 init fails.
 //!
 //! cpu-rendered via the layered-window redirection surface, heavier than
@@ -337,6 +338,7 @@ impl GdiOverlay {
                 None,
             );
             if let Ok(hwnd) = hwnd {
+                // Pure black becomes transparent (color-key), like Python.
                 let _ = SetLayeredWindowAttributes(hwnd, rgb(Rgba(0, 0, 0, 255)), 0, LWA_COLORKEY);
                 super::register_hwnd(hwnd);
                 self.hwnd = Some(hwnd);

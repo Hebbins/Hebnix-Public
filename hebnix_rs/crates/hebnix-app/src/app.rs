@@ -25,7 +25,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.0";
+pub const APP_VERSION: &str = "2.1.1";
 
 pub const DEFAULT_WIDTH: f32 = 1000.0;
 pub const DEFAULT_HEIGHT: f32 = 600.0;
@@ -165,12 +165,10 @@ impl TitleCatalogEntry {
 }
 
 fn embedded_titles() -> Vec<TitleCatalogEntry> {
-    serde_json::from_str::<serde_json::Value>(include_str!(
-        "../assets/catalogs/titles_catalog.json"
-    ))
-    .ok()
-    .and_then(|root| serde_json::from_value(root.get("titles")?.clone()).ok())
-    .unwrap_or_default()
+    serde_json::from_str::<serde_json::Value>(include_str!("../assets/catalogs/titles.json"))
+        .ok()
+        .and_then(|root| serde_json::from_value(root.get("titles")?.clone()).ok())
+        .unwrap_or_default()
 }
 
 const TITLE_RANK_TOKENS: [(&str, &str); 8] = [
@@ -1073,13 +1071,13 @@ impl HebnixApp {
         if needs_http && !self.spoofer_mgr.http_running() {
             if let Err(e) = self.spoofer_mgr.start_http() {
                 self.console
-                    .write(format!("[Spoofer] Failed to start HTTP proxy: {e}"));
+                    .write(format!("[Spoofer] Failed to start account proxy: {e}"));
             } else {
-                self.console.write("[Spoofer] HTTP proxy started.");
+                self.console.write("[Spoofer] Account proxy started.");
             }
         } else if !needs_http && self.spoofer_mgr.http_running() {
             self.spoofer_mgr.stop_http();
-            self.console.write("[Spoofer] HTTP proxy stopped.");
+            self.console.write("[Spoofer] Account proxy stopped.");
         }
 
         // Rank spoofing uses the same hosts-backed config.psynet.gg reverse
@@ -1090,13 +1088,13 @@ impl HebnixApp {
         if needs_socket && !self.spoofer_mgr.socket_running() {
             if let Err(e) = self.spoofer_mgr.start_socket() {
                 self.console
-                    .write(format!("[Spoofer] Failed to start Socket proxy: {e}"));
+                    .write(format!("[Spoofer] Failed to start PsyNet proxy: {e}"));
             } else {
-                self.console.write("[Spoofer] Socket proxy started.");
+                self.console.write("[Spoofer] PsyNet proxy started.");
             }
         } else if !needs_socket && self.spoofer_mgr.socket_running() {
             self.spoofer_mgr.stop_socket();
-            self.console.write("[Spoofer] Socket proxy stopped.");
+            self.console.write("[Spoofer] PsyNet proxy stopped.");
             if !cache_cleared {
                 clear_rl_cache(&self.tx);
             }
@@ -1161,6 +1159,8 @@ impl HebnixApp {
                     api_open,
                     root_dir,
                 } => {
+                    let rl_state_changed = rl_open != self.last_rl_open;
+                    let mut platform_changed = false;
                     if let Some(root) = root_dir {
                         let previous_root = self.config.settings.rl_path.clone();
                         let previous_platform = hebnix_sdk::process::detect_platform(
@@ -1168,7 +1168,7 @@ impl HebnixApp {
                         );
                         let detected_platform =
                             hebnix_sdk::process::detect_platform(std::path::Path::new(&root));
-                        let platform_changed = !previous_root
+                        platform_changed = !previous_root
                             .trim_end_matches(['\\', '/'])
                             .eq_ignore_ascii_case(root.trim_end_matches(['\\', '/']));
                         let platform_switched = previous_platform != detected_platform
@@ -1202,8 +1202,12 @@ impl HebnixApp {
                     self.handle_rl_status(rl_open, api_open);
 
                     if launched {
+                        self.workshop.rocket_league_reopened();
                         self.check_statsapi_rate();
                         self.check_web_port();
+                    }
+                    if rl_state_changed || platform_changed {
+                        self.workshop.refresh_wizard_status(&self.tx, ctx);
                     }
                 }
                 AppMsg::AppUpdateFetched { result } => match result {
@@ -1424,6 +1428,40 @@ impl HebnixApp {
                     self.console.write(message);
                     self.workshop.finish_op();
                 }
+                AppMsg::WorkshopMultiplayerProgress(status) => {
+                    self.workshop.set_multiplayer_progress(status);
+                }
+                AppMsg::WorkshopMultiplayerPrepared { result } => {
+                    self.workshop.finish_multiplayer_prepare(result);
+                }
+                AppMsg::WorkshopHostStarted { result } => {
+                    self.workshop.finish_hosting(result);
+                }
+                AppMsg::WorkshopGuestJoined { result } => {
+                    self.workshop.finish_joining(result);
+                }
+                AppMsg::WorkshopPlayerUpdated { result } => {
+                    self.workshop.finish_player_update(result);
+                }
+                AppMsg::WorkshopHostSessionCheck { result } => {
+                    self.workshop.finish_host_session_check(result);
+                }
+                AppMsg::WorkshopWizardCheck {
+                    rl_open,
+                    tap_ready,
+                    launch_ready,
+                    detected_map,
+                } => {
+                    self.workshop.finish_wizard_check(
+                        rl_open,
+                        tap_ready,
+                        launch_ready,
+                        detected_map,
+                    );
+                    if self.workshop.retry_multihome_check() {
+                        self.workshop.refresh_wizard_status(&self.tx, ctx);
+                    }
+                }
                 AppMsg::PluginFetch { result } => {
                     self.install_modal.fetching = false;
                     match result {
@@ -1475,6 +1513,10 @@ impl HebnixApp {
         match event.event_type.as_str() {
             "UpdateState" => {
                 self.in_match = true;
+                if let Some(state) = event.update_state() {
+                    self.workshop
+                        .update_workshop_map_from_stats(&state.game.arena, &self.tx);
+                }
                 self.plugin_mgr.dispatch_game_event(&event);
             }
             "MatchEnded" => {
@@ -1537,6 +1579,9 @@ impl HebnixApp {
                 self.console
                     .write("[Monitor] Connection lost. Halting listener...");
                 self.stats.stop();
+                if !rl_open {
+                    self.workshop.shutdown_multiplayer();
+                }
                 if self.in_match {
                     self.in_match = false;
                     self.console
@@ -1709,11 +1754,11 @@ impl HebnixApp {
             .and_then(|p| p.parse().ok())
             .unwrap_or(49123);
         self.stats.set_port(self.current_api_port);
-        if let Ok(mut shared) = self.monitor.shared.lock() {
-            shared.api_port = self.current_api_port;
-            shared.statsapi_path = self.config.settings.statsapi_path.clone();
-            shared.rl_path = self.config.settings.rl_path.clone();
-        }
+        self.monitor.update_shared(crate::monitor::MonitorShared {
+            api_port: self.current_api_port,
+            statsapi_path: self.config.settings.statsapi_path.clone(),
+            rl_path: self.config.settings.rl_path.clone(),
+        });
     }
 
     fn check_statsapi_rate(&mut self) {
@@ -2094,7 +2139,7 @@ impl HebnixApp {
                                 }
                             }
                             ui.label(
-                                egui::RichText::new("Requires Admin for Proxy Configuration")
+                                egui::RichText::new("Requires Admin for hosts-file interception")
                                     .color(egui::Color32::GRAY),
                             );
 
@@ -2102,7 +2147,7 @@ impl HebnixApp {
                             ui.add_enabled_ui(self.spoofer_master, |ui| {
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .checkbox(&mut self.spoofer_http_proxy, "HTTP Proxy")
+                                        .checkbox(&mut self.spoofer_http_proxy, "Account Proxy")
                                         .changed()
                                     {
                                         self.save_config();
@@ -2129,7 +2174,7 @@ impl HebnixApp {
 
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .checkbox(&mut self.spoofer_socket_proxy, "Socket Proxy")
+                                        .checkbox(&mut self.spoofer_socket_proxy, "PsyNet Proxy")
                                         .changed()
                                     {
                                         self.save_config();
@@ -3291,10 +3336,10 @@ impl HebnixApp {
     fn render_about_tab(&mut self, ui: &mut egui::Ui) {
         ui.add_space(40.0);
         ui.vertical_centered(|ui| {
-            ui.heading("Hebnix");
+            ui.heading("Hebnix Lite");
             ui.add_space(10.0);
             ui.label(format!(
-                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide window.",
+                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League + Spoofer + Item Changer.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide window.",
                 self.config.settings.hotkey.to_uppercase()
             ));
         });
@@ -4212,6 +4257,7 @@ impl Drop for HebnixApp {
         // Covers normal eframe shutdown paths that do not go through the
         // explicit tray/window quit handler.
         self.spoofer_mgr.shutdown();
+        self.workshop.suspend_multiplayer();
     }
 }
 
@@ -4268,6 +4314,28 @@ impl eframe::App for HebnixApp {
                                 .size(12.0)
                                 .color(self.status_color),
                         );
+                        let restart = ui
+                            .add_enabled(
+                                self.last_rl_open,
+                                egui::Button::new("Restart Rocket League"),
+                            )
+                            .on_hover_text("Restart the currently attached Steam or Epic install");
+                        if restart.clicked() {
+                            let path = self.config.settings.rl_path.clone();
+                            let tx = self.tx.clone();
+                            self.console.write("[Core] Restarting Rocket League...");
+                            std::thread::spawn(move || {
+                                let message = match crate::winutil::restart_rocket_league(
+                                    std::path::Path::new(&path),
+                                ) {
+                                    Ok(()) => "[Core] Rocket League restarted.".to_string(),
+                                    Err(error) => {
+                                        format!("[Core] Rocket League restart failed: {error}")
+                                    }
+                                };
+                                let _ = tx.send(AppMsg::Log(message));
+                            });
+                        }
                     });
                 });
                 ui.separator();

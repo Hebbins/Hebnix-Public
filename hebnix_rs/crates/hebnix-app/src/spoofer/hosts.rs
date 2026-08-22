@@ -23,25 +23,31 @@ fn line_for(host: &str) -> String {
 }
 
 /// point host at us. does nothing if its already there.
-pub fn redirect(host: &str) -> Result<(), String> {
+pub fn set_redirects(hosts: &[&str]) -> Result<(), String> {
     let path = hosts_path();
     let content =
         std::fs::read_to_string(&path).map_err(|e| format!("cant read the hosts file: {e}"))?;
-
-    if content.lines().any(|l| is_ours(l) && l.contains(host)) {
-        return Ok(());
+    let mut kept = content
+        .lines()
+        .filter(|line| !is_ours(line))
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    for host in hosts {
+        kept.push(line_for(host));
     }
-
-    let mut out = content;
-    if !out.ends_with('\n') && !out.is_empty() {
+    let mut out = kept.join("\r\n");
+    if !out.is_empty() {
         out.push_str("\r\n");
     }
-    out.push_str(&line_for(host));
-    out.push_str("\r\n");
-
     write(&path, &out)?;
     flush_dns();
     Ok(())
+}
+
+pub fn has_redirects() -> bool {
+    std::fs::read_to_string(hosts_path())
+        .map(|content| content.lines().any(is_ours))
+        .unwrap_or(false)
 }
 
 /// drops our lines, whatever host they were for
@@ -65,12 +71,6 @@ pub fn clear() -> Result<(), String> {
     Ok(())
 }
 
-pub fn is_redirected(host: &str) -> bool {
-    std::fs::read_to_string(hosts_path())
-        .map(|c| c.lines().any(|l| is_ours(l) && l.contains(host)))
-        .unwrap_or(false)
-}
-
 fn is_ours(line: &str) -> bool {
     line.contains(MARK)
 }
@@ -85,7 +85,7 @@ fn write(path: &Path, content: &str) -> Result<(), String> {
     })
 }
 
-fn flush_dns() {
+pub fn flush_dns() {
     use std::os::windows::process::CommandExt;
     let _ = std::process::Command::new("ipconfig")
         .arg("/flushdns")

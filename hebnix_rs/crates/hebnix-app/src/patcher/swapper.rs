@@ -12,14 +12,14 @@ use std::sync::Arc;
 pub enum SwapCategory {
     Antennas,
     Anthems,
-    AvatarBorders,
+    Borders,
     Bodies,
     Boosts,
     Skins,
-    EngineAudios,
-    Explosions,
-    PaintFinishes,
-    PlayerBanners,
+    Engines,
+    Goals,
+    Finishes,
+    Banners,
     Toppers,
     Trails,
     Wheels,
@@ -29,14 +29,14 @@ impl SwapCategory {
     pub const ALL: [Self; 13] = [
         Self::Antennas,
         Self::Anthems,
-        Self::AvatarBorders,
+        Self::Borders,
         Self::Bodies,
         Self::Boosts,
         Self::Skins,
-        Self::EngineAudios,
-        Self::Explosions,
-        Self::PaintFinishes,
-        Self::PlayerBanners,
+        Self::Engines,
+        Self::Goals,
+        Self::Finishes,
+        Self::Banners,
         Self::Toppers,
         Self::Trails,
         Self::Wheels,
@@ -46,13 +46,13 @@ impl SwapCategory {
         match self {
             Self::Antennas => "Antennas",
             Self::Anthems => "Anthems",
-            Self::AvatarBorders => "Avatar Borders",
+            Self::Borders => "Borders",
             Self::Bodies => "Bodies",
             Self::Boosts => "Boosts",
-            Self::EngineAudios => "Engine Audios",
-            Self::Explosions => "Explosions",
-            Self::PaintFinishes => "Paint Finishes",
-            Self::PlayerBanners => "Player Banners",
+            Self::Engines => "Engines",
+            Self::Goals => "Goals",
+            Self::Finishes => "Finishes",
+            Self::Banners => "Banners",
             Self::Skins => "Decals",
             Self::Toppers => "Toppers",
             Self::Trails => "Trails",
@@ -64,35 +64,17 @@ impl SwapCategory {
         match self {
             Self::Antennas => "antennas",
             Self::Anthems => "anthems",
-            Self::AvatarBorders => "avatarborders",
+            Self::Borders => "borders",
             Self::Bodies => "bodies",
             Self::Boosts => "boosts",
-            Self::EngineAudios => "engineaudios",
-            Self::Explosions => "explosions",
-            Self::PaintFinishes => "paintfinishes",
-            Self::PlayerBanners => "playerbanners",
+            Self::Engines => "engines",
+            Self::Goals => "goals",
+            Self::Finishes => "finishes",
+            Self::Banners => "banners",
             Self::Skins => "skins",
             Self::Toppers => "toppers",
             Self::Trails => "trails",
             Self::Wheels => "wheels",
-        }
-    }
-
-    fn upk_key(self) -> &'static str {
-        match self {
-            Self::Antennas => "antenna_upk",
-            Self::Anthems => "anthem_upk",
-            Self::AvatarBorders => "avatar_border_upk",
-            Self::Bodies => "body_upk",
-            Self::Boosts => "boost_upk",
-            Self::EngineAudios => "engine_audio_upk",
-            Self::Explosions => "explosion_upk",
-            Self::PaintFinishes => "paint_finish_upk",
-            Self::PlayerBanners => "banner_upk",
-            Self::Skins => "skin_upk",
-            Self::Toppers => "topper_upk",
-            Self::Trails => "trail_upk",
-            Self::Wheels => "wheel_upk",
         }
     }
 }
@@ -101,8 +83,8 @@ impl SwapCategory {
 struct SwapItem {
     name: String,
     upk: String,
-    asset_path: Option<String>,
-    thumbnail_upk: Option<String>,
+    path: Option<String>,
+    thumbnail: Option<String>,
     audio_bnk: Option<String>,
     upk_type: String,
     product_id: Option<i64>,
@@ -142,7 +124,7 @@ fn patch_boost_bnk(source: &Path, target_backup: &Path, destination: &Path) -> R
 }
 
 fn swap_compatible(category: SwapCategory, source: &SwapItem, target: &SwapItem) -> bool {
-    if category != SwapCategory::Explosions {
+    if category != SwapCategory::Goals {
         return true;
     }
     match target.upk_type.as_str() {
@@ -153,11 +135,11 @@ fn swap_compatible(category: SwapCategory, source: &SwapItem, target: &SwapItem)
 }
 
 fn inferred_thumbnail(category: SwapCategory, item: &SwapItem, cooked_pc: &Path) -> Option<String> {
-    if let Some(name) = item.thumbnail_upk.as_ref().filter(|name| !name.is_empty()) {
+    if let Some(name) = item.thumbnail.as_ref().filter(|name| !name.is_empty()) {
         return cooked_pc.join(name).is_file().then(|| name.clone());
     }
-    if matches!(category, SwapCategory::Boosts | SwapCategory::Explosions)
-        && (category != SwapCategory::Explosions || item.upk_type == "simple")
+    if matches!(category, SwapCategory::Boosts | SwapCategory::Goals)
+        && (category != SwapCategory::Goals || item.upk_type == "simple")
     {
         let lower = item.upk.to_ascii_lowercase();
         if lower.ends_with("_sf.upk") {
@@ -169,7 +151,7 @@ fn inferred_thumbnail(category: SwapCategory, item: &SwapItem, cooked_pc: &Path)
 }
 
 fn explosion_thumbnail_asset(item: &SwapItem) -> Option<String> {
-    let object = item.asset_path.as_deref()?.split('.').next_back()?;
+    let object = item.path.as_deref()?.split('.').next_back()?;
     (!object.is_empty()).then(|| {
         let thumbnail = format!("{object}_TThumbnail");
         format!("{thumbnail}.{thumbnail}")
@@ -261,37 +243,25 @@ impl SwapperState {
     }
 
     fn catalog_path(&self, category: SwapCategory) -> Option<PathBuf> {
-        let path = self
-            .base_dir
-            .join(format!("{}_catalog.json", category.slug()));
-        path.is_file().then_some(path)
+        let regular = self.base_dir.join(format!("{}.json", category.slug()));
+        regular.is_file().then_some(regular)
     }
 
     fn embedded_catalog(category: SwapCategory) -> &'static str {
         match category {
-            SwapCategory::Antennas => include_str!("../../assets/catalogs/antennas_catalog.json"),
-            SwapCategory::Anthems => include_str!("../../assets/catalogs/anthems_catalog.json"),
-            SwapCategory::AvatarBorders => {
-                include_str!("../../assets/catalogs/avatarborders_catalog.json")
-            }
-            SwapCategory::Bodies => include_str!("../../assets/catalogs/bodies_catalog.json"),
-            SwapCategory::Boosts => include_str!("../../assets/catalogs/boosts_catalog.json"),
-            SwapCategory::EngineAudios => {
-                include_str!("../../assets/catalogs/engineaudios_catalog.json")
-            }
-            SwapCategory::Explosions => {
-                include_str!("../../assets/catalogs/explosions_catalog.json")
-            }
-            SwapCategory::PaintFinishes => {
-                include_str!("../../assets/catalogs/paintfinishes_catalog.json")
-            }
-            SwapCategory::PlayerBanners => {
-                include_str!("../../assets/catalogs/playerbanners_catalog.json")
-            }
-            SwapCategory::Skins => include_str!("../../assets/catalogs/skins_catalog.json"),
-            SwapCategory::Toppers => include_str!("../../assets/catalogs/toppers_catalog.json"),
-            SwapCategory::Trails => include_str!("../../assets/catalogs/trails_catalog.json"),
-            SwapCategory::Wheels => include_str!("../../assets/catalogs/wheels_catalog.json"),
+            SwapCategory::Antennas => include_str!("../../assets/catalogs/antennas.json"),
+            SwapCategory::Anthems => include_str!("../../assets/catalogs/anthems.json"),
+            SwapCategory::Borders => include_str!("../../assets/catalogs/borders.json"),
+            SwapCategory::Bodies => include_str!("../../assets/catalogs/bodies.json"),
+            SwapCategory::Boosts => include_str!("../../assets/catalogs/boosts.json"),
+            SwapCategory::Engines => include_str!("../../assets/catalogs/engines.json"),
+            SwapCategory::Goals => include_str!("../../assets/catalogs/goals.json"),
+            SwapCategory::Finishes => include_str!("../../assets/catalogs/finishes.json"),
+            SwapCategory::Banners => include_str!("../../assets/catalogs/banners.json"),
+            SwapCategory::Skins => include_str!("../../assets/catalogs/skins.json"),
+            SwapCategory::Toppers => include_str!("../../assets/catalogs/toppers.json"),
+            SwapCategory::Trails => include_str!("../../assets/catalogs/trails.json"),
+            SwapCategory::Wheels => include_str!("../../assets/catalogs/wheels.json"),
         }
     }
 
@@ -359,7 +329,6 @@ impl SwapperState {
                             Self::push_item(
                                 &mut items,
                                 skin,
-                                category.upk_key(),
                                 Some((car_name, &display_name, car_product_id)),
                             );
                         }
@@ -368,7 +337,7 @@ impl SwapperState {
             }
         } else if let Some(array) = root.get(category.slug()).and_then(Value::as_array) {
             for value in array {
-                Self::push_item(&mut items, value, category.upk_key(), None);
+                Self::push_item(&mut items, value, None);
             }
         }
         let mut seen = HashSet::new();
@@ -385,19 +354,11 @@ impl SwapperState {
         }
     }
 
-    fn push_item(
-        items: &mut Vec<SwapItem>,
-        value: &Value,
-        upk_key: &str,
-        car: Option<(&str, &str, Option<i64>)>,
-    ) {
-        if value.get("swap_compat").and_then(Value::as_bool) == Some(false) {
-            return;
-        }
+    fn push_item(items: &mut Vec<SwapItem>, value: &Value, car: Option<(&str, &str, Option<i64>)>) {
         let Some(name) = value.get("name").and_then(Value::as_str) else {
             return;
         };
-        let Some(upk) = value.get(upk_key).and_then(Value::as_str) else {
+        let Some(upk) = value.get("upk_path").and_then(Value::as_str) else {
             return;
         };
         if !upk.to_ascii_lowercase().ends_with(".upk") {
@@ -406,12 +367,12 @@ impl SwapperState {
         items.push(SwapItem {
             name: name.to_string(),
             upk: upk.to_string(),
-            asset_path: value
-                .get("asset_path")
+            path: value
+                .get("path")
                 .and_then(Value::as_str)
                 .map(str::to_string),
-            thumbnail_upk: value
-                .get("thumbnail_upk")
+            thumbnail: value
+                .get("thumbnail")
                 .and_then(Value::as_str)
                 .map(str::to_string),
             audio_bnk: value
@@ -501,8 +462,8 @@ impl SwapperState {
             &target_backup,
             &target_live,
             &self.base_dir,
-            source.asset_path.as_deref(),
-            target.asset_path.as_deref(),
+            source.path.as_deref(),
+            target.path.as_deref(),
         )
         .map_err(|error| format!("Failed to patch {} for {}: {error}", source.upk, target.upk))?;
         let mut target_bnk = None;
@@ -558,10 +519,10 @@ impl SwapperState {
                 } else {
                     &source_live
                 };
-                let donor_thumbnail_asset = (category == SwapCategory::Explosions)
+                let donor_thumbnail_asset = (category == SwapCategory::Goals)
                     .then(|| explosion_thumbnail_asset(source))
                     .flatten();
-                let target_thumbnail_asset = (category == SwapCategory::Explosions)
+                let target_thumbnail_asset = (category == SwapCategory::Goals)
                     .then(|| explosion_thumbnail_asset(target))
                     .flatten();
                 if let Err(error) = crate::cosmetic_upk::patch_for_target(
@@ -787,7 +748,7 @@ impl SwapperState {
                         })
                     });
                     let image = source_item
-                        .and_then(|item| item.thumbnail_upk.as_deref())
+                        .and_then(|item| item.thumbnail.as_deref())
                         .and_then(|filename| {
                             crate::cosmetic_thumbnail::extract_png(
                                 &cooked_pc.join(filename),
@@ -798,7 +759,7 @@ impl SwapperState {
                         .map(Arc::<[u8]>::from)
                         .unwrap_or_else(|| fallback.clone());
                     let target_image = target_item
-                        .and_then(|item| item.thumbnail_upk.as_deref())
+                        .and_then(|item| item.thumbnail.as_deref())
                         .and_then(|filename| {
                             let backup = backups_dir.join(format!("{filename}.bak"));
                             let source = backup
@@ -1099,7 +1060,7 @@ impl SwapperState {
                 .unwrap_or_else(|_| include_bytes!("../../assets/hebnix.png").to_vec())
                 .into();
         for &source_index in visible {
-            if let Some(filename) = items[source_index].thumbnail_upk.as_ref() {
+            if let Some(filename) = items[source_index].thumbnail.as_ref() {
                 let cache_key = format!("{}|{}", category.slug(), filename.to_ascii_lowercase());
                 let fallback = fs::read(self.base_dir.join("assets").join("hebnix.png"))
                     .unwrap_or_else(|_| include_bytes!("../../assets/hebnix.png").to_vec());
@@ -1126,7 +1087,7 @@ impl SwapperState {
                             let source = &items[source_index];
                             let key =
                                 format!("{}|{}", category.slug(), source.upk.to_ascii_lowercase());
-                            let thumbnail = source.thumbnail_upk.as_ref().and_then(|filename| {
+                            let thumbnail = source.thumbnail.as_ref().and_then(|filename| {
                                 self.thumbnails
                                     .get(&format!(
                                         "{}|{}",

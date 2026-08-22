@@ -31,6 +31,34 @@ pub enum AppMsg {
     WorkshopOpDone {
         message: String,
     },
+    WorkshopMultiplayerProgress(String),
+    WorkshopMultiplayerPrepared {
+        result: Result<
+            (
+                crate::multiplayer_lan::TapSession,
+                Option<crate::multiplayer_lan::JoinedRoom>,
+            ),
+            String,
+        >,
+    },
+    WorkshopHostStarted {
+        result: Result<crate::multiplayer_lan::HostSession, String>,
+    },
+    WorkshopGuestJoined {
+        result: Result<crate::multiplayer_lan::GuestSession, String>,
+    },
+    WorkshopPlayerUpdated {
+        result: Result<(), String>,
+    },
+    WorkshopHostSessionCheck {
+        result: Result<crate::multiplayer_lan::Room, String>,
+    },
+    WorkshopWizardCheck {
+        rl_open: bool,
+        tap_ready: bool,
+        launch_ready: bool,
+        detected_map: Option<String>,
+    },
     // "install from hebnix" plugin metadata fetch done
     PluginFetch {
         result: Result<Value, String>,

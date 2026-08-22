@@ -1,0 +1,1945 @@
+{
+  "base_upk_path": "Body_Octane_T_SF.upk",
+  "bodies": [
+    {
+      "id": "5547",
+      "name": "007's Aston Martin DB5",
+      "upk_path": "body_amber_SF.upk",
+      "thumbnail": "body_Amber_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_amber",
+      "path": "body_amber.body_amber"
+    },
+    {
+      "id": "7343",
+      "name": "007's Aston Martin DBS",
+      "upk_path": "body_quartz_SF.upk",
+      "thumbnail": "body_quartz_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_quartz",
+      "path": "body_quartz.body_quartz"
+    },
+    {
+      "id": "6260",
+      "name": "007's Aston Martin Valhalla",
+      "upk_path": "body_heaven_SF.upk",
+      "thumbnail": "body_heaven_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_heaven",
+      "path": "body_heaven.body_heaven"
+    },
+    {
+      "id": "10698",
+      "name": "1966 Cadillac DeVille",
+      "upk_path": "body_smoke_SF.upk",
+      "thumbnail": "body_smoke_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_smoke",
+      "path": "body_smoke.body_smoke"
+    },
+    {
+      "id": "8669",
+      "name": "Ace",
+      "upk_path": "body_aa_SF.upk",
+      "thumbnail": "Body_AA_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_aa",
+      "path": "body_aa.body_aa"
+    },
+    {
+      "id": "8454",
+      "name": "Admiral",
+      "upk_path": "body_odb_SF.upk",
+      "thumbnail": "body_ODB_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_odb",
+      "path": "body_odb.body_odb"
+    },
+    {
+      "id": "1286",
+      "name": "Aftershock",
+      "upk_path": "Body_Aftershock_SF.upk",
+      "thumbnail": "Body_Aftershock_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_Aftershock",
+      "path": "Body_Aftershock.Body_Aftershock"
+    },
+    {
+      "id": "1932",
+      "name": "Animus GP",
+      "upk_path": "body_focaccia_SF.upk",
+      "thumbnail": "Body_Focaccia_T_SF.upk",
+      "quality": "Import",
+      "package": "body_focaccia",
+      "path": "body_focaccia.body_focaccia"
+    },
+    {
+      "id": "3614",
+      "name": "Artemis",
+      "upk_path": "body_enspier_tier1_SF.upk",
+      "thumbnail": "body_enspier_tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_enspier_tier1",
+      "path": "body_enspier_tier1.body_enspier_tier1"
+    },
+    {
+      "id": "3594",
+      "name": "Artemis G1",
+      "upk_path": "body_enspier_tier2_SF.upk",
+      "thumbnail": "body_enspier_tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_enspier_tier2",
+      "path": "body_enspier_tier2.body_enspier_tier2"
+    },
+    {
+      "id": "3622",
+      "name": "Artemis GXT",
+      "upk_path": "body_enspier_Tier3_SF.upk",
+      "thumbnail": "body_enspier_tier3_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_enspier_Tier3",
+      "path": "body_enspier_Tier3.body_enspier_Tier3"
+    },
+    {
+      "id": "12315",
+      "name": "Aston Martin Valhalla",
+      "upk_path": "body_numb_SF.upk",
+      "thumbnail": "Body_Numb_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_numb",
+      "path": "body_numb.body_numb"
+    },
+    {
+      "id": "11394",
+      "name": "Azura",
+      "upk_path": "body_futura_SF.upk",
+      "thumbnail": "body_Futura_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_futura",
+      "path": "body_futura.body_futura"
+    },
+    {
+      "id": "597",
+      "name": "Back To The Future Time Machine",
+      "upk_path": "Body_GreyCar_SF.upk",
+      "thumbnail": "Body_GreyCar_T_SF.upk",
+      "quality": "Exotic",
+      "package": "Body_GreyCar",
+      "path": "Body_GreyCar.Body_GreyCar"
+    },
+    {
+      "id": "21",
+      "name": "Backfire",
+      "upk_path": "Body_Backfire_SF.upk",
+      "thumbnail": "Body_Backfire_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Backfire",
+      "path": "Body_Backfire.Body_Backfire"
+    },
+    {
+      "id": "2666",
+      "name": "Batmobile (1989)",
+      "upk_path": "body_eggplant_SF.upk",
+      "thumbnail": "Body_Eggplant_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_eggplant",
+      "path": "body_eggplant.body_eggplant"
+    },
+    {
+      "id": "803",
+      "name": "Batmobile (2016)",
+      "upk_path": "Body_Darkcar_SF.upk",
+      "thumbnail": "Body_Darkcar_T_SF.upk",
+      "quality": "Exotic",
+      "package": "Body_Darkcar",
+      "path": "Body_Darkcar.Body_Darkcar"
+    },
+    {
+      "id": "7415",
+      "name": "Batmobile (2022)",
+      "upk_path": "body_tomb_SF.upk",
+      "thumbnail": "body_tomb_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_tomb",
+      "path": "body_tomb.body_tomb"
+    },
+    {
+      "id": "4780",
+      "name": "Battle Bus",
+      "upk_path": "body_bb_SF.upk",
+      "thumbnail": "Body_BB_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_bb",
+      "path": "body_bb.body_bb"
+    },
+    {
+      "id": "10689",
+      "name": "Behemoth",
+      "upk_path": "body_moonflax_suv_SF.upk",
+      "thumbnail": "body_moonflax_suv_T_SF.upk",
+      "quality": "Import",
+      "package": "body_moonflax_suv",
+      "path": "body_moonflax_suv.body_moonflax_suv"
+    },
+    {
+      "id": "10044",
+      "name": "Beskar",
+      "upk_path": "body_spartan_SF.upk",
+      "thumbnail": "Body_Spartan_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_spartan",
+      "path": "body_spartan.body_spartan"
+    },
+    {
+      "id": "10896",
+      "name": "BMW 1 Series",
+      "upk_path": "body_bober_T1_SF.upk",
+      "thumbnail": "body_bober_t1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_bober_T1",
+      "path": "body_bober_T1.body_bober_T1"
+    },
+    {
+      "id": "10897",
+      "name": "BMW 1 Series RLE",
+      "upk_path": "body_bober_t2_SF.upk",
+      "thumbnail": "body_bober_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_bober_t2",
+      "path": "body_bober_t2.body_bober_t2"
+    },
+    {
+      "id": "12325",
+      "name": "BMW M2 Racing",
+      "upk_path": "body_Stubbyhog_SF.upk",
+      "thumbnail": "body_Stubbyhog_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_Stubbyhog",
+      "path": "body_Stubbyhog.body_Stubbyhog"
+    },
+    {
+      "id": "6244",
+      "name": "BMW M240i",
+      "upk_path": "body_sixty_SF.upk",
+      "thumbnail": "Body_Sixty_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_sixty",
+      "path": "body_sixty.body_sixty"
+    },
+    {
+      "id": "11534",
+      "name": "BMW M3 (E30)",
+      "upk_path": "body_chrisp_SF.upk",
+      "thumbnail": "body_Chrisp_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_chrisp",
+      "path": "body_chrisp.body_chrisp"
+    },
+    {
+      "id": "12262",
+      "name": "BMW M4 GT3 EVO",
+      "upk_path": "body_topple_SF.upk",
+      "thumbnail": "Body_Topple_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_topple",
+      "path": "body_topple.body_topple"
+    },
+    {
+      "id": "1623",
+      "name": "Bone Shaker",
+      "upk_path": "body_bone_SF.upk",
+      "thumbnail": "Body_Bone_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_bone",
+      "path": "body_bone.body_bone"
+    },
+    {
+      "id": "22",
+      "name": "Breakout",
+      "upk_path": "Body_Force_SF.upk",
+      "thumbnail": "Body_Force_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Force",
+      "path": "Body_Force.Body_Force"
+    },
+    {
+      "id": "1416",
+      "name": "Breakout Type-S",
+      "upk_path": "Body_CarCar_SF.upk",
+      "thumbnail": "Body_CarCar_T_SF.upk",
+      "quality": "Import",
+      "package": "Body_CarCar",
+      "path": "Body_CarCar.Body_CarCar"
+    },
+    {
+      "id": "11505",
+      "name": "Breakout X",
+      "upk_path": "body_crikey_SF.upk",
+      "thumbnail": "body_crikey_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_crikey",
+      "path": "body_crikey.body_crikey"
+    },
+    {
+      "id": "8524",
+      "name": "Bugatti Centodieci",
+      "upk_path": "body_ten_SF.upk",
+      "thumbnail": "Body_Ten_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_ten",
+      "path": "body_ten.body_ten"
+    },
+    {
+      "id": "9140",
+      "name": "Bumblebee",
+      "upk_path": "body_trap_SF.upk",
+      "thumbnail": "Body_Trap_T_SF.upk",
+      "quality": "BlackMarket",
+      "package": "body_trap",
+      "path": "body_trap.body_trap"
+    },
+    {
+      "id": "1919",
+      "name": "Centio",
+      "upk_path": "body_pumpernickel_SF.upk",
+      "thumbnail": "Body_Pumpernickel_T_SF.upk",
+      "quality": "Import",
+      "package": "body_pumpernickel",
+      "path": "body_pumpernickel.body_pumpernickel"
+    },
+    {
+      "id": "11950",
+      "name": "Chevrolet Astro",
+      "upk_path": "body_galaxy_SF.upk",
+      "thumbnail": "Body_Galaxy_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_galaxy",
+      "path": "body_galaxy.body_galaxy"
+    },
+    {
+      "id": "12361",
+      "name": "Chevrolet Corvette Stingray",
+      "upk_path": "body_cutie_SF.upk",
+      "thumbnail": "body_cutie_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_cutie",
+      "path": "body_cutie.body_cutie"
+    },
+    {
+      "id": "11677",
+      "name": "Chevrolet Corvette ZR1",
+      "upk_path": "body_eagle_SF.upk",
+      "thumbnail": "body_Eagle_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_eagle",
+      "path": "body_eagle.body_eagle"
+    },
+    {
+      "id": "4472",
+      "name": "Chikara",
+      "upk_path": "body_durian_tier1_SF.upk",
+      "thumbnail": "body_durian_tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_durian_tier1",
+      "path": "body_durian_tier1.body_durian_tier1"
+    },
+    {
+      "id": "4473",
+      "name": "Chikara G1",
+      "upk_path": "body_durian_tier2_SF.upk",
+      "thumbnail": "body_durian_tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_durian_tier2",
+      "path": "body_durian_tier2.body_durian_tier2"
+    },
+    {
+      "id": "4367",
+      "name": "Chikara GXT",
+      "upk_path": "body_durian_tier3_SF.upk",
+      "thumbnail": "body_durian_tier3_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_durian_tier3",
+      "path": "body_durian_tier3.body_durian_tier3"
+    },
+    {
+      "id": "12652",
+      "name": "Chrysler Pacifica",
+      "upk_path": "body_tagtiger_SF.upk",
+      "thumbnail": "Body_TagTiger_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_tagtiger",
+      "path": "body_tagtiger.body_tagtiger"
+    },
+    {
+      "id": "12104",
+      "name": "Corlay",
+      "upk_path": "body_jekyll_SF.upk",
+      "thumbnail": "body_jekyll_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_jekyll",
+      "path": "body_jekyll.body_jekyll"
+    },
+    {
+      "id": "3031",
+      "name": "Cyclone",
+      "upk_path": "body_squash_SF.upk",
+      "thumbnail": "Body_Squash_T_SF.upk",
+      "quality": "Import",
+      "package": "body_squash",
+      "path": "body_squash.body_squash"
+    },
+    {
+      "id": "12318",
+      "name": "Defender D7X-R",
+      "upk_path": "body_lawrence_SF.upk",
+      "thumbnail": "Body_Lawrence_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_lawrence",
+      "path": "body_lawrence.body_lawrence"
+    },
+    {
+      "id": "9357",
+      "name": "Diesel",
+      "upk_path": "body_rebar_tier2_SF.upk",
+      "thumbnail": "body_rebar_tier2_T_SF.upk",
+      "quality": "Import",
+      "package": "body_rebar_tier2",
+      "path": "body_rebar_tier2.body_rebar_tier2"
+    },
+    {
+      "id": "3426",
+      "name": "Diestro",
+      "upk_path": "body_carrot_SF.upk",
+      "thumbnail": "Body_Carrot_T_SF.upk",
+      "quality": "Import",
+      "package": "body_carrot",
+      "path": "body_carrot.body_carrot"
+    },
+    {
+      "id": "5361",
+      "name": "Dingo",
+      "upk_path": "body_ramen_SF.upk",
+      "thumbnail": "Body_Ramen_T_SF.upk",
+      "quality": "Import",
+      "package": "body_ramen",
+      "path": "body_ramen.body_ramen"
+    },
+    {
+      "id": "11095",
+      "name": "Dodge Charger Daytona Scat Pack",
+      "upk_path": "body_edison_SF.upk",
+      "thumbnail": "body_edison_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_edison",
+      "path": "body_edison.body_edison"
+    },
+    {
+      "id": "403",
+      "name": "Dominus",
+      "upk_path": "Body_MuscleCar_SF.upk",
+      "thumbnail": "Body_MuscleCar_T_SF.upk",
+      "quality": "Exotic",
+      "package": "Body_MuscleCar",
+      "path": "Body_MuscleCar.Body_MuscleCar"
+    },
+    {
+      "id": "1018",
+      "name": "Dominus GT",
+      "upk_path": "Body_MuscleCar2_SF.upk",
+      "thumbnail": "Body_MuscleCar2_T_SF.upk",
+      "quality": "Import",
+      "package": "Body_MuscleCar2",
+      "path": "Body_MuscleCar2.Body_MuscleCar2"
+    },
+    {
+      "id": "11336",
+      "name": "Dominus: Neon",
+      "upk_path": "body_musclecar_SE_Glow_SF.upk",
+      "thumbnail": "body_musclecar_se_glow_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_musclecar_SE_Glow",
+      "path": "body_musclecar_SE_Glow.body_musclecar_SE_Glow"
+    },
+    {
+      "id": "4155",
+      "name": "Ecto-1",
+      "upk_path": "body_slime_SF.upk",
+      "thumbnail": "Body_Slime_T_SF.upk",
+      "quality": "Import",
+      "package": "body_slime",
+      "path": "body_slime.body_slime"
+    },
+    {
+      "id": "8360",
+      "name": "Emperor",
+      "upk_path": "body_beak_tier1_SF.upk",
+      "thumbnail": "body_beak_tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_beak_tier1",
+      "path": "body_beak_tier1.body_beak_tier1"
+    },
+    {
+      "id": "8361",
+      "name": "Emperor II",
+      "upk_path": "body_beak_tier2_SF.upk",
+      "thumbnail": "body_beak_tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_beak_tier2",
+      "path": "body_beak_tier2.body_beak_tier2"
+    },
+    {
+      "id": "8565",
+      "name": "Emperor II: Frozen",
+      "upk_path": "body_beak_tier2_ice_SF.upk",
+      "thumbnail": "body_beak_tier2_ice_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_beak_tier2_ice",
+      "path": "body_beak_tier2_ice.body_beak_tier2_ice"
+    },
+    {
+      "id": "8566",
+      "name": "Emperor II: Scorched",
+      "upk_path": "body_beak_tier2_fire_SF.upk",
+      "thumbnail": "body_beak_tier2_fire_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_beak_tier2_fire",
+      "path": "body_beak_tier2_fire.body_beak_tier2_fire"
+    },
+    {
+      "id": "1624",
+      "name": "Endo",
+      "upk_path": "body_endo_SF.upk",
+      "thumbnail": "Body_Endo_T_SF.upk",
+      "quality": "Import",
+      "package": "body_endo",
+      "path": "body_endo.body_endo"
+    },
+    {
+      "id": "1317",
+      "name": "Esper",
+      "upk_path": "Body_NeoBike_SF.upk",
+      "thumbnail": "Body_NeoBike_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_NeoBike",
+      "path": "Body_NeoBike.Anim.Body_NeoBike"
+    },
+    {
+      "id": "2268",
+      "name": "Fast & Furious Dodge Charger",
+      "upk_path": "body_Challah_SF.upk",
+      "thumbnail": "Body_Challah_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_Challah",
+      "path": "body_Challah.body_Challah"
+    },
+    {
+      "id": "9053",
+      "name": "Fast & Furious Dodge Charger SRT Hellcat",
+      "upk_path": "body_claw_SF.upk",
+      "thumbnail": "Body_Claw_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_claw",
+      "path": "body_claw.body_claw"
+    },
+    {
+      "id": "7901",
+      "name": "Fast & Furious Mazda RX-7",
+      "upk_path": "body_pete_SF.upk",
+      "thumbnail": "body_pete_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_pete",
+      "path": "body_pete.body_pete"
+    },
+    {
+      "id": "2269",
+      "name": "Fast & Furious Nissan Skyline",
+      "upk_path": "body_Melonpan_SF.upk",
+      "thumbnail": "Body_Melonpan_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_Melonpan",
+      "path": "body_Melonpan.body_Melonpan"
+    },
+    {
+      "id": "5879",
+      "name": "Fast & Furious Pontiac Fiero",
+      "upk_path": "body_fuego_SF.upk",
+      "thumbnail": "Body_Fuego_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_fuego",
+      "path": "body_fuego.body_fuego"
+    },
+    {
+      "id": "2949",
+      "name": "Fast 4WD",
+      "upk_path": "body_daggy_SF.upk",
+      "thumbnail": "Body_Daggy_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_daggy",
+      "path": "body_daggy.body_daggy"
+    },
+    {
+      "id": "4284",
+      "name": "Fennec",
+      "upk_path": "body_grain_SF.upk",
+      "thumbnail": "Body_Grain_T_SF.upk",
+      "quality": "Import",
+      "package": "body_grain",
+      "path": "body_grain.body_grain"
+    },
+    {
+      "id": "11603",
+      "name": "Fennec ZR-F",
+      "upk_path": "body_zrf_SF.upk",
+      "thumbnail": "body_ZRF_T_SF.upk",
+      "quality": "Import",
+      "package": "body_zrf",
+      "path": "body_zrf.body_zrf"
+    },
+    {
+      "id": "7772",
+      "name": "Ferrari 296 GTB",
+      "upk_path": "body_rafael_SF.upk",
+      "thumbnail": "Body_Rafael_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_rafael",
+      "path": "body_rafael.body_rafael"
+    },
+    {
+      "id": "12173",
+      "name": "Ferrari F40",
+      "upk_path": "body_garage_SF.upk",
+      "thumbnail": "body_Garage_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_garage",
+      "path": "body_garage.body_garage"
+    },
+    {
+      "id": "7815",
+      "name": "Ford Bronco Raptor RLE",
+      "upk_path": "body_fbrn_SF.upk",
+      "thumbnail": "body_fbrn_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_fbrn",
+      "path": "body_fbrn.body_fbrn"
+    },
+    {
+      "id": "5713",
+      "name": "Ford F-150 RLE",
+      "upk_path": "body_drof_SF.upk",
+      "thumbnail": "Body_DROF_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_drof",
+      "path": "body_drof.body_drof"
+    },
+    {
+      "id": "10094",
+      "name": "Ford Mustang GTD",
+      "upk_path": "body_alokin_SF.upk",
+      "thumbnail": "Body_Alokin_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_alokin",
+      "path": "body_alokin.body_alokin"
+    },
+    {
+      "id": "6939",
+      "name": "Ford Mustang Mach-E RLE",
+      "upk_path": "body_elm_SF.upk",
+      "thumbnail": "body_elm_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_elm",
+      "path": "body_elm.body_elm"
+    },
+    {
+      "id": "6836",
+      "name": "Ford Mustang Shelby GT350R RLE",
+      "upk_path": "body_msg_SF.upk",
+      "thumbnail": "Body_MSG_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_msg",
+      "path": "body_msg.body_msg"
+    },
+    {
+      "id": "11315",
+      "name": "Ford Mustang Shelby GT500",
+      "upk_path": "body_magnet_SF.upk",
+      "thumbnail": "body_magnet_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_magnet",
+      "path": "body_magnet.body_magnet"
+    },
+    {
+      "id": "5265",
+      "name": "Formula 1 2021",
+      "upk_path": "body_fracture_SF.upk",
+      "thumbnail": "Body_Fracture_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_fracture",
+      "path": "body_fracture.body_fracture"
+    },
+    {
+      "id": "7052",
+      "name": "Formula 1 2022",
+      "upk_path": "body_cured_SF.upk",
+      "thumbnail": "body_cured_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_cured",
+      "path": "body_cured.body_cured"
+    },
+    {
+      "id": "7890",
+      "name": "Fuse",
+      "upk_path": "body_thrice_SF.upk",
+      "thumbnail": "body_Thrice_T_SF.upk",
+      "quality": "Import",
+      "package": "body_thrice",
+      "path": "body_thrice.body_thrice.body_thrice"
+    },
+    {
+      "id": "2951",
+      "name": "Gazella GT",
+      "upk_path": "body_doggy_SF.upk",
+      "thumbnail": "Body_Doggy_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_doggy",
+      "path": "body_doggy.body_doggy"
+    },
+    {
+      "id": "26",
+      "name": "Gizmo",
+      "upk_path": "Body_Spark_SF.upk",
+      "thumbnail": "Body_Spark_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Spark",
+      "path": "Body_Spark.Body_Spark"
+    },
+    {
+      "id": "12324",
+      "name": "GMC Sierra 2500 AT4X",
+      "upk_path": "body_condormotor_SF.upk",
+      "thumbnail": "body_CondorMotor_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_condormotor",
+      "path": "body_condormotor.body_condormotor"
+    },
+    {
+      "id": "607",
+      "name": "Grog",
+      "upk_path": "Body_WastelandTruck_SF.upk",
+      "thumbnail": "Body_WastelandTruck_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_WastelandTruck",
+      "path": "Body_WastelandTruck.Body_WastelandTruck"
+    },
+    {
+      "id": "3879",
+      "name": "Guardian",
+      "upk_path": "body_mango_tier1_SF.upk",
+      "thumbnail": "body_mango_tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_mango_tier1",
+      "path": "body_mango_tier1.body_mango_tier1"
+    },
+    {
+      "id": "3880",
+      "name": "Guardian G1",
+      "upk_path": "body_mango_tier2_SF.upk",
+      "thumbnail": "body_mango_tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_mango_tier2",
+      "path": "body_mango_tier2.body_mango_tier2"
+    },
+    {
+      "id": "3875",
+      "name": "Guardian GXT",
+      "upk_path": "body_mango_tier3_SF.upk",
+      "thumbnail": "body_mango_tier3_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_mango_tier3",
+      "path": "body_mango_tier3.body_mango_tier3"
+    },
+    {
+      "id": "4906",
+      "name": "Harbinger",
+      "upk_path": "body_lemonade_SF.upk",
+      "thumbnail": "Body_Lemonade_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_lemonade",
+      "path": "body_lemonade.body_lemonade"
+    },
+    {
+      "id": "12484",
+      "name": "Havoc",
+      "upk_path": "body_spike_SF.upk",
+      "thumbnail": "Body_Spike_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_spike",
+      "path": "body_spike.body_spike"
+    },
+    {
+      "id": "11932",
+      "name": "Hearse",
+      "upk_path": "body_wedding_SF.upk",
+      "thumbnail": "body_wedding_T_SF.upk",
+      "quality": "Import",
+      "package": "body_wedding",
+      "path": "body_wedding.body_wedding"
+    },
+    {
+      "id": "12142",
+      "name": "Homer's Car",
+      "upk_path": "body_sprinkle_SF.upk",
+      "thumbnail": "Body_Sprinkle_T_SF.upk",
+      "quality": "Import",
+      "package": "body_sprinkle",
+      "path": "body_sprinkle.body_sprinkle"
+    },
+    {
+      "id": "7947",
+      "name": "Honda Civic Type R",
+      "upk_path": "body_hic_t1_SF.upk",
+      "thumbnail": "body_hic_t1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_hic_t1",
+      "path": "body_hic_t1.body_hic_t1"
+    },
+    {
+      "id": "7948",
+      "name": "Honda Civic Type R-LE",
+      "upk_path": "body_hic_t2_SF.upk",
+      "thumbnail": "body_hic_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_hic_t2",
+      "path": "body_hic_t2.body_hic_t2"
+    },
+    {
+      "id": "29",
+      "name": "Hotshot",
+      "upk_path": "Body_Torment_SF.upk",
+      "thumbnail": "Body_Torment_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Torment",
+      "path": "Body_Torment.Body_Torment"
+    },
+    {
+      "id": "12658",
+      "name": "Hyundai Ioniq 6",
+      "upk_path": "body_turtlemodem_SF.upk",
+      "thumbnail": "body_TurtleModem_T_SF.upk",
+      "package": "body_turtlemodem",
+      "path": "body_turtlemodem.body_turtlemodem"
+    },
+    {
+      "id": "1675",
+      "name": "Ice Charger",
+      "upk_path": "body_charged_SF.upk",
+      "thumbnail": "Body_Charged_T_SF.upk",
+      "quality": "Import",
+      "package": "body_charged",
+      "path": "body_charged.body_charged"
+    },
+    {
+      "id": "1883",
+      "name": "Imperator DT5",
+      "upk_path": "body_Multigrain_SF.upk",
+      "thumbnail": "body_multigrain_T_SF.upk",
+      "quality": "Import",
+      "package": "body_Multigrain",
+      "path": "body_Multigrain.body_Multigrain"
+    },
+    {
+      "id": "3582",
+      "name": "Insidio",
+      "upk_path": "body_peach_SF.upk",
+      "thumbnail": "Body_Peach_T_SF.upk",
+      "quality": "Import",
+      "package": "body_peach",
+      "path": "body_peach.body_peach"
+    },
+    {
+      "id": "5951",
+      "name": "Jackal",
+      "upk_path": "body_tomahawk_SF.upk",
+      "thumbnail": "Body_Tomahawk_T_SF.upk",
+      "quality": "Import",
+      "package": "body_tomahawk",
+      "path": "body_tomahawk.body_tomahawk"
+    },
+    {
+      "id": "11314",
+      "name": "Jeep Wrangler Rubicon",
+      "upk_path": "body_mudpie_SF.upk",
+      "thumbnail": "Body_Mudpie_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_mudpie",
+      "path": "body_mudpie.body_mudpie"
+    },
+    {
+      "id": "1856",
+      "name": "Jger 619",
+      "upk_path": "body_Sourdough_SF.upk",
+      "thumbnail": "Body_Sourdough_T_SF.upk",
+      "quality": "Import",
+      "package": "body_Sourdough",
+      "path": "body_Sourdough.body_Sourdough"
+    },
+    {
+      "id": "2919",
+      "name": "Jurassic Jeep Wrangler",
+      "upk_path": "body_maple_SF.upk",
+      "thumbnail": "Body_Maple_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_maple",
+      "path": "body_maple.body_maple"
+    },
+    {
+      "id": "4014",
+      "name": "K.I.T.T.",
+      "upk_path": "body_feline_SF.upk",
+      "thumbnail": "Body_Feline_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_feline",
+      "path": "body_feline.body_feline"
+    },
+    {
+      "id": "3311",
+      "name": "Komodo",
+      "upk_path": "body_mitty_SF.upk",
+      "thumbnail": "body_Mitty_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_mitty",
+      "path": "body_mitty.body_mitty"
+    },
+    {
+      "id": "7512",
+      "name": "Lamborghini Countach LPI 800-4",
+      "upk_path": "body_rage_SF.upk",
+      "thumbnail": "body_rage_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_rage",
+      "path": "body_rage.body_rage"
+    },
+    {
+      "id": "5964",
+      "name": "Lamborghini Huracn STO",
+      "upk_path": "body_oblong_SF.upk",
+      "thumbnail": "Body_Oblong_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_oblong",
+      "path": "body_oblong.body_oblong"
+    },
+    {
+      "id": "12638",
+      "name": "Lamborghini Temerario GT3",
+      "upk_path": "body_ivorycascade_SF.upk",
+      "thumbnail": "body_ivorycascade_T_SF.upk",
+      "package": "body_ivorycascade",
+      "path": "body_ivorycascade.body_ivorycascade"
+    },
+    {
+      "id": "11141",
+      "name": "Lamborghini Urus SE",
+      "upk_path": "body_wurst_SF.upk",
+      "thumbnail": "body_wurst_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_wurst",
+      "path": "body_wurst.body_wurst"
+    },
+    {
+      "id": "9388",
+      "name": "Lightning McQueen",
+      "upk_path": "body_pixie_SF.upk",
+      "thumbnail": "Body_Pixie_T_SF.upk",
+      "quality": "BlackMarket",
+      "package": "body_pixie",
+      "path": "body_pixie.body_pixie"
+    },
+    {
+      "id": "10694",
+      "name": "Lockjaw",
+      "upk_path": "body_moonflax_sportscar_SF.upk",
+      "thumbnail": "body_moonflax_sportscar_T_SF.upk",
+      "quality": "Import",
+      "package": "body_moonflax_sportscar",
+      "path": "body_moonflax_sportscar.body_moonflax_sportscar"
+    },
+    {
+      "id": "7532",
+      "name": "Maestro",
+      "upk_path": "body_lux_SF.upk",
+      "thumbnail": "body_lux_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_lux",
+      "path": "body_lux.body_lux"
+    },
+    {
+      "id": "12106",
+      "name": "Magnifique",
+      "upk_path": "body_hydet1_SF.upk",
+      "thumbnail": "body_hydeT1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_hydet1",
+      "path": "body_hydet1.body_hydet1"
+    },
+    {
+      "id": "12286",
+      "name": "Magnifique GXT",
+      "upk_path": "body_hydet2_SF.upk",
+      "thumbnail": "body_HydeT2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_hydet2",
+      "path": "body_hydet2.body_hydet2"
+    },
+    {
+      "id": "8006",
+      "name": "Mako",
+      "upk_path": "body_keanu_SF.upk",
+      "thumbnail": "body_keanu_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_keanu",
+      "path": "body_keanu.body_keanu"
+    },
+    {
+      "id": "7211",
+      "name": "Mamba",
+      "upk_path": "body_Maser_SF.upk",
+      "thumbnail": "Body_Maser_T_SF.upk",
+      "quality": "Import",
+      "package": "body_Maser",
+      "path": "body_Maser.body_Maser"
+    },
+    {
+      "id": "1691",
+      "name": "Mantis",
+      "upk_path": "body_flatbread_SF.upk",
+      "thumbnail": "body_Flatbread_T_SF.upk",
+      "quality": "Import",
+      "package": "body_flatbread",
+      "path": "body_flatbread.body_flatbread"
+    },
+    {
+      "id": "1172",
+      "name": "Marauder",
+      "upk_path": "Body_Marauder_SF.upk",
+      "thumbnail": "Body_Marauder_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_Marauder",
+      "path": "Body_Marauder.Body_Marauder"
+    },
+    {
+      "id": "1171",
+      "name": "Masamune",
+      "upk_path": "Body_NeoCar_SF.upk",
+      "thumbnail": "Body_NeoCar_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_NeoCar",
+      "path": "Body_NeoCar.Body_NeoCar"
+    },
+    {
+      "id": "6122",
+      "name": "Masamune",
+      "upk_path": "body_neocar_xbb_SF.upk",
+      "thumbnail": "Body_NeoCar_XBB_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_neocar_xbb",
+      "path": "body_neocar_xbb.body_neocar_xbb"
+    },
+    {
+      "id": "12382",
+      "name": "Maven",
+      "upk_path": "body_superomega_SF.upk",
+      "thumbnail": "Body_SuperOmega_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_superomega",
+      "path": "body_superomega.body_superomega"
+    },
+    {
+      "id": "3155",
+      "name": "Maverick",
+      "upk_path": "Body_Rye_Tier1_SF.upk",
+      "thumbnail": "body_rye_tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "Body_Rye_Tier1",
+      "path": "Body_Rye_Tier1.Body_Rye_Tier1"
+    },
+    {
+      "id": "3156",
+      "name": "Maverick G1",
+      "upk_path": "Body_Rye_Tier2_SF.upk",
+      "thumbnail": "body_rye_tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "Body_Rye_Tier2",
+      "path": "Body_Rye_Tier2.Body_Rye_Tier2"
+    },
+    {
+      "id": "3157",
+      "name": "Maverick GXT",
+      "upk_path": "Body_Rye_Tier3_SF.upk",
+      "thumbnail": "body_rye_tier3_T_SF.upk",
+      "quality": "Limited",
+      "package": "Body_Rye_Tier3",
+      "path": "Body_Rye_Tier3.Body_Rye_Tier3"
+    },
+    {
+      "id": "3265",
+      "name": "McLaren 570S",
+      "upk_path": "body_ron_SF.upk",
+      "thumbnail": "Body_Ron_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_ron",
+      "path": "body_ron.body_ron"
+    },
+    {
+      "id": "6247",
+      "name": "McLaren 765LT",
+      "upk_path": "body_ran_SF.upk",
+      "thumbnail": "Body_Ran_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_ran",
+      "path": "body_ran.body_ran"
+    },
+    {
+      "id": "10695",
+      "name": "McLaren P1",
+      "upk_path": "body_arrow_SF.upk",
+      "thumbnail": "body_arrow_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_arrow",
+      "path": "body_arrow.body_arrow"
+    },
+    {
+      "id": "10822",
+      "name": "McLaren Senna",
+      "upk_path": "body_bullet_SF.upk",
+      "thumbnail": "Body_Bullet_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_bullet",
+      "path": "body_bullet.body_bullet"
+    },
+    {
+      "id": "11800",
+      "name": "Megastar",
+      "upk_path": "body_slick_SF.upk",
+      "thumbnail": "Body_Slick_T_SF.upk",
+      "quality": "Import",
+      "package": "body_slick",
+      "path": "body_slick.body_slick"
+    },
+    {
+      "id": "30",
+      "name": "Merc",
+      "upk_path": "Body_Vanquish_SF.upk",
+      "thumbnail": "Body_Vanquish_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Vanquish",
+      "path": "Body_Vanquish.Body_Vanquish"
+    },
+    {
+      "id": "11941",
+      "name": "Mercedes-AMG GT 63 S",
+      "upk_path": "body_macht_SF.upk",
+      "thumbnail": "body_Macht_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_macht",
+      "path": "body_macht.body_macht"
+    },
+    {
+      "id": "11996",
+      "name": "Mercedes-Benz CLA",
+      "upk_path": "body_econ_SF.upk",
+      "thumbnail": "body_econ_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_econ",
+      "path": "body_econ.body_econ"
+    },
+    {
+      "id": "2950",
+      "name": "MR11",
+      "upk_path": "body_diggy_SF.upk",
+      "thumbnail": "Body_Diggy_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_diggy",
+      "path": "body_diggy.body_diggy"
+    },
+    {
+      "id": "4318",
+      "name": "Mudcat",
+      "upk_path": "body_melon_tier_01_SF.upk",
+      "thumbnail": "Body_Melon_Tier_01_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_melon_tier_01",
+      "path": "body_melon_tier_01.body_melon_tier_01"
+    },
+    {
+      "id": "4319",
+      "name": "Mudcat G1",
+      "upk_path": "body_melon_tier_02_SF.upk",
+      "thumbnail": "Body_Melon_Tier_02_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_melon_tier_02",
+      "path": "body_melon_tier_02.body_melon_tier_02"
+    },
+    {
+      "id": "4320",
+      "name": "Mudcat GXT",
+      "upk_path": "body_melon_tier_03_SF.upk",
+      "thumbnail": "Body_Melon_Tier_03_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_melon_tier_03",
+      "path": "body_melon_tier_03.body_melon_tier_03"
+    },
+    {
+      "id": "3138",
+      "name": "Mystery Item",
+      "upk_path": "body_genericmystery_SF.upk",
+      "thumbnail": "Body_GenericMystery_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_genericmystery",
+      "path": "body_genericmystery.body_genericmystery"
+    },
+    {
+      "id": "5823",
+      "name": "NASCAR Chevrolet Camaro",
+      "upk_path": "body_oramac_SF.upk",
+      "thumbnail": "Body_Oramac_T_SF.upk",
+      "quality": "Import",
+      "package": "body_oramac",
+      "path": "body_oramac.body_oramac"
+    },
+    {
+      "id": "5709",
+      "name": "NASCAR Ford Mustang",
+      "upk_path": "body_droftwo_SF.upk",
+      "thumbnail": "Body_Droftwo_T_SF.upk",
+      "quality": "Import",
+      "package": "body_droftwo",
+      "path": "body_droftwo.body_droftwo"
+    },
+    {
+      "id": "7337",
+      "name": "NASCAR Next Gen Chevrolet Camaro",
+      "upk_path": "body_scar_b_SF.upk",
+      "thumbnail": "body_scar_b_T_SF.upk",
+      "quality": "Import",
+      "package": "body_scar_b",
+      "path": "body_scar_b.body_scar_b"
+    },
+    {
+      "id": "7338",
+      "name": "NASCAR Next Gen Ford Mustang",
+      "upk_path": "body_scar_a_SF.upk",
+      "thumbnail": "body_scar_a_T_SF.upk",
+      "quality": "Import",
+      "package": "body_scar_a",
+      "path": "body_scar_a.body_scar_a"
+    },
+    {
+      "id": "7341",
+      "name": "NASCAR Next Gen Toyota Camry",
+      "upk_path": "body_scar_c_SF.upk",
+      "thumbnail": "body_scar_c_T_SF.upk",
+      "quality": "Import",
+      "package": "body_scar_c",
+      "path": "body_scar_c.body_scar_c"
+    },
+    {
+      "id": "5773",
+      "name": "NASCAR Toyota Camry",
+      "upk_path": "body_atoyot_SF.upk",
+      "thumbnail": "Body_Atoyot_T_SF.upk",
+      "quality": "Import",
+      "package": "body_atoyot",
+      "path": "body_atoyot.body_atoyot"
+    },
+    {
+      "id": "1689",
+      "name": "Nemesis",
+      "upk_path": "body_zmoney_SF.upk",
+      "thumbnail": "Body_ZMoney_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_zmoney",
+      "path": "body_zmoney.body_zmoney"
+    },
+    {
+      "id": "6243",
+      "name": "Nexus",
+      "upk_path": "body_norton_SF.upk",
+      "thumbnail": "body_Norton_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_norton",
+      "path": "body_norton.body_norton"
+    },
+    {
+      "id": "6489",
+      "name": "Nexus SC",
+      "upk_path": "Body_Norton_Tier2_SF.upk",
+      "thumbnail": "body_norton_tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "Body_Norton_Tier2",
+      "path": "Body_Norton_Tier2.Body_Norton_Tier2"
+    },
+    {
+      "id": "3451",
+      "name": "Nimbus",
+      "upk_path": "body_retro_SF.upk",
+      "thumbnail": "Body_Retro_T_SF.upk",
+      "quality": "Import",
+      "package": "body_retro",
+      "path": "body_retro.body_retro"
+    },
+    {
+      "id": "12669",
+      "name": "Nissan 350Z",
+      "upk_path": "body_zedthirty_SF.upk",
+      "thumbnail": "Body_ZedThirty_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_zedthirty",
+      "path": "body_zedthirty.body_zedthirty"
+    },
+    {
+      "id": "10440",
+      "name": "Nissan Fairlady Z",
+      "upk_path": "body_akuma_t1_SF.upk",
+      "thumbnail": "body_akuma_t1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_akuma_t1",
+      "path": "body_akuma_t1.body_akuma_t1"
+    },
+    {
+      "id": "10441",
+      "name": "Nissan Fairlady Z RLE",
+      "upk_path": "body_akuma_t2_SF.upk",
+      "thumbnail": "body_akuma_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_akuma_t2",
+      "path": "body_akuma_t2.body_akuma_t2"
+    },
+    {
+      "id": "9084",
+      "name": "Nissan Silvia",
+      "upk_path": "body_seasalt_t1_SF.upk",
+      "thumbnail": "body_seasalt_t1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_seasalt_t1",
+      "path": "body_seasalt_t1.body_seasalt_t1"
+    },
+    {
+      "id": "9085",
+      "name": "Nissan Silvia RLE",
+      "upk_path": "body_seasalt_t2_SF.upk",
+      "thumbnail": "body_seasalt_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_seasalt_t2",
+      "path": "body_seasalt_t2.body_seasalt_t2"
+    },
+    {
+      "id": "10805",
+      "name": "Nissan Skyline GT-R (R32)",
+      "upk_path": "body_nerd_SF.upk",
+      "thumbnail": "Body_Nerd_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_nerd",
+      "path": "body_nerd.body_nerd"
+    },
+    {
+      "id": "7593",
+      "name": "Nissan Z Performance",
+      "upk_path": "body_sassy_SF.upk",
+      "thumbnail": "body_sassy_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_sassy",
+      "path": "body_sassy.body_sassy"
+    },
+    {
+      "id": "7336",
+      "name": "Nomad",
+      "upk_path": "body_Maui_SF.upk",
+      "thumbnail": "body_Maui_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_Maui",
+      "path": "body_Maui.Maui_Body_T1.body_Maui"
+    },
+    {
+      "id": "7477",
+      "name": "Nomad GXT",
+      "upk_path": "body_Maui_t2_SF.upk",
+      "thumbnail": "body_maui_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_Maui_t2",
+      "path": "body_Maui_t2.body_Maui_t2"
+    },
+    {
+      "id": "23",
+      "name": "Octane",
+      "upk_path": "Body_Octane_SF.upk",
+      "thumbnail": "Body_Octane_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Octane",
+      "path": "Body_Octane.Body_Octane"
+    },
+    {
+      "id": "1568",
+      "name": "Octane ZSR",
+      "upk_path": "Body_O2_SF.upk",
+      "thumbnail": "Body_O2_T_SF.upk",
+      "quality": "Import",
+      "package": "Body_O2",
+      "path": "Body_O2.Body_O2"
+    },
+    {
+      "id": "5020",
+      "name": "Outlaw",
+      "upk_path": "body_rattrap_SF.upk",
+      "thumbnail": "Body_Rattrap_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_rattrap",
+      "path": "body_rattrap.body_rattrap"
+    },
+    {
+      "id": "5837",
+      "name": "Outlaw GXT",
+      "upk_path": "body_rattrap_tier2_SF.upk",
+      "thumbnail": "body_rattrap_tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_rattrap_tier2",
+      "path": "body_rattrap_tier2.body_rattrap_tier2"
+    },
+    {
+      "id": "24",
+      "name": "Paladin",
+      "upk_path": "Body_Orion_SF.upk",
+      "thumbnail": "Body_Orion_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Orion",
+      "path": "Body_Orion.Body_Orion"
+    },
+    {
+      "id": "12105",
+      "name": "Patty Wagon",
+      "upk_path": "body_lionsmane_SF.upk",
+      "thumbnail": "Body_Lionsmane_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_lionsmane",
+      "path": "body_lionsmane.body_lionsmane"
+    },
+    {
+      "id": "4781",
+      "name": "Peregrine TT",
+      "upk_path": "body_shark_SF.upk",
+      "thumbnail": "Body_Shark_T_SF.upk",
+      "quality": "Import",
+      "package": "body_shark",
+      "path": "body_shark.body_shark"
+    },
+    {
+      "id": "12335",
+      "name": "Pizza Planet Delivery Truck",
+      "upk_path": "body_greenclaw_SF.upk",
+      "thumbnail": "body_GreenClaw_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_greenclaw",
+      "path": "body_greenclaw.body_greenclaw"
+    },
+    {
+      "id": "11949",
+      "name": "Pontiac Firebird",
+      "upk_path": "body_manual_SF.upk",
+      "thumbnail": "Body_Manual_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_manual",
+      "path": "body_manual.body_manual"
+    },
+    {
+      "id": "11016",
+      "name": "Porsche 911 GT3 RS",
+      "upk_path": "body_jam_SF.upk",
+      "thumbnail": "body_Jam_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_jam",
+      "path": "body_jam.body_jam"
+    },
+    {
+      "id": "9088",
+      "name": "Porsche 911 Turbo",
+      "upk_path": "body_butter_t1_SF.upk",
+      "thumbnail": "body_butter_t1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_butter_t1",
+      "path": "body_butter_t1.body_butter_t1"
+    },
+    {
+      "id": "9089",
+      "name": "Porsche 911 Turbo RLE",
+      "upk_path": "body_butter_t2_SF.upk",
+      "thumbnail": "body_butter_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_butter_t2",
+      "path": "body_butter_t2.body_butter_t2"
+    },
+    {
+      "id": "11933",
+      "name": "Porsche 918 Spyder",
+      "upk_path": "body_bawu_SF.upk",
+      "thumbnail": "Body_Bawu_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_bawu",
+      "path": "body_bawu.body_bawu"
+    },
+    {
+      "id": "12532",
+      "name": "Porsche Cayenne Turbo Electric",
+      "upk_path": "body_bluetorque_SF.upk",
+      "thumbnail": "Body_BlueTorque_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_bluetorque",
+      "path": "body_bluetorque.body_bluetorque"
+    },
+    {
+      "id": "9427",
+      "name": "Primo",
+      "upk_path": "body_skunkz_SF.upk",
+      "thumbnail": "Body_Skunkz_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_skunkz",
+      "path": "body_skunkz.body_skunkz"
+    },
+    {
+      "id": "1475",
+      "name": "Proteus",
+      "upk_path": "Body_Number6_SF.upk",
+      "thumbnail": "Body_Number6_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_Number6",
+      "path": "Body_Number6.Body_Number6"
+    },
+    {
+      "id": "4782",
+      "name": "Psyclops",
+      "upk_path": "body_tritip_SF.upk",
+      "thumbnail": "Body_Tritip_T_SF.upk",
+      "quality": "Uncommon",
+      "package": "body_tritip",
+      "path": "body_tritip.body_tritip"
+    },
+    {
+      "id": "10817",
+      "name": "Quadra Turbo-R",
+      "upk_path": "body_seba_SF.upk",
+      "thumbnail": "Body_Seba_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_seba",
+      "path": "body_seba.body_seba"
+    },
+    {
+      "id": "5488",
+      "name": "R3MX GXT",
+      "upk_path": "body_unicorn_SF.upk",
+      "thumbnail": "body_Unicorn_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_unicorn",
+      "path": "body_unicorn.body_unicorn_tier2.body_unicorn_tier2"
+    },
+    {
+      "id": "11379",
+      "name": "Ram 1500 RHO",
+      "upk_path": "body_rio_SF.upk",
+      "thumbnail": "Body_Rio_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_rio",
+      "path": "body_rio.body_rio"
+    },
+    {
+      "id": "11736",
+      "name": "Recoil AV",
+      "upk_path": "body_legs_SF.upk",
+      "thumbnail": "Body_Legs_T_SF.upk",
+      "quality": "Import",
+      "package": "body_legs",
+      "path": "body_legs.body_legs"
+    },
+    {
+      "id": "7651",
+      "name": "Redline",
+      "upk_path": "body_jinn_SF.upk",
+      "thumbnail": "body_jinn_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_jinn",
+      "path": "body_jinn.body_jinn"
+    },
+    {
+      "id": "11038",
+      "name": "Revolver",
+      "upk_path": "body_zuse_SF.upk",
+      "thumbnail": "body_zuse_T_SF.upk",
+      "quality": "Import",
+      "package": "body_zuse",
+      "path": "body_zuse.body_zuse"
+    },
+    {
+      "id": "600",
+      "name": "Ripper",
+      "upk_path": "Body_Interceptor_SF.upk",
+      "thumbnail": "Body_Interceptor_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_Interceptor",
+      "path": "Body_Interceptor.Body_Interceptor"
+    },
+    {
+      "id": "12569",
+      "name": "Rivian R1S",
+      "upk_path": "body_sheepbolt_SF.upk",
+      "thumbnail": "Body_SheepBolt_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_sheepbolt",
+      "path": "body_sheepbolt.body_sheepbolt"
+    },
+    {
+      "id": "25",
+      "name": "Road Hog",
+      "upk_path": "Body_Rhino_SF.upk",
+      "thumbnail": "Body_Rhino_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Rhino",
+      "path": "Body_Rhino.Body_Rhino"
+    },
+    {
+      "id": "1300",
+      "name": "Road Hog XL",
+      "upk_path": "Body_Rhino2_SF.upk",
+      "thumbnail": "Body_Rhino2_T_SF.upk",
+      "quality": "Import",
+      "package": "Body_Rhino2",
+      "path": "Body_Rhino2.Body_Rhino2"
+    },
+    {
+      "id": "4861",
+      "name": "Ronin",
+      "upk_path": "body_kusanagi_t1_SF.upk",
+      "thumbnail": "body_kusanagi_t1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_kusanagi_t1",
+      "path": "body_kusanagi_t1.body_kusanagi_t1"
+    },
+    {
+      "id": "4864",
+      "name": "Ronin G1",
+      "upk_path": "body_kusanagi_t2_SF.upk",
+      "thumbnail": "body_kusanagi_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_kusanagi_t2",
+      "path": "body_kusanagi_t2.body_kusanagi_t2"
+    },
+    {
+      "id": "4745",
+      "name": "Ronin GXT",
+      "upk_path": "body_kusanagi_t3_SF.upk",
+      "thumbnail": "body_kusanagi_t3_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_kusanagi_t3",
+      "path": "body_kusanagi_t3.body_kusanagi_t3"
+    },
+    {
+      "id": "12657",
+      "name": "Ryza T60",
+      "upk_path": "body_ryzat2_SF.upk",
+      "thumbnail": "body_ryzaT2_T_SF.upk",
+      "package": "body_ryzat2",
+      "path": "body_ryzat2.body_ryzat2"
+    },
+    {
+      "id": "12814",
+      "name": "Ryza Trophy",
+      "upk_path": "body_ryzarevt1_SF.upk",
+      "thumbnail": "Body_RyzaRevT1_T_SF.upk",
+      "package": "body_ryzarevt1",
+      "path": "body_ryzarevt1.body_ryzarevt1"
+    },
+    {
+      "id": "1894",
+      "name": "Samurai",
+      "upk_path": "body_wheatbread_SF.upk",
+      "thumbnail": "body_wheatbread_T_SF.upk",
+      "quality": "Import",
+      "package": "body_wheatbread",
+      "path": "body_wheatbread.body_wheatbread"
+    },
+    {
+      "id": "404",
+      "name": "Scarab",
+      "upk_path": "Body_Scarab_SF.upk",
+      "thumbnail": "Body_Scarab_T_SF.upk",
+      "quality": "Import",
+      "package": "Body_Scarab",
+      "path": "Body_Scarab.Body_Scarab"
+    },
+    {
+      "id": "9894",
+      "name": "Scorpion",
+      "upk_path": "body_ghost_SF.upk",
+      "thumbnail": "body_ghost_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_ghost",
+      "path": "body_ghost.body_ghost"
+    },
+    {
+      "id": "4268",
+      "name": "Sentinel",
+      "upk_path": "body_chip_SF.upk",
+      "thumbnail": "Body_Chip_T_SF.upk",
+      "quality": "Import",
+      "package": "body_chip",
+      "path": "body_chip.body_chip"
+    },
+    {
+      "id": "10900",
+      "name": "Shokunin",
+      "upk_path": "body_zaku_t1_SF.upk",
+      "thumbnail": "body_zaku_t1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_zaku_t1",
+      "path": "body_zaku_t1.body_zaku_t1"
+    },
+    {
+      "id": "10901",
+      "name": "Shokunin GXT",
+      "upk_path": "body_zaku_t2_SF.upk",
+      "thumbnail": "body_zaku_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_zaku_t2",
+      "path": "body_zaku_t2.body_zaku_t2"
+    },
+    {
+      "id": "7979",
+      "name": "Stampede",
+      "upk_path": "body_lime_SF.upk",
+      "thumbnail": "body_lime_T_SF.upk",
+      "quality": "Import",
+      "package": "body_lime",
+      "path": "body_lime.body_lime"
+    },
+    {
+      "id": "402",
+      "name": "Takumi",
+      "upk_path": "Body_Import_SF.upk",
+      "thumbnail": "Body_Import_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_Import",
+      "path": "Body_Import.Body_Import"
+    },
+    {
+      "id": "1295",
+      "name": "Takumi RX-T",
+      "upk_path": "body_takumi_ii_SF.upk",
+      "thumbnail": "Body_Takumi_II_T_SF.upk",
+      "quality": "Import",
+      "package": "body_takumi_ii",
+      "path": "body_takumi_ii.body_takumi_ii"
+    },
+    {
+      "id": "7012",
+      "name": "Tesla Cybertruck",
+      "upk_path": "body_future_SF.upk",
+      "thumbnail": "Body_Future_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_future",
+      "path": "body_future.body_future"
+    },
+    {
+      "id": "2665",
+      "name": "The Dark Knight's Tumbler",
+      "upk_path": "body_berry_SF.upk",
+      "thumbnail": "Body_Berry_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_berry",
+      "path": "body_berry.body_berry"
+    },
+    {
+      "id": "10697",
+      "name": "The Incredibile",
+      "upk_path": "body_hero_SF.upk",
+      "thumbnail": "body_hero_T_SF.upk",
+      "quality": "Exotic",
+      "package": "body_hero",
+      "path": "body_hero.body_hero"
+    },
+    {
+      "id": "11905",
+      "name": "The Mystery Machine",
+      "upk_path": "body_banjo_SF.upk",
+      "thumbnail": "Body_Banjo_T_SF.upk",
+      "quality": "Import",
+      "package": "body_banjo",
+      "path": "body_banjo.body_banjo"
+    },
+    {
+      "id": "1478",
+      "name": "Triton",
+      "upk_path": "body_cannonboy_SF.upk",
+      "thumbnail": "Body_Cannonboy_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_cannonboy",
+      "path": "body_cannonboy.body_cannonboy"
+    },
+    {
+      "id": "11098",
+      "name": "Turtle Van",
+      "upk_path": "body_frog_SF.upk",
+      "thumbnail": "Body_Frog_T_SF.upk",
+      "quality": "Import",
+      "package": "body_frog",
+      "path": "body_frog.body_frog"
+    },
+    {
+      "id": "1603",
+      "name": "Twin Mill III",
+      "upk_path": "body_scallop_SF.upk",
+      "thumbnail": "Body_Scallop_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_scallop",
+      "path": "body_scallop.body_scallop"
+    },
+    {
+      "id": "2853",
+      "name": "Twinzer",
+      "upk_path": "body_twinzer_SF.upk",
+      "thumbnail": "Body_Twinzer_T_SF.upk",
+      "quality": "Import",
+      "package": "body_twinzer",
+      "path": "body_twinzer.body_twinzer"
+    },
+    {
+      "id": "3702",
+      "name": "Tygris",
+      "upk_path": "body_brick_SF.upk",
+      "thumbnail": "Body_Brick_T_SF.upk",
+      "quality": "Import",
+      "package": "body_brick",
+      "path": "body_brick.body_brick"
+    },
+    {
+      "id": "5858",
+      "name": "Tyranno",
+      "upk_path": "body_raddish_tier1_SF.upk",
+      "thumbnail": "body_raddish_tier1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_raddish_tier1",
+      "path": "body_raddish_tier1.body_raddish_tier1"
+    },
+    {
+      "id": "5979",
+      "name": "Tyranno GXT",
+      "upk_path": "body_raddish_tier2_SF.upk",
+      "thumbnail": "body_raddish_tier2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_raddish_tier2",
+      "path": "body_raddish_tier2.body_raddish_tier2"
+    },
+    {
+      "id": "31",
+      "name": "Venom",
+      "upk_path": "Body_Venom_SF.upk",
+      "thumbnail": "Body_Venom_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Venom",
+      "path": "Body_Venom.Body_Venom"
+    },
+    {
+      "id": "11138",
+      "name": "Void Burn",
+      "upk_path": "body_pickle_SF.upk",
+      "thumbnail": "Body_Pickle_T_SF.upk",
+      "quality": "Import",
+      "package": "body_pickle",
+      "path": "body_pickle.body_pickle"
+    },
+    {
+      "id": "8806",
+      "name": "Volkswagen Golf GTI",
+      "upk_path": "body_dub_t1_SF.upk",
+      "thumbnail": "body_dub_t1_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_dub_t1",
+      "path": "body_dub_t1.body_dub_t1"
+    },
+    {
+      "id": "8807",
+      "name": "Volkswagen Golf GTI RLE",
+      "upk_path": "body_dub_t2_SF.upk",
+      "thumbnail": "body_dub_t2_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_dub_t2",
+      "path": "body_dub_t2.body_dub_t2"
+    },
+    {
+      "id": "1533",
+      "name": "Vulcan",
+      "upk_path": "body_gilliam_SF.upk",
+      "thumbnail": "Body_Gilliam_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "body_gilliam",
+      "path": "body_gilliam.body_gilliam"
+    },
+    {
+      "id": "2070",
+      "name": "Werewolf",
+      "upk_path": "body_levain_SF.upk",
+      "thumbnail": "Body_Levain_T_SF.upk",
+      "quality": "Import",
+      "package": "body_levain",
+      "path": "body_levain.body_levain"
+    },
+    {
+      "id": "7696",
+      "name": "Whiplash",
+      "upk_path": "body_whiplash_SF.upk",
+      "thumbnail": "body_whiplash_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_whiplash",
+      "path": "body_whiplash.body_whiplash"
+    },
+    {
+      "id": "28",
+      "name": "X-Devil",
+      "upk_path": "Body_Torch_SF.upk",
+      "thumbnail": "Body_Torch_T_SF.upk",
+      "quality": "Common",
+      "package": "Body_Torch",
+      "path": "Body_Torch.Body_Torch"
+    },
+    {
+      "id": "1159",
+      "name": "X-Devil Mk2",
+      "upk_path": "Body_Torch2_SF.upk",
+      "thumbnail": "Body_Torch2_T_SF.upk",
+      "quality": "Import",
+      "package": "Body_Torch2",
+      "path": "Body_Torch2.Body_Torch2"
+    },
+    {
+      "id": "8383",
+      "name": "Xentari",
+      "upk_path": "body_ruckus_SF.upk",
+      "thumbnail": "body_ruckus_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_ruckus",
+      "path": "body_ruckus.body_ruckus"
+    },
+    {
+      "id": "12563",
+      "name": "Zefira",
+      "upk_path": "body_sportytack_SF.upk",
+      "thumbnail": "body_sportytack_T_SF.upk",
+      "quality": "Limited",
+      "package": "body_sportytack",
+      "path": "body_sportytack.body_sportytack"
+    },
+    {
+      "id": "523",
+      "name": "Zippy",
+      "upk_path": "Body_Zippy_SF.upk",
+      "thumbnail": "Body_Zippy_T_SF.upk",
+      "quality": "VeryRare",
+      "package": "Body_Zippy",
+      "path": "Body_Zippy.Body_Zippy"
+    }
+  ]
+}

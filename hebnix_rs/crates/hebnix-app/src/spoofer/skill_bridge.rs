@@ -40,10 +40,7 @@ impl SkillBridge {
         tx: Sender<AppMsg>,
         dump_path: PathBuf,
     ) -> Result<Self, String> {
-        let _ = std::fs::write(
-            &dump_path,
-            "# Rank spoofer WebSocket frames (credentials omitted)\n",
-        );
+        let _ = std::fs::write(&dump_path, "# Rank spoofer WebSocket frames (credentials omitted)\n");
         let listener = TcpListener::bind(LISTEN_ADDR).map_err(|error| {
             format!("cannot bind rank websocket bridge on {LISTEN_ADDR}: {error}")
         })?;
@@ -196,9 +193,7 @@ fn handle_connection(
 
 fn dump_frame(path: &std::path::Path, direction: &str, message: &Message) {
     let Message::Text(text) = message else { return };
-    let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(path) else {
-        return;
-    };
+    let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(path) else { return };
     use std::io::Write;
     let _ = writeln!(file, "\n--- {direction} ---\n{text}");
 }

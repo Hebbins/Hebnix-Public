@@ -1,7 +1,8 @@
 //! EOS oauth tokens for RL, steam + epic
-
+//!
+// ported from the python hebnix.eos package. two paths:
 //  - steam: load steam_api64.dll, get an auth session ticket, POST it to epic
-
+//    oauth as an external_auth grant (see steam, ported from the C++ eos_client)
 //  - epic: scan EpicGamesLauncher.exe memory for the eg1~eyJ... bearer token,
 //    swap it for an exchange_code via the EGS oauth api, POST that to epic oauth
 //    (see memory)
@@ -16,6 +17,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+// RL's EOS creds (from RLAPI/egs.go, same as the python/C++ clients)
 const EOS_CLIENT_ID: &str = "xyza7891p5D7s9R6Gm6moTHWGloerp7B";
 const EOS_CLIENT_SECRET: &str = "Knh18du4NVlFs+3uQ+ZPpDCVto0WYf4yXP8+OcwVt1o";
 const EOS_DEPLOYMENT_ID: &str = "da32ae9c12ae40e8a112c52e1f17f3ba";
@@ -156,6 +158,7 @@ pub enum SaveContent {
 /// on-disk cache format
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SaveFormat {
+    /// Key=Value lines (compatible with the python/C++ EOS_token.txt)
     Text,
     /// pretty json, snake_case keys
     Json,
@@ -348,7 +351,7 @@ fn refresh(refresh_token: &str) -> Option<EOSToken> {
 
 /// Scan `EpicGamesLauncher.exe` for a valid `eg1~eyJ...` bearer token: prefer
 /// the `eg1~`-prefixed form, fall back to a bare JWT, and validate that the
-
+/// payload has the `app`+`sub` claims (matching the Python heuristic).
 fn scan_egl_token() -> Option<String> {
     let pid = memory::find_process("EpicGamesLauncher.exe")?;
     let mut candidates = memory::scan_memory(pid, b"eg1~eyJ");

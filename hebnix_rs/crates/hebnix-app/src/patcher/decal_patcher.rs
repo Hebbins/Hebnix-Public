@@ -12,6 +12,8 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::messages::AppMsg;
+
+const SKINS_CATALOG: &str = include_str!("../../assets/catalogs/skins.json");
 use crate::patch_core::upk;
 
 // UPK magic constant
@@ -592,6 +594,7 @@ fn parse_exports(data: &[u8], header: &PackageHeader) -> Result<Vec<ExportEntry>
 // ============================================================================
 
 fn startup_upk_field_override(body_id: i32, field_key: &str) -> Option<&'static str> {
+    // Direct port of the C# StartupUpkFieldOverrides table.
     // Body 23 is Octane in the current catalog and pins its diffuse export.
     if body_id == 23 {
         match field_key {
@@ -606,6 +609,7 @@ fn startup_upk_field_override(body_id: i32, field_key: &str) -> Option<&'static 
 }
 
 fn keywords_for_field(field_key: &str) -> &'static [&'static str] {
+    // Direct port of C# FieldExportKeywords + KeywordTokens.
     match field_key {
         "diffuse" | "1_diffuse_skin" => &["_d", "_diffuse", "_basecolor"],
         "curvaturepack" => &["curvature"],
@@ -627,6 +631,7 @@ fn keywords_for_field(field_key: &str) -> &'static [&'static str] {
 }
 
 fn effective_field_key_for_matching(field_key: &str, total_field_count: usize) -> String {
+    // Direct port of C# EffectiveFieldKeyForMatching.
     let key = field_key.to_ascii_lowercase();
     if total_field_count != 1 || !keywords_for_field(&key).is_empty() {
         return key;
@@ -658,6 +663,7 @@ fn is_non_diffuse_export(name: &str) -> bool {
 }
 
 fn texture_name_matches(name: &str, keyword: &str) -> bool {
+    // Direct port of the local C# Matches() function.
     if keyword.starts_with('_') && !keyword.starts_with("_rgb") {
         name.ends_with(keyword)
     } else {
@@ -1744,7 +1750,7 @@ pub struct DecalItem {
 pub struct SkinInfo {
     pub id: String,
     pub name: String,
-    pub skin_upk: String,
+    pub upk_path: String,
 }
 
 #[derive(Clone)]
@@ -2151,6 +2157,7 @@ fn patch_decal_on_skin(
         return Err("No textures were patched successfully".to_string());
     }
 
+    // Direct port of C# PatchBlankSkin. Body diffuse decals need the matching
     // BlankSkin mip chain cleared or the paint material washes/obscures the
     // full-colour texture in game.
     if let Some(diffuse_name) = diffuse_export_name.as_deref() {
@@ -2452,27 +2459,10 @@ impl DecalPatcherState {
         self.car_skins.clear();
         self.catalog_error = None;
 
-        let catalog_path = self.base_dir.join("skins_catalog.json");
-        if !catalog_path.exists() {
-            self.catalog_error = Some(format!(
-                "skins_catalog.json not found at: {}",
-                catalog_path.display()
-            ));
-            return;
-        }
-
-        let data = match fs::read_to_string(&catalog_path) {
-            Ok(d) => d,
-            Err(e) => {
-                self.catalog_error = Some(format!("Failed to read skins_catalog.json: {}", e));
-                return;
-            }
-        };
-
-        let json: Value = match serde_json::from_str(&data) {
+        let json: Value = match serde_json::from_str(SKINS_CATALOG) {
             Ok(j) => j,
             Err(e) => {
-                self.catalog_error = Some(format!("Failed to parse skins_catalog.json: {}", e));
+                self.catalog_error = Some(format!("Failed to parse skins.json: {}", e));
                 return;
             }
         };
@@ -2480,8 +2470,7 @@ impl DecalPatcherState {
         let cars = match json.get("cars").and_then(|v| v.as_object()) {
             Some(c) => c,
             None => {
-                self.catalog_error =
-                    Some("No 'cars' object found in skins_catalog.json".to_string());
+                self.catalog_error = Some("No 'cars' object found in skins.json".to_string());
                 return;
             }
         };
@@ -2504,11 +2493,11 @@ impl DecalPatcherState {
                     Some(n) => n.to_string(),
                     None => continue,
                 };
-                let skin_upk = match skin.get("skin_upk").and_then(|v| v.as_str()) {
+                let upk_path = match skin.get("upk_path").and_then(|v| v.as_str()) {
                     Some(s) => s.to_string(),
                     None => continue,
                 };
-                skin_list.push(SkinInfo { id, name, skin_upk });
+                skin_list.push(SkinInfo { id, name, upk_path });
             }
 
             if !skin_list.is_empty() {
@@ -2582,7 +2571,7 @@ impl DecalPatcherState {
                         let target_upk = pack_data
                             .get("TargetUpk")
                             .or(pack_data.get("target_upk"))
-                            .or(pack_data.get("skin_upk"))
+                            .or(pack_data.get("upk_path"))
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());
 
@@ -2687,15 +2676,15 @@ impl DecalPatcherState {
             .as_array()?
             .iter()
             .find(|body| decal_catalog_id(body.get("id")) == Some(body_id))?
-            .get("body_upk")?
+            .get("upk_path")?
             .as_str()
             .map(str::to_string)
     }
 
     fn load_bodies_catalog(&self) -> Option<Value> {
         for path in [
-            self.base_dir.join("bodies_catalog.json"),
-            self.base_dir.join("assets/catalogs/bodies_catalog.json"),
+            self.base_dir.join("bodies.json"),
+            self.base_dir.join("assets/catalogs/bodies.json"),
         ] {
             if let Ok(data) = fs::read_to_string(path) {
                 if let Ok(json) = serde_json::from_str(&data) {
@@ -2703,24 +2692,21 @@ impl DecalPatcherState {
                 }
             }
         }
-        serde_json::from_str(include_str!("../../assets/catalogs/bodies_catalog.json")).ok()
+        serde_json::from_str(include_str!("../../assets/catalogs/bodies.json")).ok()
     }
 
     fn lookup_skin_name(&self, skin_id: i32) -> Option<String> {
-        let catalog_path = self.base_dir.join("skins_catalog.json");
-        if let Ok(data) = fs::read_to_string(&catalog_path) {
-            if let Ok(json) = serde_json::from_str::<Value>(&data) {
-                if let Some(cars) = json.get("cars").and_then(|v| v.as_object()) {
-                    for car_data in cars.values() {
-                        if let Some(skins) = car_data.get("skins").and_then(|v| v.as_array()) {
-                            for skin in skins {
-                                if let Some(id) = skin.get("id").and_then(|v| v.as_str()) {
-                                    if id == skin_id.to_string() {
-                                        return skin
-                                            .get("name")
-                                            .and_then(|v| v.as_str())
-                                            .map(|s| s.to_string());
-                                    }
+        if let Ok(json) = serde_json::from_str::<Value>(SKINS_CATALOG) {
+            if let Some(cars) = json.get("cars").and_then(|v| v.as_object()) {
+                for car_data in cars.values() {
+                    if let Some(skins) = car_data.get("skins").and_then(|v| v.as_array()) {
+                        for skin in skins {
+                            if let Some(id) = skin.get("id").and_then(|v| v.as_str()) {
+                                if id == skin_id.to_string() {
+                                    return skin
+                                        .get("name")
+                                        .and_then(|v| v.as_str())
+                                        .map(|s| s.to_string());
                                 }
                             }
                         }
@@ -2783,7 +2769,7 @@ impl DecalPatcherState {
             .ok_or_else(|| format!("Decal '{}' not found", decal_name))?;
         let expected_car = self.car_key_for_body_id(decal.body_id).ok_or_else(|| {
             format!(
-                "BodyID {} does not match a car in bodies_catalog.json and skins_catalog.json",
+                "BodyID {} does not match a car in bodies.json and skins.json",
                 decal.body_id
             )
         })?;
@@ -2799,7 +2785,7 @@ impl DecalPatcherState {
         // the selected catalog skin is the concrete decal package to replace.
         // Never fall back to Body_*.upk or Startup.upk here: those textures are
         // shared by the whole car and are not a skin/decal replacement.
-        let target_candidates = vec![(skin_info.skin_upk.clone(), true)];
+        let target_candidates = vec![(skin_info.upk_path.clone(), true)];
         let mut legacy_shared_targets = Vec::new();
         if let Some(body_upk) = self.lookup_body_upk(decal.body_id) {
             legacy_shared_targets.push(body_upk.clone());
@@ -2822,14 +2808,14 @@ impl DecalPatcherState {
         });
         let donor_upks = donor_skins
             .into_iter()
-            .map(|skin| skin.skin_upk)
+            .map(|skin| skin.upk_path)
             .collect::<Vec<_>>();
         let previous_targets = self
             .active_decals
             .keys()
             .filter_map(|active_key| active_key.split_once('|'))
             .filter_map(|(active_car, active_skin)| self.find_skin(active_car, active_skin).ok())
-            .map(|skin| skin.skin_upk)
+            .map(|skin| skin.upk_path)
             .collect::<HashSet<_>>()
             .into_iter()
             .collect::<Vec<_>>();
@@ -2861,7 +2847,7 @@ impl DecalPatcherState {
         let field_labels_clone = entry.field_labels.clone();
         let target_candidates_clone = target_candidates.clone();
         let legacy_shared_targets_clone = legacy_shared_targets;
-        let selected_skin_upk = skin_info.skin_upk.clone();
+        let selected_skin_upk = skin_info.upk_path.clone();
         let donor_upks_clone = donor_upks;
         let previous_targets_clone = previous_targets;
         let local_tx = self.local_tx.clone();
@@ -2974,7 +2960,7 @@ impl DecalPatcherState {
 
         // Find the skin info to get the target UPK
         let skin_info = self.find_skin(car_key, skin_id)?;
-        let target_candidates = vec![skin_info.skin_upk];
+        let target_candidates = vec![skin_info.upk_path];
 
         self.processing_target = Some(format!("Restoring {}", decal_name));
         self.progress = Some(0.05);
@@ -3029,7 +3015,7 @@ impl DecalPatcherState {
                 continue;
             };
             if let Ok(skin) = self.find_skin(car_key, skin_id) {
-                target_candidates.insert(skin.skin_upk);
+                target_candidates.insert(skin.upk_path);
             }
         }
         // Include shared packages touched by older Rust builds so Restore All
@@ -3591,7 +3577,7 @@ impl DecalPatcherState {
                                         }
                                     });
                             } else if self.car_skins.is_empty() {
-                                ui.label("No decals available - check skins_catalog.json");
+                                ui.label("No decals available - check skins.json");
                             } else {
                                 ui.label("Select an imported decal first");
                             }

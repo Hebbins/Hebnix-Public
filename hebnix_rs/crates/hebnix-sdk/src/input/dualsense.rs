@@ -1,6 +1,7 @@
 //! playstation controller support via hidapi, buttons only
 //
 // DualSense/DualSense Edge (PS5) and DualShock 4 (PS4), USB + bluetooth.
+// button names match the python port ("btn_cross", "btn_l1", ...). DS4 Share maps to "btn_create".
 
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};

@@ -218,11 +218,7 @@ impl Rule for NameRule {
 
     fn announce(&self) -> Option<String> {
         (!self.announced.swap(true, Ordering::Relaxed)).then(|| {
-            let name = self
-                .name
-                .lock()
-                .map(|name| name.clone())
-                .unwrap_or_default();
+            let name = self.name.lock().map(|name| name.clone()).unwrap_or_default();
             format!("Username Spoofed to {name}")
         })
     }
@@ -458,11 +454,7 @@ impl Rule for TitleRule {
 
     fn announce(&self) -> Option<String> {
         (!self.announced.swap(true, Ordering::Relaxed)).then(|| {
-            let title = self
-                .settings
-                .lock()
-                .map(|settings| settings.text.clone())
-                .unwrap_or_default();
+            let title = self.settings.lock().map(|settings| settings.text.clone()).unwrap_or_default();
             format!("Title Spoofed to {title}")
         })
     }
@@ -487,10 +479,7 @@ impl Rule for RankRule {
         // Only the HTTP PsyNet RPC response contains PerConURL.  Never MITM
         // ws.rlpp.psynet.gg: that is a long-lived websocket and must be
         // tunnelled until the PerCon URL points it at the local bridge.
-        self.spoofs
-            .lock()
-            .map(|spoofs| !spoofs.is_empty())
-            .unwrap_or(false)
+        self.spoofs.lock().map(|spoofs| !spoofs.is_empty()).unwrap_or(false)
             && (host.eq_ignore_ascii_case("api.rlpp.psynet.gg")
                 || host.eq_ignore_ascii_case("config.psynet.gg"))
     }
@@ -502,7 +491,7 @@ impl Rule for RankRule {
     fn upstream_host(&self, host: &str, path: &str) -> Option<&'static str> {
         (host.eq_ignore_ascii_case("config.psynet.gg")
             && (path.contains("/rpc/") || path.contains("/Services")))
-        .then_some("api.rlpp.psynet.gg")
+            .then_some("api.rlpp.psynet.gg")
     }
 
     fn rewrite(&self, body: &mut Body) -> bool {
@@ -516,26 +505,13 @@ impl Rule for RankRule {
         // api.rlpp.psynet.gg by `upstream_host` above.
         if body_str.contains("api.rlpp.psynet.gg") {
             let rewritten = body_str
-                .replace(
-                    "https:\\/\\/api.rlpp.psynet.gg\\/rpc",
-                    "https:\\/\\/config.psynet.gg\\/rpc",
-                )
-                .replace(
-                    "https:\\/\\/api.rlpp.psynet.gg\\/Services",
-                    "https:\\/\\/config.psynet.gg\\/Services",
-                )
-                .replace(
-                    "https://api.rlpp.psynet.gg/rpc",
-                    "https://config.psynet.gg/rpc",
-                )
-                .replace(
-                    "https://api.rlpp.psynet.gg/Services",
-                    "https://config.psynet.gg/Services",
-                );
+                .replace("https:\\/\\/api.rlpp.psynet.gg\\/rpc", "https:\\/\\/config.psynet.gg\\/rpc")
+                .replace("https:\\/\\/api.rlpp.psynet.gg\\/Services", "https:\\/\\/config.psynet.gg\\/Services")
+                .replace("https://api.rlpp.psynet.gg/rpc", "https://config.psynet.gg/rpc")
+                .replace("https://api.rlpp.psynet.gg/Services", "https://config.psynet.gg/Services");
             if rewritten != body_str {
                 let bytes = rewritten.into_bytes();
-                body.set_headers
-                    .push(("Psysignature".into(), config_psysignature(&bytes)));
+                body.set_headers.push(("Psysignature".into(), config_psysignature(&bytes)));
                 body.bytes = bytes;
                 return true;
             }
@@ -735,11 +711,10 @@ mod tests {
             "ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player"
         );
         assert_eq!(value["Result"]["PerConURLv2"], "ws://127.0.0.1:8025/ws/gc2");
-        assert!(
-            body.set_headers
-                .iter()
-                .any(|(name, value)| name == "PsySig" && !value.is_empty())
-        );
+        assert!(body
+            .set_headers
+            .iter()
+            .any(|(name, value)| name == "PsySig" && !value.is_empty()));
     }
 
     #[test]
@@ -755,11 +730,7 @@ mod tests {
         );
         assert!(rule.rewrite(&mut body));
         assert!(String::from_utf8_lossy(&body.bytes).contains("config.psynet.gg/rpc"));
-        assert!(
-            body.set_headers
-                .iter()
-                .any(|(name, _)| name == "Psysignature")
-        );
+        assert!(body.set_headers.iter().any(|(name, _)| name == "Psysignature"));
     }
 
     #[test]
@@ -769,8 +740,7 @@ mod tests {
             "application/json",
             br#"{"Result":{"Skills":[{"Playlist":63,"Tier":1,"Division":2,"MMR":15.0,"Mu":15.0}]}}"#.to_vec(),
         );
-        body.response_headers
-            .push(("PsyTime".into(), "123456".into()));
+        body.response_headers.push(("PsyTime".into(), "123456".into()));
         assert!(rule.rewrite(&mut body));
         let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
         assert_eq!(value["Result"]["Skills"][0]["Tier"], 22);

@@ -47,7 +47,7 @@ fn generic_frame<'a>(bytes: &'a [u8], category: &str) -> Option<(&'a [u8], u32, 
         // size-only decoder wraps both exports into a repeated 512x256 (or
         // 256x128) image. Player banners really are 2:1; every other catalog
         // uses the final square item thumbnail from this layout.
-        if width == height * 2 && category != "playerbanners" {
+        if width == height * 2 && category != "banners" {
             let square_pixels = height.checked_mul(height)?.checked_mul(4)?;
             let square_start = bytes.len().checked_sub(square_pixels + TRAILER_SIZE)?;
             return Some((
@@ -121,7 +121,7 @@ mod tests {
         bytes.extend(vec![2; 256 * 256 * 4]);
         bytes.extend(vec![0; TRAILER_SIZE]);
 
-        let (frame, width, height) = generic_frame(&bytes, "engineaudios").unwrap();
+        let (frame, width, height) = generic_frame(&bytes, "engines").unwrap();
         assert_eq!((width, height), (256, 256));
         assert_eq!(frame.len(), 256 * 256 * 4);
         assert!(frame.iter().all(|byte| *byte == 2));
@@ -133,7 +133,7 @@ mod tests {
         bytes.extend(vec![1; 512 * 256 * 4]);
         bytes.extend(vec![0; TRAILER_SIZE]);
 
-        let (frame, width, height) = generic_frame(&bytes, "playerbanners").unwrap();
+        let (frame, width, height) = generic_frame(&bytes, "banners").unwrap();
         assert_eq!((width, height), (512, 256));
         assert_eq!(frame.len(), 512 * 256 * 4);
     }
@@ -156,7 +156,7 @@ mod tests {
             let decode_category = if category.starts_with("body-") {
                 "bodies"
             } else if category.starts_with("engine-") {
-                "engineaudios"
+                "engines"
             } else {
                 category
             };

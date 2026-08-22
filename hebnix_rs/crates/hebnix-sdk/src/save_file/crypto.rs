@@ -1,3 +1,5 @@
+//! aes encrypt/decrypt + crc32 for RL save files. ported from RLSaveViewer/RocketRP.
+
 use aes::Aes256;
 use aes::cipher::generic_array::GenericArray;
 use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};

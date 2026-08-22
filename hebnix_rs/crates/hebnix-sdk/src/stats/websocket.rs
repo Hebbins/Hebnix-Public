@@ -137,7 +137,7 @@ fn reader_writer_loop(
             Ok(s) => s,
             Err(_) => {
                 connected.store(false, Ordering::Relaxed);
-
+                // Sleep to prevent tight spinloop when game is closed[cite: 11]
                 for _ in 0..20 {
                     if !running.load(Ordering::Relaxed) {
                         return;

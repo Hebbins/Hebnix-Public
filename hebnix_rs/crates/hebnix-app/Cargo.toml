@@ -3,6 +3,19 @@ name = "hebnix-app"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+lite = []
+
+[[bin]]
+name = "hebnix-app"
+path = "src/main.rs"
+
+[[bin]]
+name = "hebnix-lite"
+path = "src/lite_main.rs"
+required-features = ["lite"]
+
 [dependencies]
 aes = "0.8"
 crossbeam-channel.workspace = true
@@ -12,6 +25,7 @@ egui_extras = { version = "0.35.0", features = ["image", "svg"] }
 global-hotkey = "0.8.0"
 hebnix-sdk = { version = "0.1.0", path = "../hebnix-sdk" }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "ico", "bmp", "webp"] }
+libloading = "0.8"
 bcdec_rs = "0.1"
 mlua = { version = "0.11.6", features = ["lua54", "vendored", "serialize"] }
 httparse = "1"

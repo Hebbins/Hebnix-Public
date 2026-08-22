@@ -1,4 +1,5 @@
 //! background monitor: RL presence, statsapi availability, topmost tracking.
+//! python's 3 polling threads folded into one ticking task.
 
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -21,7 +22,8 @@ pub struct MonitorShared {
 }
 
 pub struct Monitor {
-    pub shared: Arc<Mutex<MonitorShared>>,
+    #[cfg(not(feature = "lite"))]
+    shared: Arc<Mutex<MonitorShared>>,
     running: Arc<AtomicBool>,
 }
 
@@ -47,11 +49,22 @@ impl Monitor {
                 .expect("failed to spawn monitor thread");
         }
 
-        Self { shared, running }
+        Self {
+            #[cfg(not(feature = "lite"))]
+            shared,
+            running,
+        }
     }
 
     pub fn stop(&self) {
         self.running.store(false, Ordering::SeqCst);
+    }
+
+    #[cfg(not(feature = "lite"))]
+    pub fn update_shared(&self, shared: MonitorShared) {
+        if let Ok(mut current) = self.shared.lock() {
+            *current = shared;
+        }
     }
 }
 

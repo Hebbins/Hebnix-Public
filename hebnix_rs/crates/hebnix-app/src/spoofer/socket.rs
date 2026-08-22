@@ -10,7 +10,9 @@ use rustls::{ServerConfig, ServerConnection, StreamOwned};
 
 use crate::messages::AppMsg;
 use crate::spoofer::ca::Ca;
-use crate::spoofer::proxy::{CertResolver, build_server_config, build_upstream_agent, serve_one};
+use crate::spoofer::proxy::{
+    CertResolver, build_server_config, build_upstream_agent_pins, serve_one,
+};
 use crate::spoofer::rules::Rule;
 
 // The hosts redirect is explicitly 127.0.0.1, so match the C# relay and do
@@ -27,8 +29,7 @@ impl SocketProxy {
         ca: Arc<Ca>,
         rules: Arc<Vec<Box<dyn Rule>>>,
         tx: Sender<AppMsg>,
-        host: String,
-        real_ip: std::net::Ipv4Addr,
+        real_ips: std::collections::HashMap<String, std::net::Ipv4Addr>,
     ) -> Result<Self, String> {
         let addr = REVERSE_ADDR.to_string();
         let listener = TcpListener::bind(&addr).map_err(|e| {
@@ -44,7 +45,7 @@ impl SocketProxy {
 
         let resolver = Arc::new(CertResolver::new(ca));
         let server_config = build_server_config(resolver)?;
-        let upstream = build_upstream_agent(Some((host, real_ip)));
+        let upstream = build_upstream_agent_pins(real_ips);
 
         {
             let running = Arc::clone(&running);

@@ -307,6 +307,231 @@ pub fn restart_rocket_league(game_path: &std::path::Path) -> std::io::Result<()>
         .map(|_| ())
 }
 
+pub fn restart_rocket_league_multihome(
+    game_path: &std::path::Path,
+    address: &str,
+) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    kill_rocket_league().map_err(|error| error.to_string())?;
+    for _ in 0..60 {
+        if !hebnix_sdk::process::is_rocket_league_running() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    let path = game_path.to_string_lossy().to_ascii_lowercase();
+    let is_steam = path.contains("steamapps")
+        || path.contains("steam\\common")
+        || path.contains("steam/library");
+    if is_steam {
+        let launch = format!("steam://run/252950//-multihome%3D{address}/");
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &launch])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+    apply_epic_multihome(address)?;
+    restart_epic_launcher_for_multihome()?;
+    std::process::Command::new("cmd")
+        .args([
+            "/C",
+            "start",
+            "",
+            "com.epicgames.launcher://apps/9773aa1aa54f4f7b80e44bef04986cea%3A530145df28a24424923f5828cc9031a1%3ASugar?action=launch&silent=true",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn restart_epic_launcher_for_multihome() -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/IM", "EpicGamesLauncher.exe"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+    for _ in 0..40 {
+        let running = std::process::Command::new("tasklist")
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map(|output| {
+                String::from_utf8_lossy(&output.stdout)
+                    .to_ascii_lowercase()
+                    .contains("epicgameslauncher.exe")
+            })
+            .unwrap_or(false);
+        if !running {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+    Err(
+        "Epic Games Launcher did not close so its launch options could not be refreshed"
+            .to_string(),
+    )
+}
+
+pub fn clear_rocket_league_multihome() -> Result<(), String> {
+    clear_epic_multihome()
+}
+
+fn apply_epic_multihome(address: &str) -> Result<(), String> {
+    let config_root = dirs::data_local_dir()
+        .ok_or_else(|| "could not find LocalAppData".to_string())?
+        .join("EpicGamesLauncher")
+        .join("Saved")
+        .join("Config");
+    let paths = [
+        config_root
+            .join("WindowsEditor")
+            .join("GameUserSettings.ini"),
+        config_root.join("Windows").join("GameUserSettings.ini"),
+    ];
+    let command_key = "9773aa1aa54f4f7b80e44bef04986cea:530145df28a24424923f5828cc9031a1:Sugar_AdditionalCommands";
+    let enabled_key = "9773aa1aa54f4f7b80e44bef04986cea:530145df28a24424923f5828cc9031a1:Sugar_AdditionalCommandsEnabled";
+    let mut changed = false;
+    for path in paths.into_iter().filter(|path| path.is_file()) {
+        let original = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
+        let mut lines: Vec<String> = original.lines().map(str::to_owned).collect();
+        let prefixes = lines
+            .iter()
+            .filter_map(|line| {
+                line.strip_prefix('[')
+                    .and_then(|line| line.strip_suffix("_Launcher]"))
+                    .map(str::to_owned)
+            })
+            .collect::<Vec<_>>();
+        for prefix in prefixes {
+            let settings_section = format!("[{prefix}_Settings]");
+            let settings = match lines.iter().position(|line| line == &settings_section) {
+                Some(index) => index,
+                None => {
+                    lines.push(settings_section);
+                    lines.len() - 1
+                }
+            };
+            let end = lines
+                .iter()
+                .skip(settings + 1)
+                .position(|line| line.starts_with('['))
+                .map(|offset| settings + 1 + offset)
+                .unwrap_or(lines.len());
+            let mut command_found = false;
+            let mut enabled_found = false;
+            for line in &mut lines[settings + 1..end] {
+                if let Some((key, value)) = line.split_once('=') {
+                    if key == command_key {
+                        let mut arguments = value
+                            .split_whitespace()
+                            .filter(|argument| !argument.starts_with("-multihome="))
+                            .map(str::to_owned)
+                            .collect::<Vec<_>>();
+                        arguments.push(format!("-multihome={address}"));
+                        *line = format!("{command_key}={}", arguments.join(" "));
+                        command_found = true;
+                    } else if key == enabled_key {
+                        *line = format!("{enabled_key}=True");
+                        enabled_found = true;
+                    }
+                }
+            }
+            if !command_found {
+                lines.insert(end, format!("{command_key}=-multihome={address}"));
+            }
+            if !enabled_found {
+                let enabled_at = if command_found { end } else { end + 1 };
+                lines.insert(enabled_at, format!("{enabled_key}=True"));
+            }
+            changed = true;
+        }
+        if lines.join("\n") != original.replace("\r\n", "\n") {
+            std::fs::write(path, lines.join("\r\n")).map_err(|error| error.to_string())?;
+        }
+    }
+    if changed {
+        Ok(())
+    } else {
+        Err("Epic Games Launcher settings were not found".to_string())
+    }
+}
+
+fn clear_epic_multihome() -> Result<(), String> {
+    let backup = dirs::data_dir()
+        .ok_or_else(|| "could not find AppData".to_string())?
+        .join("Hebnix")
+        .join("state")
+        .join("epic_multihome_backup.txt");
+    if let Ok(contents) = std::fs::read_to_string(&backup) {
+        if let Some((path, original)) = contents.split_once('\n') {
+            std::fs::write(path, original).map_err(|error| error.to_string())?;
+            let _ = std::fs::remove_file(&backup);
+            return Ok(());
+        }
+    }
+    let config_root = dirs::data_local_dir()
+        .ok_or_else(|| "could not find LocalAppData".to_string())?
+        .join("EpicGamesLauncher")
+        .join("Saved")
+        .join("Config");
+    let paths = [
+        config_root
+            .join("WindowsEditor")
+            .join("GameUserSettings.ini"),
+        config_root.join("Windows").join("GameUserSettings.ini"),
+    ];
+    for path in paths.into_iter().filter(|path| path.is_file()) {
+        let original = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
+        let mut lines: Vec<String> = original.lines().map(str::to_owned).collect();
+        let mut changed = false;
+        for line in &mut lines {
+            if let Some((key, value)) = line.split_once('=') {
+                if key.ends_with(":Sugar_AdditionalCommands") {
+                    let remaining = value
+                        .split_whitespace()
+                        .filter(|argument| {
+                            !argument.starts_with("-multihome=10.242.77.")
+                                && !argument.starts_with("-multihome=192.10.192.")
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if remaining != value {
+                        *line = format!("{key}={remaining}");
+                        changed = true;
+                    }
+                }
+            }
+        }
+        let commands_empty = lines.iter().all(|line| {
+            line.split_once('=')
+                .filter(|(key, _)| key.ends_with(":Sugar_AdditionalCommands"))
+                .is_none_or(|(_, value)| value.trim().is_empty())
+        });
+        if commands_empty {
+            for line in &mut lines {
+                if let Some((key, value)) = line.split_once('=')
+                    && key.ends_with(":Sugar_AdditionalCommandsEnabled")
+                    && !value.eq_ignore_ascii_case("false")
+                {
+                    *line = format!("{key}=False");
+                    changed = true;
+                }
+            }
+        }
+        if changed {
+            std::fs::write(&path, lines.join("\r\n")).map_err(|error| error.to_string())?;
+        }
+    }
+    let _ = std::fs::remove_file(backup);
+    Ok(())
+}
+
 /// hide by dropping the os alpha to 0. SW_HIDE crashes wgpu and takes the
 /// plugin child windows with it.
 pub fn set_main_window_invisible(invisible: bool) {

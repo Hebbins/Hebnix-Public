@@ -22,6 +22,8 @@ mod dpi_fix;
 mod hotkey;
 mod messages;
 mod monitor;
+#[path = "multiplayer-lan/mod.rs"]
+mod multiplayer_lan;
 mod overlay;
 mod patch_core {
     pub use crate::patcher::patch_core::*;
@@ -40,6 +42,7 @@ mod update;
 mod upk_keys {
     pub use crate::patcher::upk_keys::*;
 }
+mod watchdog;
 mod winutil;
 
 use app::HebnixApp;
@@ -90,10 +93,8 @@ fn setup_logging(base_dir: &std::path::Path) {
 /// then fall through to the default hook.
 fn setup_panic_hook(base_dir: &std::path::Path) {
     let crash_path = base_dir.join("crash.txt");
-    let restore_dir = base_dir.to_path_buf();
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        spoofer::disable_proxy(&restore_dir);
         let _ = spoofer::hosts::clear();
         let backtrace = std::backtrace::Backtrace::force_capture();
         let ts = std::time::SystemTime::now()
@@ -134,6 +135,10 @@ fn dcomp_wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
 
 fn main() -> eframe::Result {
     let base_dir = config::base_dir();
+    if let Some(parent_pid) = watchdog::parent_pid() {
+        watchdog::run(parent_pid);
+        return Ok(());
+    }
     setup_logging(&base_dir);
     setup_panic_hook(&base_dir);
     tracing::info!("Hebnix {} starting", app::APP_VERSION);
@@ -157,6 +162,7 @@ fn main() -> eframe::Result {
     };
 
     spoofer::restore_if_crashed(&base_dir);
+    let _ = watchdog::spawn();
 
     let mut viewport = eframe::egui::ViewportBuilder::default()
         .with_title("Hebnix")
