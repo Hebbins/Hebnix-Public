@@ -1,6 +1,8 @@
-# AMOLED black + Material purple accent, with the bundled Lexend font. drop
-# in the themes/ folder next to the exe, pick "CometPurple" in Settings > Theme.
+# AMOLED black + Material purple accent, paired with Lexend. drop this in the
+# themes/ folder next to the exe, and drop examples/fonts/Lexend.ttf into the
+# fonts/ folder next to it, then pick "CometPurple" in Settings > Theme.
 # `font` is optional on any theme -- omit it to keep the default egui font.
+# it matches (case-insensitively) a .ttf/.otf file stem in the fonts/ folder.
 
 base = "dark"
 font = "Lexend"

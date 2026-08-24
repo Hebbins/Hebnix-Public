@@ -319,6 +319,7 @@ struct InstallModal {
 pub struct HebnixApp {
     base_dir: PathBuf,
     themes_dir: PathBuf,
+    fonts_dir: PathBuf,
     plugin_dir: PathBuf,
     config: Config,
 
@@ -441,14 +442,16 @@ impl HebnixApp {
 
         let base_dir = crate::config::base_dir();
         let themes_dir = base_dir.join("themes");
+        let fonts_dir = base_dir.join("fonts");
         let plugin_dir = base_dir.join("plugins");
         let _ = std::fs::create_dir_all(&themes_dir);
+        let _ = std::fs::create_dir_all(&fonts_dir);
         let _ = std::fs::create_dir_all(&plugin_dir);
 
         let mut config = Config::load(&base_dir);
 
         let error_file = base_dir.join("theme_errors.txt");
-        match theme::apply_theme(&cc.egui_ctx, &themes_dir, &config.settings.theme) {
+        match theme::apply_theme(&cc.egui_ctx, &themes_dir, &fonts_dir, &config.settings.theme) {
             Ok(()) => {
                 let _ = std::fs::remove_file(&error_file);
             }
@@ -457,7 +460,7 @@ impl HebnixApp {
                     &error_file,
                     format!("Startup Theme Error ({}): {e}\n", config.settings.theme),
                 );
-                let _ = theme::apply_theme(&cc.egui_ctx, &themes_dir, "Dark");
+                let _ = theme::apply_theme(&cc.egui_ctx, &themes_dir, &fonts_dir, "Dark");
                 config.settings.theme = "Dark".to_string();
                 let _ = config.save(&base_dir);
             }
@@ -728,6 +731,7 @@ impl HebnixApp {
         let mut app = Self {
             base_dir: base_dir.clone(),
             themes_dir,
+            fonts_dir,
             plugin_dir,
             config,
             tx,
@@ -3032,6 +3036,9 @@ impl HebnixApp {
                                 if ui.button("Open Folder").clicked() {
                                     let _ = open::that(&self.themes_dir);
                                 }
+                                if ui.button("Open Fonts Folder").clicked() {
+                                    let _ = open::that(&self.fonts_dir);
+                                }
                             });
 
                             ui.horizontal(|ui| {
@@ -3045,7 +3052,12 @@ impl HebnixApp {
                                 );
                                 if slider.changed() {
                                     let theme_name = self.config.settings.theme.clone();
-                                    let _ = theme::apply_theme(&ctx, &self.themes_dir, &theme_name);
+                                    let _ = theme::apply_theme(
+                                        &ctx,
+                                        &self.themes_dir,
+                                        &self.fonts_dir,
+                                        &theme_name,
+                                    );
                                     theme::apply_window_opacity(
                                         &ctx,
                                         self.config.settings.window_opacity,
@@ -3259,7 +3271,7 @@ impl HebnixApp {
 
     fn change_theme(&mut self, ctx: &egui::Context, choice: &str) {
         let error_file = self.base_dir.join("theme_errors.txt");
-        match theme::apply_theme(ctx, &self.themes_dir, choice) {
+        match theme::apply_theme(ctx, &self.themes_dir, &self.fonts_dir, choice) {
             Ok(()) => {
                 let _ = std::fs::remove_file(&error_file);
                 self.config.settings.theme = choice.to_string();
@@ -3272,7 +3284,7 @@ impl HebnixApp {
                     &error_file,
                     format!("Runtime Theme Error ({choice}): {e}\n"),
                 );
-                let _ = theme::apply_theme(ctx, &self.themes_dir, "Dark");
+                let _ = theme::apply_theme(ctx, &self.themes_dir, &self.fonts_dir, "Dark");
                 self.config.settings.theme = "Dark".to_string();
                 self.save_config();
                 self.console.write(format!(

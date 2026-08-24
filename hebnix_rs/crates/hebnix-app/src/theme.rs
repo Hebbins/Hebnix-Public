@@ -13,30 +13,60 @@ pub struct ThemeFile {
     pub base: String,
     #[serde(default)]
     pub colors: ThemeColors,
-    /// optional font family name, e.g. "Lexend". unknown/omitted -> egui default.
+    /// optional font name, matched (case-insensitively) against a file stem in
+    /// fonts/. unknown/omitted -> egui default.
     #[serde(default)]
     pub font: Option<String>,
 }
 
-/// fonts bundled into the binary; themes reference these by name (case-insensitive).
-const LEXEND_TTF: &[u8] = include_bytes!("../assets/fonts/Lexend.ttf");
+/// find a font file in `fonts_dir` whose stem matches `name` (case-insensitive),
+/// trying the extensions fonts commonly ship as.
+fn find_font_file(fonts_dir: &Path, name: &str) -> Option<std::path::PathBuf> {
+    for ext in ["ttf", "otf"] {
+        let candidate = fonts_dir.join(format!("{name}.{ext}"));
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    let entries = std::fs::read_dir(fonts_dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_font = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("ttf") || e.eq_ignore_ascii_case("otf"))
+            .unwrap_or(false);
+        if !is_font {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            if stem.eq_ignore_ascii_case(name) {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
 
-/// swap the proportional font family, or reset to egui's default if `font_name`
-/// doesn't match a bundled font (including None). users never need to install
-/// anything -- the font bytes are baked into the exe.
-pub fn apply_font(ctx: &egui::Context, font_name: Option<&str>) {
+/// swap the proportional font family to a user-supplied file in `fonts_dir`, or
+/// reset to egui's default if `font_name` is None or no matching file is found.
+/// users just drop a .ttf/.otf in the fonts/ folder next to themes/ -- no
+/// install required.
+pub fn apply_font(ctx: &egui::Context, fonts_dir: &Path, font_name: Option<&str>) {
     let mut fonts = egui::FontDefinitions::default();
 
     if let Some(name) = font_name {
-        if name.eq_ignore_ascii_case("lexend") {
-            fonts
-                .font_data
-                .insert("Lexend".to_owned(), egui::FontData::from_static(LEXEND_TTF).into());
-            fonts
-                .families
-                .entry(egui::FontFamily::Proportional)
-                .or_default()
-                .insert(0, "Lexend".to_owned());
+        if let Some(path) = find_font_file(fonts_dir, name) {
+            if let Ok(bytes) = std::fs::read(&path) {
+                fonts
+                    .font_data
+                    .insert(name.to_owned(), egui::FontData::from_owned(bytes).into());
+                fonts
+                    .families
+                    .entry(egui::FontFamily::Proportional)
+                    .or_default()
+                    .insert(0, name.to_owned());
+            }
         }
     }
 
@@ -125,18 +155,23 @@ pub fn list_themes(themes_dir: &Path) -> Vec<String> {
 
 /// apply a theme by name. Errs (for the caller to log) if the file is
 /// missing/invalid, caller falls back to Dark.
-pub fn apply_theme(ctx: &egui::Context, themes_dir: &Path, name: &str) -> Result<(), String> {
+pub fn apply_theme(
+    ctx: &egui::Context,
+    themes_dir: &Path,
+    fonts_dir: &Path,
+    name: &str,
+) -> Result<(), String> {
     match name {
         "Dark" => {
             ctx.set_theme(egui::Theme::Dark);
             ctx.set_visuals_of(egui::Theme::Dark, egui::Visuals::dark());
-            apply_font(ctx, None);
+            apply_font(ctx, fonts_dir, None);
             Ok(())
         }
         "Light" => {
             ctx.set_theme(egui::Theme::Light);
             ctx.set_visuals_of(egui::Theme::Light, egui::Visuals::light());
-            apply_font(ctx, None);
+            apply_font(ctx, fonts_dir, None);
             Ok(())
         }
         _ => {
@@ -192,7 +227,7 @@ pub fn apply_theme(ctx: &egui::Context, themes_dir: &Path, name: &str) -> Result
 
             ctx.set_theme(base_theme);
             ctx.set_visuals_of(base_theme, visuals);
-            apply_font(ctx, theme.font.as_deref());
+            apply_font(ctx, fonts_dir, theme.font.as_deref());
             Ok(())
         }
     }
