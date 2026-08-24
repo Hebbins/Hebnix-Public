@@ -13,14 +13,13 @@ pub struct ThemeFile {
     pub base: String,
     #[serde(default)]
     pub colors: ThemeColors,
-    /// optional font name, matched (case-insensitively) against a file stem in
-    /// fonts/. unknown/omitted -> egui default.
+    /// optional font name. matches a filename in fonts/, not case sensitive.
+    /// leave blank to use the default font.
     #[serde(default)]
     pub font: Option<String>,
 }
 
-/// find a font file in `fonts_dir` whose stem matches `name` (case-insensitive),
-/// trying the extensions fonts commonly ship as.
+/// look for a .ttf or .otf in fonts_dir with this name
 fn find_font_file(fonts_dir: &Path, name: &str) -> Option<std::path::PathBuf> {
     for ext in ["ttf", "otf"] {
         let candidate = fonts_dir.join(format!("{name}.{ext}"));
@@ -48,10 +47,8 @@ fn find_font_file(fonts_dir: &Path, name: &str) -> Option<std::path::PathBuf> {
     None
 }
 
-/// swap the proportional font family to a user-supplied file in `fonts_dir`, or
-/// reset to egui's default if `font_name` is None or no matching file is found.
-/// users just drop a .ttf/.otf in the fonts/ folder next to themes/ -- no
-/// install required.
+/// switches the app's font to whatever's in fonts_dir. falls back to the
+/// default font if nothing's set or the file isn't there.
 pub fn apply_font(ctx: &egui::Context, fonts_dir: &Path, font_name: Option<&str>) {
     let mut fonts = egui::FontDefinitions::default();
 
