@@ -13,6 +13,34 @@ pub struct ThemeFile {
     pub base: String,
     #[serde(default)]
     pub colors: ThemeColors,
+    /// optional font family name, e.g. "Lexend". unknown/omitted -> egui default.
+    #[serde(default)]
+    pub font: Option<String>,
+}
+
+/// fonts bundled into the binary; themes reference these by name (case-insensitive).
+const LEXEND_TTF: &[u8] = include_bytes!("../assets/fonts/Lexend.ttf");
+
+/// swap the proportional font family, or reset to egui's default if `font_name`
+/// doesn't match a bundled font (including None). users never need to install
+/// anything -- the font bytes are baked into the exe.
+pub fn apply_font(ctx: &egui::Context, font_name: Option<&str>) {
+    let mut fonts = egui::FontDefinitions::default();
+
+    if let Some(name) = font_name {
+        if name.eq_ignore_ascii_case("lexend") {
+            fonts
+                .font_data
+                .insert("Lexend".to_owned(), egui::FontData::from_static(LEXEND_TTF).into());
+            fonts
+                .families
+                .entry(egui::FontFamily::Proportional)
+                .or_default()
+                .insert(0, "Lexend".to_owned());
+        }
+    }
+
+    ctx.set_fonts(fonts);
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -102,11 +130,13 @@ pub fn apply_theme(ctx: &egui::Context, themes_dir: &Path, name: &str) -> Result
         "Dark" => {
             ctx.set_theme(egui::Theme::Dark);
             ctx.set_visuals_of(egui::Theme::Dark, egui::Visuals::dark());
+            apply_font(ctx, None);
             Ok(())
         }
         "Light" => {
             ctx.set_theme(egui::Theme::Light);
             ctx.set_visuals_of(egui::Theme::Light, egui::Visuals::light());
+            apply_font(ctx, None);
             Ok(())
         }
         _ => {
@@ -162,6 +192,7 @@ pub fn apply_theme(ctx: &egui::Context, themes_dir: &Path, name: &str) -> Result
 
             ctx.set_theme(base_theme);
             ctx.set_visuals_of(base_theme, visuals);
+            apply_font(ctx, theme.font.as_deref());
             Ok(())
         }
     }

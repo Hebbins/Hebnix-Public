@@ -1,0 +1,16 @@
+# AMOLED black + Material purple accent, with the bundled Lexend font. drop
+# in the themes/ folder next to the exe, pick "CometPurple" in Settings > Theme.
+# `font` is optional on any theme -- omit it to keep the default egui font.
+
+base = "dark"
+font = "Lexend"
+
+[colors]
+accent    = "#A177FF"
+window_bg = "#000000"
+panel_bg  = "#000000"
+widget_bg = "#141014"
+text      = "#FFFFFF"
+hyperlink = "#B69CFF"
+warn      = "#F1FA8C"
+error     = "#FF6E6E"
