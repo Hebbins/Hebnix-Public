@@ -157,6 +157,10 @@ fn asset_path(plugin_dir: &std::path::Path, rel: &str) -> Result<std::path::Path
     Ok(full)
 }
 
+fn is_http_url(path: &str) -> bool {
+    path.starts_with("https://") || path.starts_with("http://")
+}
+
 /// cached asset bytes
 fn load_asset(host: &HostCtx, rel: &str) -> Option<std::sync::Arc<[u8]>> {
     if let Some(cached) = host.assets.borrow().get(rel) {
@@ -2306,18 +2310,28 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
     }
 
     // ui.image("logo.png", {width=, height=, x=, y=, tint="#rrggbb[aa]"})
-    // false when the file isn't in the plugin's assets folder. x and y need
-    // both sizes, they paint in place so images can stack instead of pushing
-    // the layout cursor along.
+    // false when the file isn't in the plugin's assets folder, or for a url
+    // hebnix holds no cached avatar for. x and y need both sizes, they paint
+    // in place so images can stack instead of pushing the layout cursor along.
     {
         let host = Rc::clone(&host);
         ui.set(
             "image",
             lua.create_function(move |_, (path, opts): (String, Option<Table>)| {
-                let Some(bytes) = load_asset(&host, &path) else {
-                    return Ok(false);
+                let (bytes, uri) = if is_http_url(&path) {
+                    // plugin's own urls never land in this cache, only tracker profile avatars do
+                    match tracker_client().avatar_bytes(&path) {
+                        Some(bytes) => (bytes, format!("bytes://remote/{path}")),
+                        None => return Ok(false),
+                    }
+                } else {
+                    match load_asset(&host, &path) {
+                        Some(bytes) => {
+                            (bytes, format!("bytes://plugin/{}/{}", host.slug, path))
+                        }
+                        None => return Ok(false),
+                    }
                 };
-                let uri = format!("bytes://plugin/{}/{}", host.slug, path);
                 let w = opt_num(&opts, "width");
                 let h = opt_num(&opts, "height");
                 let at = match (opt_num(&opts, "x"), opt_num(&opts, "y")) {

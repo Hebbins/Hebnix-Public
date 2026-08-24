@@ -68,7 +68,7 @@ pub struct PlayerStats {
     pub display_name: String,
     pub platform: String,
     pub platform_user_handle: String,
-    pub avatar_url: String,
+    pub avatar_url: Option<String>,
     pub player_id: i64,
     pub ranks: HashMap<i64, PlaylistRank>,
     pub lifetime: Option<LifetimeStats>,

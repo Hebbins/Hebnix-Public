@@ -6,6 +6,8 @@
 //! doesn't collapse into one blockable client. no fallback on purpose: if the
 //! binary is missing, fetches just error out.
 
+use std::io::Read;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
@@ -44,6 +46,9 @@ const FPS_PER_ROUND: usize = 3;
 const MAX_ROUNDS: usize = 3;
 const ROUND_WAIT: Duration = Duration::from_secs(20);
 
+// avatars are a few kb, this is only here so a bad url cant use too much memory
+const AVATAR_MAX_BYTES: u64 = 4 * 1024 * 1024;
+
 /// find the bundled curl-impersonate exe. HEBNIX_CURL_IMPERSONATE overrides,
 /// else it's in the curl-impersonate/ folder next to our exe (put there at
 /// build time). cacert.pem lives right beside it.
@@ -77,6 +82,8 @@ fn pick_impersonate_index() -> usize {
 pub struct TrackerClient {
     timeout: Duration,
     cache: TtlCache<PlayerStats>,
+    /// avatar bytes by url. only filled from avatarUrl on a fetched profile
+    avatars: TtlCache<Arc<[u8]>>,
 }
 
 impl Default for TrackerClient {
@@ -90,6 +97,7 @@ impl TrackerClient {
         Self {
             timeout,
             cache: TtlCache::new(cache_ttl),
+            avatars: TtlCache::new(cache_ttl),
         }
     }
 
@@ -123,6 +131,7 @@ impl TrackerClient {
                 let (stats, expiry_ttl) =
                     parse_response(&data, primary_id, display_name, &platform);
                 self.cache.set(primary_id, stats.clone(), expiry_ttl);
+                self.cache_avatar(&stats, expiry_ttl);
                 Ok(stats)
             }
             Err(err_msg) => {
@@ -162,6 +171,7 @@ impl TrackerClient {
             Ok(data) => {
                 let (stats, expiry_ttl) = parse_response(&data, &cache_key, identifier, slug);
                 self.cache.set(&cache_key, stats.clone(), expiry_ttl);
+                self.cache_avatar(&stats, expiry_ttl);
                 Ok(stats)
             }
             Err(err_msg) => {
@@ -188,8 +198,37 @@ impl TrackerClient {
         self.cache.get(primary_id)
     }
 
+    pub fn avatar_bytes(&self, url: &str) -> Option<Arc<[u8]>> {
+        self.avatars.get(url)
+    }
+
     pub fn clear_cache(&self) {
         self.cache.clear();
+        self.avatars.clear();
+    }
+
+    fn cache_avatar(&self, stats: &PlayerStats, ttl: Option<Duration>) {
+        let Some(url) = stats.avatar_url.as_deref() else {
+            return;
+        };
+        if self.avatars.get(url).is_some() {
+            return;
+        }
+        let Ok(response) = ureq::get(url).timeout(self.timeout).call() else {
+            return;
+        };
+        let mut bytes = Vec::new();
+        if response
+            .into_reader()
+            .take(AVATAR_MAX_BYTES)
+            .read_to_end(&mut bytes)
+            .is_err()
+        {
+            return;
+        }
+        if !bytes.is_empty() {
+            self.avatars.set(url, Arc::from(bytes), ttl);
+        }
     }
 
     fn request(&self, slug: &str, target_user: &str) -> Result<Value, String> {
@@ -356,8 +395,8 @@ fn parse_response(
     let avatar_url = pinfo
         .get("avatarUrl")
         .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
+        .filter(|url| !url.is_empty())
+        .map(str::to_string);
 
     let meta = inner.get("metadata").unwrap_or(&empty);
     let player_id = meta.get("playerId").and_then(|v| v.as_i64()).unwrap_or(0);
