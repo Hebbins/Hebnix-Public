@@ -2099,6 +2099,17 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         })?,
     )?;
 
+    // ui.copy_to_clipboard("text") - writes to the OS clipboard
+    ui.set(
+        "copy_to_clipboard",
+        lua.create_function(|_, text: String| {
+            with_current_ui(|ui| {
+                ui.ctx().copy_text(text);
+            });
+            Ok(())
+        })?,
+    )?;
+
     // Persisted colour picker: ui.color_picker("key", "Label", "#rrggbb[aa]") -> hex
     // The alpha byte, when supplied, is preserved while selecting the RGB tint.
     {
