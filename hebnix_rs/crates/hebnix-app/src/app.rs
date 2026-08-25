@@ -1930,7 +1930,7 @@ impl HebnixApp {
                 let sub_cmd = parts.get(1).map(|s| s.to_lowercase());
                 let tx = self.tx.clone();
                 std::thread::spawn(move || {
-                    let log_info = hebnix_sdk::log::parse_launch_log(None, false, "INT");
+                    let log_info = hebnix_sdk::log::parse_launch_log(None, true, "INT"); // verify so a menu or a closed game cant serve the last match
                     if let Some(game) = log_info.game {
                         let name = game.server_name.unwrap_or_else(|| "Unknown".to_string());
                         let ip = game.server_ip.unwrap_or_else(|| "Unknown".to_string());
@@ -1985,9 +1985,14 @@ impl HebnixApp {
                             }
                         }
                     } else {
-                        let _ = tx.send(AppMsg::Log(
-                            "[Console] Error: No active server info found in the log.".to_string(),
-                        ));
+                        let reason = if !hebnix_sdk::process::is_rocket_league_running() {
+                            "Rocket League is not running."
+                        } else if !log_info.stats_api_available {
+                            "Can't read the match, the stats api is not answering."
+                        } else {
+                            "Not in a game."
+                        };
+                        let _ = tx.send(AppMsg::Log(format!("[Console] {reason}")));
                     }
                 });
             }

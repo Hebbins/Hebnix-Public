@@ -29,6 +29,28 @@ const BASE_COMMANDS: [&str; 10] = [
     "restart",
 ];
 
+/// longest prefix shared by every candidate
+fn common_prefix(items: &[String]) -> String {
+    let mut iter = items.iter();
+    let Some(first) = iter.next() else {
+        return String::new();
+    };
+    let mut prefix = first.clone();
+    for item in iter {
+        let shared = prefix
+            .chars()
+            .zip(item.chars())
+            .take_while(|(a, b)| a == b)
+            .count();
+        let cut = prefix
+            .char_indices()
+            .nth(shared)
+            .map_or(prefix.len(), |(i, _)| i);
+        prefix.truncate(cut);
+    }
+    prefix
+}
+
 impl Default for ConsoleState {
     fn default() -> Self {
         Self {
@@ -131,6 +153,18 @@ impl ConsoleState {
         if has_focus {
             let up = ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::ArrowUp));
             let down = ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::ArrowDown));
+            let tab = ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Tab));
+
+            if tab && !self.suggestions.is_empty() {
+                let prefix = common_prefix(&self.suggestions);
+                apply_suggestion = if prefix.chars().count() > self.input.chars().count() {
+                    Some(prefix)
+                } else {
+                    self.suggestions
+                        .get(self.suggestion_index.unwrap_or(0))
+                        .cloned()
+                };
+            }
 
             if !self.suggestions.is_empty() {
                 if up {
@@ -170,6 +204,7 @@ impl ConsoleState {
                 .id(input_id)
                 .hint_text("Enter system command...")
                 .font(egui::TextStyle::Monospace)
+                .lock_focus(!self.suggestions.is_empty()) // else tab should walk focus off the input
                 .desired_width(f32::INFINITY),
         );
 
@@ -239,5 +274,28 @@ impl ConsoleState {
         }
 
         submitted
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::common_prefix;
+
+    fn v(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn prefix_stops_where_candidates_diverge() {
+        assert_eq!(common_prefix(&v(&["plugin load ", "plugins list"])), "plugin");
+        assert_eq!(common_prefix(&v(&["quit"])), "quit");
+        assert_eq!(common_prefix(&v(&["help", "info"])), "");
+        assert_eq!(common_prefix(&v(&[])), "");
+    }
+
+    #[test]
+    fn prefix_cuts_on_a_char_boundary() {
+        assert_eq!(common_prefix(&v(&["p\u{e9}che", "p\u{e9}cheur"])), "p\u{e9}che");
+        assert_eq!(common_prefix(&v(&["p\u{e9}che", "porte"])), "p");
     }
 }
