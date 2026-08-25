@@ -13,6 +13,61 @@ pub struct ThemeFile {
     pub base: String,
     #[serde(default)]
     pub colors: ThemeColors,
+    /// optional font name. matches a filename in fonts/, not case sensitive.
+    /// leave blank to use the default font.
+    #[serde(default)]
+    pub font: Option<String>,
+}
+
+/// look for a .ttf or .otf in fonts_dir with this name
+fn find_font_file(fonts_dir: &Path, name: &str) -> Option<std::path::PathBuf> {
+    for ext in ["ttf", "otf"] {
+        let candidate = fonts_dir.join(format!("{name}.{ext}"));
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    let entries = std::fs::read_dir(fonts_dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_font = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("ttf") || e.eq_ignore_ascii_case("otf"))
+            .unwrap_or(false);
+        if !is_font {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            if stem.eq_ignore_ascii_case(name) {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+/// switches the app's font to whatever's in fonts_dir. falls back to the
+/// default font if nothing's set or the file isn't there.
+pub fn apply_font(ctx: &egui::Context, fonts_dir: &Path, font_name: Option<&str>) {
+    let mut fonts = egui::FontDefinitions::default();
+
+    if let Some(name) = font_name {
+        if let Some(path) = find_font_file(fonts_dir, name) {
+            if let Ok(bytes) = std::fs::read(&path) {
+                fonts
+                    .font_data
+                    .insert(name.to_owned(), egui::FontData::from_owned(bytes).into());
+                fonts
+                    .families
+                    .entry(egui::FontFamily::Proportional)
+                    .or_default()
+                    .insert(0, name.to_owned());
+            }
+        }
+    }
+
+    ctx.set_fonts(fonts);
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -97,16 +152,23 @@ pub fn list_themes(themes_dir: &Path) -> Vec<String> {
 
 /// apply a theme by name. Errs (for the caller to log) if the file is
 /// missing/invalid, caller falls back to Dark.
-pub fn apply_theme(ctx: &egui::Context, themes_dir: &Path, name: &str) -> Result<(), String> {
+pub fn apply_theme(
+    ctx: &egui::Context,
+    themes_dir: &Path,
+    fonts_dir: &Path,
+    name: &str,
+) -> Result<(), String> {
     match name {
         "Dark" => {
             ctx.set_theme(egui::Theme::Dark);
             ctx.set_visuals_of(egui::Theme::Dark, egui::Visuals::dark());
+            apply_font(ctx, fonts_dir, None);
             Ok(())
         }
         "Light" => {
             ctx.set_theme(egui::Theme::Light);
             ctx.set_visuals_of(egui::Theme::Light, egui::Visuals::light());
+            apply_font(ctx, fonts_dir, None);
             Ok(())
         }
         _ => {
@@ -162,6 +224,7 @@ pub fn apply_theme(ctx: &egui::Context, themes_dir: &Path, name: &str) -> Result
 
             ctx.set_theme(base_theme);
             ctx.set_visuals_of(base_theme, visuals);
+            apply_font(ctx, fonts_dir, theme.font.as_deref());
             Ok(())
         }
     }
