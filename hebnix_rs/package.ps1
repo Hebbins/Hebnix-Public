@@ -4,9 +4,9 @@ target/ (no deps/, build/, .ilk, .d...).
 
 dist/ =
   hebnix-app.exe
+  hebnix-lite.exe
   steam_api64.dll         eos steam auth
   rlapi-bridge.exe        psynet bridge (from rlapi_bridge/dist/)
-  curl-impersonate/       tracker.gg tls-fingerprint bypass (exe+cacert)
 
 pdb (target/release/hebnix_app.pdb, big) is not shipped by default. keep it
 archived per release so you can symbolicate a user's crash.txt later. -WithPdb
@@ -21,7 +21,6 @@ $releaseDir = Join-Path $root 'target\release'
 $distDir    = Join-Path $root 'dist'
 $bridgeExe  = Join-Path $repoRoot 'rlapi_bridge\dist\rlapi-bridge.exe'
 $steamDll   = Join-Path $root 'vendor\steam_api64.dll'
-$curlDir    = Join-Path $root 'vendor\curl-impersonate'
 
 Write-Host 'building release...' -ForegroundColor Cyan
 Push-Location $root
@@ -32,10 +31,15 @@ try {
     # check the real exit code.
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    cargo build --release
+    cargo build --release --bin hebnix-app
     $code = $LASTEXITCODE
     $ErrorActionPreference = $prev
     if ($code -ne 0) { throw "cargo build failed ($code)" }
+    $ErrorActionPreference = 'Continue'
+    cargo build --release --bin hebnix-lite --features lite
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    if ($code -ne 0) { throw "lite build failed ($code)" }
 } finally {
     Pop-Location
 }
@@ -47,16 +51,13 @@ if (-not (Test-Path $bridgeExe)) {
 if (-not (Test-Path $steamDll)) {
     throw "steam_api64.dll missing at $steamDll (should be committed under vendor/)"
 }
-if (-not (Test-Path $curlDir)) {
-    throw "curl-impersonate/ missing at $curlDir (should be committed under vendor/)"
-}
-
 Write-Host 'assembling dist/...' -ForegroundColor Cyan
 if (Test-Path $distDir) { Remove-Item $distDir -Recurse -Force }
 New-Item -ItemType Directory -Path $distDir | Out-Null
 
 $files = @(
     (Join-Path $releaseDir 'hebnix-app.exe'),
+    (Join-Path $releaseDir 'hebnix-lite.exe'),
     $steamDll,
     $bridgeExe
 )
@@ -70,10 +71,6 @@ foreach ($f in $files) {
     Write-Host "  + $(Split-Path $f -Leaf)"
 }
 
-# curl-impersonate is a folder (files must stay together)
-Copy-Item $curlDir -Destination $distDir -Recurse
-Write-Host "  + curl-impersonate/"
-
 Write-Host "`ndist/ ready: $distDir" -ForegroundColor Green
 Get-ChildItem $distDir | Select-Object Name, @{N='Size';E={"{0:N0} KB" -f ($_.Length/1KB)}} | Format-Table -AutoSize
 
@@ -82,3 +79,4 @@ if (-not $WithPdb) {
     Write-Host "no pdb shipped. archive this per release to read crash.txt later:" -ForegroundColor Yellow
     Write-Host "  $pdb"
 }
+

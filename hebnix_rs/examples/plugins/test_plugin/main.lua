@@ -22,7 +22,8 @@ local last_touch_speed = nil
 local capture_active = false
 local captured_bind = nil
 local fetch_pid = nil            -- key of the demo stats fetch
-local log_info = nil             -- result of parse_launch_log
+local log_key = nil              -- key of the launch log parse
+local log_info = nil             -- result once the parse lands
 local rl_info = nil              -- result of find_rocket_league
 local save_summary = nil         -- result of load_save_summary
 local http_status = nil          -- last http_get_async status
@@ -195,12 +196,21 @@ function plugin.on_settings(ui)
                 hebnix.log("Rocket League is not running")
             end
         end
-        if ui.button("parse_launch_log()") then
-            log_info = hebnix.parse_launch_log(false) -- verify=false: fast
-            local user = (log_info.session or {}).username or "?"
-            hebnix.log("Launch.log user: " .. tostring(user))
+        if ui.button("parse_launch_log_async()") then
+            log_info = nil
+            hebnix.clear_launch_log()
+            log_key = hebnix.parse_launch_log_async(false) -- verify=false: no stats api wait
         end
     end)
+    if log_key and not log_info then
+        local res = hebnix.launch_log_result(log_key)
+        if res == "pending" then
+            ui.colored_label("#f39c12", "Reading Launch.log ...")
+        elseif res ~= nil then
+            log_info = res
+            hebnix.log("Launch.log user: " .. tostring((res.session or {}).username or "?"))
+        end
+    end
     if rl_info then
         ui.label("RL: pid " .. rl_info.pid .. ", " .. rl_info.platform .. ", " .. rl_info.root_dir)
     end

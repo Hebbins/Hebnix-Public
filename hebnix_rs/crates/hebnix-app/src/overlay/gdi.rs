@@ -8,25 +8,25 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use windows::core::PCWSTR;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    AlphaBlend, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateDIBSection, CreateFontW,
-    CreatePen, CreateSolidBrush, DeleteDC, DeleteObject, Ellipse, FillRect, GetDC, GetStockObject,
-    LineTo, MoveToEx, Polygon, Rectangle, ReleaseDC, RoundRect, SelectObject, SetBkMode,
-    SetTextAlign, SetTextColor, TextOutW, AC_SRC_ALPHA, AC_SRC_OVER, ANTIALIASED_QUALITY,
-    BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLACK_BRUSH, BLENDFUNCTION, CLIP_DEFAULT_PRECIS,
-    DEFAULT_CHARSET, DIB_RGB_COLORS, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HPEN, NULL_BRUSH,
-    NULL_PEN, OUT_DEFAULT_PRECIS, PS_SOLID, SRCCOPY, TA_CENTER, TA_LEFT, TA_RIGHT, TA_TOP,
-    TEXT_ALIGN_OPTIONS, TRANSPARENT,
+    AC_SRC_ALPHA, AC_SRC_OVER, ANTIALIASED_QUALITY, AlphaBlend, BI_RGB, BITMAPINFO,
+    BITMAPINFOHEADER, BLACK_BRUSH, BLENDFUNCTION, BitBlt, CLIP_DEFAULT_PRECIS,
+    CreateCompatibleBitmap, CreateCompatibleDC, CreateDIBSection, CreateFontW, CreatePen,
+    CreateSolidBrush, DEFAULT_CHARSET, DIB_RGB_COLORS, DeleteDC, DeleteObject, Ellipse, FillRect,
+    GetDC, GetStockObject, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HPEN, LineTo, MoveToEx,
+    NULL_BRUSH, NULL_PEN, OUT_DEFAULT_PRECIS, PS_SOLID, Polygon, Rectangle, ReleaseDC, RoundRect,
+    SRCCOPY, SelectObject, SetBkMode, SetTextAlign, SetTextColor, TA_CENTER, TA_LEFT, TA_RIGHT,
+    TA_TOP, TEXT_ALIGN_OPTIONS, TRANSPARENT, TextOutW,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, IsWindowVisible, RegisterClassW,
-    SetLayeredWindowAttributes, SetWindowPos, ShowWindow, HWND_TOPMOST, LWA_COLORKEY,
-    SWP_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, HWND_TOPMOST, IsWindowVisible, LWA_COLORKEY,
+    RegisterClassW, SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SetLayeredWindowAttributes,
+    SetWindowPos, ShowWindow, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_EX_TRANSPARENT, WS_POPUP,
 };
+use windows::core::PCWSTR;
 
 use super::Rgba;
 

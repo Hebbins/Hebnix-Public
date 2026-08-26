@@ -25,7 +25,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.1";
+pub const APP_VERSION: &str = "2.1.2";
 
 pub const DEFAULT_WIDTH: f32 = 1000.0;
 pub const DEFAULT_HEIGHT: f32 = 600.0;
@@ -451,7 +451,12 @@ impl HebnixApp {
         let mut config = Config::load(&base_dir);
 
         let error_file = base_dir.join("theme_errors.txt");
-        match theme::apply_theme(&cc.egui_ctx, &themes_dir, &fonts_dir, &config.settings.theme) {
+        match theme::apply_theme(
+            &cc.egui_ctx,
+            &themes_dir,
+            &fonts_dir,
+            &config.settings.theme,
+        ) {
             Ok(()) => {
                 let _ = std::fs::remove_file(&error_file);
             }
@@ -1930,7 +1935,7 @@ impl HebnixApp {
                 let sub_cmd = parts.get(1).map(|s| s.to_lowercase());
                 let tx = self.tx.clone();
                 std::thread::spawn(move || {
-                    let log_info = hebnix_sdk::log::parse_launch_log(None, false, "INT");
+                    let log_info = hebnix_sdk::log::parse_launch_log(None, true, "INT"); // verify so a menu or a closed game cant serve the last match
                     if let Some(game) = log_info.game {
                         let name = game.server_name.unwrap_or_else(|| "Unknown".to_string());
                         let ip = game.server_ip.unwrap_or_else(|| "Unknown".to_string());
@@ -1985,9 +1990,14 @@ impl HebnixApp {
                             }
                         }
                     } else {
-                        let _ = tx.send(AppMsg::Log(
-                            "[Console] Error: No active server info found in the log.".to_string(),
-                        ));
+                        let reason = if !hebnix_sdk::process::is_rocket_league_running() {
+                            "Rocket League is not running."
+                        } else if !log_info.stats_api_available {
+                            "Can't read the match, the stats api is not answering."
+                        } else {
+                            "Not in a game."
+                        };
+                        let _ = tx.send(AppMsg::Log(format!("[Console] {reason}")));
                     }
                 });
             }
@@ -2854,27 +2864,41 @@ impl HebnixApp {
                         continue;
                     }
                     let mut enabled = plugin.enabled;
-                    ui.horizontal(|ui| {
-                        let text = format!(
-                            "{} v{} by {} ({})",
-                            plugin.display_name(),
-                            plugin.manifest.version,
-                            plugin.manifest.author,
-                            plugin.filename
-                        );
-                        if ui.checkbox(&mut enabled, text).changed() {
-                            toggles.push((plugin.slug.clone(), enabled));
-                        }
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            let has_settings = plugin.has_settings();
-                            if ui
-                                .add_enabled(has_settings && plugin.enabled, egui::Button::new("⚙"))
-                                .clicked()
-                            {
-                                open_settings = Some(plugin.slug.clone());
-                            }
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(6))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                let text = format!(
+                                    "{} v{} by {} ({})",
+                                    plugin.display_name(),
+                                    plugin.manifest.version,
+                                    plugin.manifest.author,
+                                    plugin.filename
+                                );
+                                let checkbox = egui::Frame::group(ui.style())
+                                    .inner_margin(egui::Margin::same(3))
+                                    .show(ui, |ui| ui.checkbox(&mut enabled, text))
+                                    .inner;
+                                if checkbox.changed() {
+                                    toggles.push((plugin.slug.clone(), enabled));
+                                }
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        let has_settings = plugin.has_settings();
+                                        if ui
+                                            .add_enabled(
+                                                has_settings && plugin.enabled,
+                                                egui::Button::new("⚙"),
+                                            )
+                                            .clicked()
+                                        {
+                                            open_settings = Some(plugin.slug.clone());
+                                        }
+                                    },
+                                );
+                            });
                         });
-                    });
                     ui.add_space(2.0);
                 }
                 if self.plugin_mgr.plugins.is_empty() {
@@ -3368,10 +3392,10 @@ impl HebnixApp {
     fn render_about_tab(&mut self, ui: &mut egui::Ui) {
         ui.add_space(40.0);
         ui.vertical_centered(|ui| {
-            ui.heading("Hebnix Lite");
+            ui.heading("Hebnix");
             ui.add_space(10.0);
             ui.label(format!(
-                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League + Spoofer + Item Changer.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide window.",
+                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League with integrated Spoofer & Item Changer.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide window.",
                 self.config.settings.hotkey.to_uppercase()
             ));
         });
@@ -3822,7 +3846,7 @@ impl HebnixApp {
             return;
         }
 
-        let items_per_page = 20;
+        let items_per_page = 10;
         let (total_items, total_pages, current_page_items) = {
             let query = self.install_modal.search_query.to_lowercase();
             let filtered: Vec<&Value> = self
@@ -3885,132 +3909,139 @@ impl HebnixApp {
             Download(String),
         }
 
-        egui::ScrollArea::both()
+        egui::ScrollArea::vertical()
             .id_salt("plugin_catalog_scroll")
-            .auto_shrink([false, false])
             .max_height(ui.available_height() - 35.0)
             .show(ui, |ui| {
-                egui::Grid::new("plugin_catalog_grid")
-                    .striped(true)
-                    .spacing([15.0, 10.0])
-                    .show(ui, |ui| {
-                        ui.label(egui::RichText::new("Banner").strong());
-                        ui.label(egui::RichText::new("Plugin Name").strong());
-                        ui.label(egui::RichText::new("Author").strong());
-                        ui.label(egui::RichText::new("Description").strong());
-                        ui.label(egui::RichText::new("Version").strong());
-                        ui.label(egui::RichText::new("Action").strong());
-                        ui.end_row();
-
-                        if total_items == 0 {
-                            ui.label(
-                                egui::RichText::new("No plugins found.")
-                                    .italics()
-                                    .color(egui::Color32::GRAY),
-                            );
-                            ui.end_row();
-                        }
-
-                        for plugin_data in current_page_items {
-                            let id = plugin_data.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                            let name = plugin_data
-                                .get("name")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("Unknown");
-                            let author = plugin_data
-                                .get("author")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("Unknown");
-                            let desc = plugin_data
-                                .get("short_description")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-                            let hover = plugin_data
-                                .get("long_description")
-                                .and_then(|v| v.as_str())
-                                .filter(|s| !s.is_empty())
-                                .unwrap_or(desc);
-
-                            let mut short_desc = desc.replace('\n', " ").replace('\r', "");
-                            if short_desc.chars().count() > 120 {
-                                short_desc = short_desc.chars().take(117).collect();
-                                short_desc.push_str("...");
-                            }
-                            let version = plugin_data
-                                .get("version_number")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("?");
-                            let banner = plugin_data
-                                .get("banner_path")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-
-                            let img_size = egui::vec2(128.0, 72.0);
-                            match self.install_modal.images.get(banner) {
-                                Some(ImageState::Ready(bytes)) => {
-                                    ui.add(
-                                        egui::Image::from_bytes(
-                                            format!("bytes://plugin/{banner}"),
-                                            bytes.clone(),
-                                        )
-                                        .fit_to_exact_size(img_size),
-                                    );
-                                }
-                                Some(ImageState::Failed) | None => {
-                                    ui.add_sized(img_size, egui::Label::new(""));
-                                }
-                                Some(ImageState::Loading) => {
-                                    ui.add_sized(img_size, egui::Spinner::new());
-                                }
-                            }
-
-                            ui.label(name);
-                            ui.label(author);
-                            ui.vertical(|ui| {
-                                ui.set_width(300.0);
-                                ui.add(egui::Label::new(short_desc).wrap())
-                                    .on_hover_text(hover);
-                            });
-                            ui.label(version);
-
-                            let existing =
-                                self.plugin_mgr.plugins.iter().find(|p| {
-                                    p.manifest.name == name && p.manifest.author == author
-                                });
-
-                            if let Some(existing) = existing {
-                                let slug = existing.slug.clone();
-                                if existing.enabled {
-                                    if ui.button("Disable").clicked() {
-                                        action = Some(ModalAction::Disable(slug));
-                                    }
-                                } else {
-                                    if ui
-                                        .add(
-                                            egui::Button::new("Enable")
-                                                .fill(egui::Color32::from_rgb(0x2e, 0xcc, 0x71)),
-                                        )
-                                        .clicked()
-                                    {
-                                        action = Some(ModalAction::Enable(slug));
-                                    }
-                                }
-                            } else {
-                                let is_downloading =
-                                    self.install_modal.downloading_id.as_deref() == Some(id);
-                                if is_downloading {
-                                    ui.add_enabled(false, egui::Button::new("Installing..."));
-                                } else {
-                                    if ui.button("Install").clicked() {
-                                        action = Some(ModalAction::Download(id.to_string()));
-                                    }
-                                }
-                            }
-                            ui.end_row();
-                        }
+                if total_items == 0 {
+                    ui.add_space(20.0);
+                    ui.centered_and_justified(|ui| {
+                        ui.label(
+                            egui::RichText::new("No plugins found.")
+                                .italics()
+                                .color(egui::Color32::GRAY),
+                        );
                     });
-            });
+                }
 
+                for plugin_data in current_page_items {
+                    let id = plugin_data
+                        .get("plugin_id")
+                        .or_else(|| plugin_data.get("id"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let name = plugin_data
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown");
+                    let author = plugin_data
+                        .get("author")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown");
+                    let desc = plugin_data
+                        .get("short_description")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let hover = plugin_data
+                        .get("long_description")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or(desc);
+                    let mut short_desc = desc.trim_start().replace('\n', " ").replace('\r', "");
+                    if short_desc.chars().count() > 120 {
+                        short_desc = short_desc.chars().take(117).collect();
+                        short_desc.push_str("...");
+                    }
+                    let version = plugin_data
+                        .get("version_number")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    let banner = plugin_data
+                        .get("banner_path")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(8))
+                        .show(ui, |ui| {
+                            ui.set_height(76.0);
+                            ui.horizontal(|ui| {
+                                ui.set_height(76.0);
+                                match self.install_modal.images.get(banner) {
+                                    Some(ImageState::Ready(bytes)) => {
+                                        ui.add(
+                                            egui::Image::from_bytes(
+                                                format!("bytes://plugin/{banner}"),
+                                                bytes.clone(),
+                                            )
+                                            .fit_to_exact_size(egui::vec2(160.0, 72.0)),
+                                        );
+                                    }
+                                    Some(ImageState::Loading) => {
+                                        ui.allocate_ui(egui::vec2(160.0, 72.0), |ui| {
+                                            ui.centered_and_justified(|ui| ui.spinner());
+                                        });
+                                    }
+                                    Some(ImageState::Failed) | None => {
+                                        ui.allocate_space(egui::vec2(160.0, 72.0));
+                                    }
+                                }
+                                ui.add_space(4.0);
+                                let details_width = (ui.available_width() - 88.0).max(150.0);
+                                ui.allocate_ui_with_layout(
+                                    egui::vec2(details_width, 72.0),
+                                    egui::Layout::top_down(egui::Align::Min),
+                                    |ui| {
+                                        ui.strong(format!("{name} v{version}"));
+                                        ui.weak(format!("by {author}"));
+                                        ui.add_sized(
+                                            [details_width, 34.0],
+                                            egui::Label::new(short_desc)
+                                                .wrap()
+                                                .halign(egui::Align::Min),
+                                        )
+                                        .on_hover_text(hover);
+                                    },
+                                );
+
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        let existing =
+                                            self.plugin_mgr.plugins.iter().find(|p| {
+                                                p.manifest.plugin_id.as_deref() == Some(id)
+                                            });
+                                        if let Some(existing) = existing {
+                                            let slug = existing.slug.clone();
+                                            if existing.enabled {
+                                                if ui.button("Disable").clicked() {
+                                                    action = Some(ModalAction::Disable(slug));
+                                                }
+                                            } else if ui
+                                                .add(egui::Button::new("Enable").fill(
+                                                    egui::Color32::from_rgb(0x2e, 0xcc, 0x71),
+                                                ))
+                                                .clicked()
+                                            {
+                                                action = Some(ModalAction::Enable(slug));
+                                            }
+                                        } else if self.install_modal.downloading_id.as_deref()
+                                            == Some(id)
+                                        {
+                                            ui.add_enabled(
+                                                false,
+                                                egui::Button::new("Installing..."),
+                                            );
+                                        } else if ui.button("Install").clicked() {
+                                            action = Some(ModalAction::Download(id.to_string()));
+                                        }
+                                    },
+                                );
+                            });
+                        });
+                    ui.add_space(4.0);
+                }
+            });
         ui.add_space(8.0);
         ui.horizontal(|ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
