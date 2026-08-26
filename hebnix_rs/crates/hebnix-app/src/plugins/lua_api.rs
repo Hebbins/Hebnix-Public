@@ -287,6 +287,39 @@ fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
     })
 }
 
+enum AsyncLog {
+    Pending,
+    Done(hebnix_sdk::log::LogInfo),
+}
+
+fn async_log() -> &'static std::sync::Mutex<std::collections::HashMap<String, AsyncLog>> {
+    static MAP: OnceLock<std::sync::Mutex<std::collections::HashMap<String, AsyncLog>>> =
+        OnceLock::new();
+    MAP.get_or_init(Default::default)
+}
+
+/// single worker a verify=true parse waits on the stats api and the psynet
+/// config, they are too slow for the ui thread lua runs on
+fn log_queue() -> &'static crossbeam_channel::Sender<(String, bool)> {
+    static QUEUE: OnceLock<crossbeam_channel::Sender<(String, bool)>> = OnceLock::new();
+    QUEUE.get_or_init(|| {
+        let (tx, rx) = crossbeam_channel::unbounded::<(String, bool)>();
+        std::thread::Builder::new()
+            .name("launch-log-worker".into())
+            .spawn(move || {
+                while let Ok((key, verify)) = rx.recv() {
+                    let info = hebnix_sdk::log::parse_launch_log(None, verify, "INT");
+                    async_log()
+                        .lock()
+                        .unwrap()
+                        .insert(key, AsyncLog::Done(info));
+                }
+            })
+            .ok();
+        tx
+    })
+}
+
 use std::io::Cursor;
 fn play_audio(
     bytes: std::sync::Arc<[u8]>,
@@ -820,6 +853,16 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         "is_bind_pressed",
         lua.create_function(|_, bind: String| Ok(hebnix_sdk::input::is_bind_pressed(&bind)))?,
     )?;
+    hebnix.set(
+        "monotonic_seconds",
+        lua.create_function(|_, ()| {
+            static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+            Ok(START
+                .get_or_init(std::time::Instant::now)
+                .elapsed()
+                .as_secs_f64())
+        })?,
+    )?;
 
     // connected pads (Universal Analog Support)
     hebnix.set(
@@ -1267,12 +1310,42 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
-    // Launch.log (blocking, up to a few seconds when verify=true)
+    // Launch.log verify=true (default) confirms the match against the stats
+    // api Returns the key to poll with hebnix.launch_log_result(key).
     hebnix.set(
-        "parse_launch_log",
-        lua.create_function(|lua, verify: Option<bool>| {
-            let info = hebnix_sdk::log::parse_launch_log(None, verify.unwrap_or(true), "INT");
-            to_lua(lua, &info)
+        "parse_launch_log_async",
+        lua.create_function(|_, verify: Option<bool>| {
+            let verify = verify.unwrap_or(true);
+            let key = format!("launchlog:{verify}");
+            let mut map = async_log().lock().unwrap();
+            if !map.contains_key(&key) {
+                map.insert(key.clone(), AsyncLog::Pending);
+                drop(map);
+                let _ = log_queue().send((key.clone(), verify));
+            }
+            Ok(key)
+        })?,
+    )?;
+
+    // Returns nil (never requested), "pending", or the log table.
+    hebnix.set(
+        "launch_log_result",
+        lua.create_function(|lua, key: String| {
+            let map = async_log().lock().unwrap();
+            match map.get(&key) {
+                None => Ok(LuaValue::Nil),
+                Some(AsyncLog::Pending) => Ok(LuaValue::String(lua.create_string("pending")?)),
+                Some(AsyncLog::Done(info)) => Ok(to_lua(lua, info)?),
+            }
+        })?,
+    )?;
+
+    // cleans the parseso the next _async call re-reads the log
+    hebnix.set(
+        "clear_launch_log",
+        lua.create_function(|_, ()| {
+            async_log().lock().unwrap().clear();
+            Ok(())
         })?,
     )?;
 
@@ -1312,7 +1385,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
-    // Save file access (read-only). Blocking: decrypt + parse takes a
+    // save file access. blocking: decrypt + parse takes a
     // moment, so call from a button/on_load, not every frame.
     hebnix.set(
         "find_save_file",
@@ -1345,6 +1418,116 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                     Ok(LuaValue::Table(t))
                 }
             }
+        })?,
+    )?;
+
+    hebnix.set(
+        "find_save_accounts",
+        lua.create_function(|lua, ()| {
+            to_lua(lua, &hebnix_sdk::save_file::find_save_accounts(None))
+        })?,
+    )?;
+    hebnix.set(
+        "find_save_files",
+        lua.create_function(|lua, ()| {
+            let files = lua.create_table()?;
+            let Some(dir) = hebnix_sdk::save_file::detect_save_data_path() else {
+                return Ok(files);
+            };
+            let mut paths: Vec<_> = std::fs::read_dir(dir)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|entry| entry.path())
+                .filter(|path| {
+                    path.extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("save"))
+                })
+                .collect();
+            paths.sort();
+            for (index, path) in paths.iter().enumerate() {
+                files.set(index + 1, path.to_string_lossy().to_string())?;
+            }
+            Ok(files)
+        })?,
+    )?;
+    hebnix.set(
+        "load_save_configuration",
+        lua.create_function(|lua, path: Option<String>| {
+            let Some(path) = path
+                .map(std::path::PathBuf::from)
+                .or_else(|| hebnix_sdk::save_file::find_save_file(None))
+            else {
+                let result = lua.create_table()?;
+                result.set("error", "no .save file found")?;
+                return Ok(result);
+            };
+            let result = lua.create_table()?;
+            result.set("path", path.to_string_lossy().to_string())?;
+            match hebnix_sdk::save_file::list_configuration(&path) {
+                Ok(values) => result.set("values", to_lua(lua, &values)?)?,
+                Err(error) => result.set("error", error.to_string())?,
+            }
+            Ok(result)
+        })?,
+    )?;
+    hebnix.set(
+        "update_save_configuration",
+        lua.create_function(|lua, (path, id, value): (String, String, String)| {
+            let result = lua.create_table()?;
+            match hebnix_sdk::save_file::update_configuration(
+                std::path::Path::new(&path),
+                &id,
+                &value,
+            ) {
+                Ok(backup) => {
+                    result.set("ok", true)?;
+                    result.set("backup", backup.to_string_lossy().to_string())?;
+                }
+                Err(error) => result.set("error", error.to_string())?,
+            }
+            Ok(result)
+        })?,
+    )?;
+    hebnix.set(
+        "restore_save_configuration",
+        lua.create_function(|lua, (path, backup): (String, String)| {
+            let result = lua.create_table()?;
+            match hebnix_sdk::save_file::restore_configuration(
+                std::path::Path::new(&path),
+                std::path::Path::new(&backup),
+            ) {
+                Ok(safety_backup) => {
+                    result.set("ok", true)?;
+                    result.set("backup", safety_backup.to_string_lossy().to_string())?;
+                }
+                Err(error) => result.set("error", error.to_string())?,
+            }
+            Ok(result)
+        })?,
+    )?;
+
+    hebnix.set(
+        "backup_save_configuration",
+        lua.create_function(|lua, path: String| {
+            let result = lua.create_table()?;
+            let source = std::path::Path::new(&path);
+            let stamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis();
+            let backup = std::path::PathBuf::from(format!(
+                "{}.backup-{stamp}.save",
+                source.to_string_lossy()
+            ));
+            match std::fs::copy(source, &backup) {
+                Ok(_) => {
+                    result.set("ok", true)?;
+                    result.set("backup", backup.to_string_lossy().to_string())?;
+                }
+                Err(error) => result.set("error", error.to_string())?,
+            }
+            Ok(result)
         })?,
     )?;
 
@@ -1637,7 +1820,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     hebnix.set(
         "base64_encode",
         lua.create_function(|_, data: mlua::String| {
-            use base64::{Engine as _, engine::general_purpose::STANDARD};
+            use base64::{engine::general_purpose::STANDARD, Engine as _};
             Ok(STANDARD.encode(data.as_bytes().as_ref()))
         })?,
     )?;
@@ -1858,19 +2041,44 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         )?,
     )?;
 
-    // draw.rect(x, y, w, h, {color=, width=, filled=false})
+    // draw.rect(x, y, w, h, {color=, filled=false, border=0, border_color=, radius=0})
     draw.set(
         "rect",
         lua.create_function(
             |_, (x, y, w, h, opts): (f32, f32, f32, f32, Option<Table>)| {
+                let filled = opt_bool(&opts, "filled", false);
+                let border = opts
+                    .as_ref()
+                    .and_then(|table| table.get::<f32>("border").ok())
+                    .or_else(|| {
+                        opts.as_ref()
+                            .and_then(|table| table.get::<f32>("border_size").ok())
+                    })
+                    .unwrap_or_else(|| {
+                        if filled {
+                            0.0
+                        } else {
+                            opt_f32(&opts, "width", 1.0)
+                        }
+                    });
+                let radius = opts
+                    .as_ref()
+                    .and_then(|table| table.get::<f32>("radius").ok())
+                    .or_else(|| {
+                        opts.as_ref()
+                            .and_then(|table| table.get::<f32>("border_radius").ok())
+                    })
+                    .unwrap_or(0.0);
                 overlay::rect(
                     x,
                     y,
                     w,
                     h,
                     opt_rgba(&opts, "color", WHITE),
-                    opt_f32(&opts, "width", 1.0),
-                    opt_bool(&opts, "filled", false),
+                    opt_rgba(&opts, "border_color", opt_rgba(&opts, "color", WHITE)),
+                    border,
+                    filled,
+                    radius,
                 );
                 Ok(())
             },
@@ -2099,17 +2307,13 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         })?,
     )?;
 
-    // ui.copy_to_clipboard("text") - writes to the OS clipboard
     ui.set(
         "copy_to_clipboard",
         lua.create_function(|_, text: String| {
-            with_current_ui(|ui| {
-                ui.ctx().copy_text(text);
-            });
+            with_current_ui(|ui| ui.ctx().copy_text(text));
             Ok(())
         })?,
     )?;
-
     // Persisted colour picker: ui.color_picker("key", "Label", "#rrggbb[aa]") -> hex
     // The alpha byte, when supplied, is preserved while selecting the RGB tint.
     {
@@ -2186,7 +2390,7 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
             lua.create_function(
                 move |_, (key, label, min, max, default): (String, String, f32, f32, Option<f32>)| {
                     let mut value = host.store.borrow().get_number(&key, default.unwrap_or(min) as f64) as f32;
-                    
+
                     let changed = with_current_ui(|ui| {
                         let mut is_changed = false;
                         ui.horizontal(|ui| {
@@ -2195,7 +2399,7 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                         });
                         is_changed
                     }).unwrap_or(false);
-                    
+
                     if changed {
                         host.store.borrow_mut().set_number(&key, value as f64);
                     }
@@ -2304,16 +2508,15 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
     {
         ui.set(
             "readonly_textbox",
-            lua.create_function(move |_, text: String| {
+            lua.create_function(move |_, (text, height): (String, Option<f32>)| {
                 let _ = with_current_ui(|ui| {
-                    let mut display_text = text;
-
-                    // add_sized forces the TextEdit to fill all remaining window space
-                    ui.add_sized(
-                        ui.available_size(),
-                        egui::TextEdit::multiline(&mut display_text)
-                            .font(egui::TextStyle::Monospace),
-                    );
+                    let display_text = text;
+                    let height = height.unwrap_or(260.0).max(48.0);
+                    egui::ScrollArea::vertical()
+                        .max_height(height)
+                        .show(ui, |ui| {
+                            ui.monospace(&display_text);
+                        });
                 });
                 Ok(())
             })?,

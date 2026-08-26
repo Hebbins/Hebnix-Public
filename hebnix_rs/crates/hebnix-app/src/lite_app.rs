@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crossbeam_channel::{Receiver, Sender};
 use eframe::egui::{self, Color32};
-use hebnix_sdk::stats::{StatsClient, StatsEvent, websocket::WsStatsClient};
+use hebnix_sdk::stats::{websocket::WsStatsClient, StatsClient, StatsEvent};
 use serde_json::Value;
 
 use crate::config::Config;
@@ -113,8 +113,8 @@ impl LiteApp {
         let _ = std::fs::create_dir_all(&plugin_dir);
 
         let mut config = Config::load(&base_dir);
-        if theme::apply_theme(&cc.egui_ctx, &themes_dir, &config.settings.theme).is_err() {
-            let _ = theme::apply_theme(&cc.egui_ctx, &themes_dir, "Dark");
+        if theme::apply_theme(&cc.egui_ctx, &themes_dir, &themes_dir, &config.settings.theme).is_err() {
+            let _ = theme::apply_theme(&cc.egui_ctx, &themes_dir, &themes_dir, "Dark");
             config.settings.theme = "Dark".to_string();
         }
         theme::apply_window_opacity(&cc.egui_ctx, config.settings.window_opacity);
@@ -157,6 +157,9 @@ impl LiteApp {
                 let receiver = global_hotkey::GlobalHotKeyEvent::receiver();
                 while let Ok(event) = receiver.recv() {
                     if event.state() == global_hotkey::HotKeyState::Pressed {
+                        if winutil::main_window_hidden() {
+                            winutil::request_show();
+                        }
                         let _ = tx.send(AppMsg::ToggleVisibility);
                         ctx.request_repaint();
                     }
@@ -387,9 +390,9 @@ impl LiteApp {
                     }
                 }
                 AppMsg::Topmost(topmost) => {
-                    self.topmost = false;
-                    if topmost {
-                        winutil::set_main_window_topmost(false);
+                    if self.topmost != topmost {
+                        self.topmost = topmost;
+                        winutil::set_main_window_topmost(topmost);
                     }
                 }
                 AppMsg::PluginHttpRes {
@@ -400,6 +403,22 @@ impl LiteApp {
                 } => self
                     .plugin_mgr
                     .on_http_response(&slug, &req_id, status, &body),
+                AppMsg::PluginHttpDownloadRes {
+                    slug,
+                    req_id,
+                    status,
+                    body,
+                } => self
+                    .plugin_mgr
+                    .on_http_download_response(&slug, &req_id, status, &body),
+                AppMsg::PluginHttpRedirectRes {
+                    slug,
+                    req_id,
+                    status,
+                    location,
+                } => self
+                    .plugin_mgr
+                    .on_http_redirect_response(&slug, &req_id, status, &location),
                 AppMsg::PluginFetch { result } => {
                     self.install_modal.fetching = false;
                     match result {
@@ -492,24 +511,32 @@ impl LiteApp {
     }
 
     fn set_hidden(&mut self, ctx: &egui::Context, hidden: bool) {
+        if !hidden {
+            winutil::note_foreground();
+        }
         self.hidden = hidden;
-        self.topmost = false;
-        winutil::set_main_window_topmost(false);
+        winutil::set_main_window_invisible(hidden);
+        ctx.send_viewport_cmd(egui::ViewportCommand::MousePassthrough(hidden));
+
         if hidden {
-            ctx.send_viewport_cmd(egui::ViewportCommand::MousePassthrough(true));
-            winutil::set_main_window_invisible(true);
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+            self.topmost = false;
+            winutil::set_main_window_topmost(false);
             winutil::focus_rocket_league();
         } else {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
-            winutil::set_main_window_invisible(false);
-            ctx.send_viewport_cmd(egui::ViewportCommand::MousePassthrough(false));
-            winutil::focus_main_window();
+            if self.topmost || hebnix_sdk::process::is_rocket_league_focused() {
+                self.topmost = true;
+                winutil::set_main_window_topmost(true);
+            }
+            let game_fullscreen = self.last_rl_open
+                && self.window_mode == Some(hebnix_sdk::save_file::WindowMode::Fullscreen);
+            if !game_fullscreen {
+                winutil::focus_main_window();
+            }
         }
+
         self.plugin_mgr.dispatch_gui_visibility(!hidden);
         ctx.request_repaint();
     }
-
     fn start_hotkey_capture(&mut self, ctx: &egui::Context) {
         if self.capturing_hotkey {
             return;
@@ -537,8 +564,15 @@ impl LiteApp {
             Some("server") => {
                 let tx = self.tx.clone();
                 std::thread::spawn(move || {
-                    let info = hebnix_sdk::log::parse_launch_log(None, false, "INT");
-                    let message = info.game.map(|game| format!("[Console] Server: {}:{}", game.server_ip.unwrap_or_else(|| "Unknown".to_string()), game.server_port.map(|port| port.to_string()).unwrap_or_else(|| "Unknown".to_string()))).unwrap_or_else(|| "[Console] No active server found in the log.".to_string());
+                    let info = hebnix_sdk::log::parse_launch_log(None, true, "INT"); // verify so a menu or a closed game cant serve the last match
+                    let fallback = if !hebnix_sdk::process::is_rocket_league_running() {
+                        "[Console] Rocket League is not running."
+                    } else if !info.stats_api_available {
+                        "[Console] Can't read the match, the stats api is not answering."
+                    } else {
+                        "[Console] Not in a game."
+                    };
+                    let message = info.game.map(|game| format!("[Console] Server: {}:{}", game.server_ip.unwrap_or_else(|| "Unknown".to_string()), game.server_port.map(|port| port.to_string()).unwrap_or_else(|| "Unknown".to_string()))).unwrap_or_else(|| fallback.to_string());
                     let _ = tx.send(AppMsg::Log(message));
                 });
             }
@@ -642,25 +676,32 @@ impl LiteApp {
             return;
         }
         let mut open = true;
-        egui::Window::new("Install Plugin")
+        let window = if self.install_modal.catalog_open {
+            egui::Window::new("Install Plugin")
+                .resizable(true)
+                .default_size([720.0, 500.0])
+        } else {
+            egui::Window::new("Install Plugin")
+                .resizable(false)
+                .fixed_size([350.0, 160.0])
+        };
+        window
             .open(&mut open)
             .collapsible(false)
-            .resizable(self.install_modal.catalog_open)
-            .default_size([720.0, 500.0])
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 if !self.install_modal.catalog_open {
                     ui.add_space(12.0);
                     ui.horizontal(|ui| {
                         if ui
-                            .add_sized([180.0, 100.0], egui::Button::new("Install from Hebnix"))
+                            .add_sized([160.0, 120.0], egui::Button::new("☁\n\nInstall from Hebnix"))
                             .clicked()
                         {
                             self.install_modal.catalog_open = true;
                             self.fetch_plugin_catalog();
                         }
                         if ui
-                            .add_sized([180.0, 100.0], egui::Button::new("Install from .ZIP"))
+                            .add_sized([160.0, 120.0], egui::Button::new("📁\n\nInstall from .ZIP"))
                             .clicked()
                         {
                             if let Some(file) = rfd::FileDialog::new()
@@ -751,7 +792,7 @@ impl LiteApp {
                     .max_height(360.0)
                     .show(ui, |ui| {
                         for entry in entries {
-                            let id = entry.get("id").and_then(Value::as_str).unwrap_or("");
+                            let id = entry.get("plugin_id").or_else(|| entry.get("id")).and_then(Value::as_str).unwrap_or("");
                             let name = entry
                                 .get("name")
                                 .and_then(Value::as_str)
@@ -778,11 +819,9 @@ impl LiteApp {
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
-                                            let existing =
-                                                self.plugin_mgr.plugins.iter().find(|p| {
-                                                    p.manifest.name == name
-                                                        && p.manifest.author == author
-                                                });
+                                            let existing = self.plugin_mgr.plugins.iter().find(|p| {
+                                                p.manifest.plugin_id.as_deref() == Some(id)
+                                            });
                                             if let Some(plugin) = existing {
                                                 if plugin.enabled {
                                                     if ui.button("Disable").clicked() {
@@ -883,18 +922,11 @@ impl LiteApp {
     }
 
     fn check_plugin_updates(&self) {
-        let payload = self
-            .plugin_mgr
-            .plugins
-            .iter()
-            .map(|plugin| {
-                serde_json::json!({
-                    "name": plugin.manifest.name,
-                    "author": plugin.manifest.author,
-                    "version": plugin.manifest.version,
-                })
+        let payload = self.plugin_mgr.plugins.iter().filter_map(|plugin| {
+            plugin.manifest.plugin_id.as_deref().filter(|id| !id.is_empty()).map(|id| {
+                serde_json::json!({ "plugin_id": id, "version": plugin.manifest.version })
             })
-            .collect::<Vec<_>>();
+        }).collect::<Vec<_>>();
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let result = ureq::AgentBuilder::new()
@@ -916,24 +948,17 @@ impl LiteApp {
 
     fn start_plugin_updates(&mut self, updates: Vec<Value>) {
         for update in updates {
-            let id = update.get("id").and_then(Value::as_str).unwrap_or("");
-            let name = update.get("name").and_then(Value::as_str).unwrap_or("");
-            let author = update.get("author").and_then(Value::as_str).unwrap_or("");
-            let Some(plugin) =
-                self.plugin_mgr.plugins.iter().find(|plugin| {
-                    plugin.manifest.name == name && plugin.manifest.author == author
-                })
-            else {
-                continue;
-            };
-            if id.is_empty() {
-                continue;
-            }
+            let plugin_id = update.get("plugin_id").and_then(Value::as_str).unwrap_or("");
+            if plugin_id.is_empty() { continue; }
+            let Some(plugin) = self.plugin_mgr.plugins.iter().find(|plugin| {
+                plugin.manifest.plugin_id.as_deref() == Some(plugin_id)
+            }) else { continue; };
             let slug = plugin.slug.clone();
+            let name = plugin.display_name().to_string();
             let was_enabled = plugin.enabled;
             let plugin_dir = self.plugin_dir.clone();
             let tx = self.tx.clone();
-            let id = id.to_string();
+            let id = plugin_id.to_string();
             self.console
                 .write(format!("[Core] Updating plugin '{name}'..."));
             std::thread::spawn(move || {
@@ -1034,7 +1059,7 @@ impl LiteApp {
                     }
                 });
             if choice != self.config.settings.theme {
-                if theme::apply_theme(&ctx, &self.themes_dir, &choice).is_ok() {
+                if theme::apply_theme(&ctx, &self.themes_dir, &self.themes_dir, &choice).is_ok() {
                     self.config.settings.theme = choice;
                     self.save_config();
                 }
@@ -1056,7 +1081,7 @@ impl LiteApp {
                 ))
                 .changed()
             {
-                let _ = theme::apply_theme(&ctx, &self.themes_dir, &self.config.settings.theme);
+                let _ = theme::apply_theme(&ctx, &self.themes_dir, &self.themes_dir, &self.config.settings.theme);
                 theme::apply_window_opacity(&ctx, self.config.settings.window_opacity);
                 self.save_config();
             }
@@ -1200,46 +1225,67 @@ impl LiteApp {
     }
 
     fn render_plugin_settings(&mut self, ui: &mut egui::Ui) {
-        let entries = self
+        let with_settings: Vec<(String, String)> = self
             .plugin_mgr
             .plugins
             .iter()
             .filter(|plugin| plugin.enabled && plugin.has_settings())
             .map(|plugin| (plugin.slug.clone(), plugin.display_name().to_string()))
-            .collect::<Vec<_>>();
-        if entries.is_empty() {
-            ui.label("No enabled plugins have settings.");
-            return;
-        }
-        let selected = self
-            .selected_settings_plugin
-            .clone()
-            .filter(|slug| entries.iter().any(|(entry, _)| entry == slug))
-            .unwrap_or_else(|| entries[0].0.clone());
-        self.selected_settings_plugin = Some(selected.clone());
-        egui::ComboBox::from_id_salt("lite_plugin_settings")
-            .selected_text(
-                entries
-                    .iter()
-                    .find(|(slug, _)| slug == &selected)
-                    .map(|(_, name)| name.as_str())
-                    .unwrap_or("Plugin"),
-            )
-            .show_ui(ui, |ui| {
-                for (slug, name) in &entries {
-                    ui.selectable_value(
-                        &mut self.selected_settings_plugin,
-                        Some(slug.clone()),
-                        name,
-                    );
+            .collect();
+
+        if with_settings.is_empty() {
+            ui.add_space(50.0);
+            ui.vertical_centered(|ui| {
+                ui.label("No Plugins with Settings Enabled");
+                ui.add_space(8.0);
+                if ui.button("Go to Plugins").clicked() {
+                    self.tab = Tab::Plugins;
                 }
             });
-        if let Some(slug) = self.selected_settings_plugin.clone() {
-            if let Err(error) = self.plugin_mgr.render_settings(&slug, ui) {
-                self.console
-                    .write(format!("[Console] Plugin settings error: {error}"));
-            }
+            return;
         }
+
+        let selected_valid = self
+            .selected_settings_plugin
+            .as_ref()
+            .map(|slug| with_settings.iter().any(|(entry, _)| entry == slug))
+            .unwrap_or(false);
+        if !selected_valid {
+            self.selected_settings_plugin = Some(with_settings[0].0.clone());
+        }
+        let selected = self.selected_settings_plugin.clone().unwrap_or_default();
+        let display_name = with_settings
+            .iter()
+            .find(|(slug, _)| *slug == selected)
+            .map(|(_, name)| name.clone())
+            .unwrap_or_default();
+
+        egui::Panel::left("lite_plugin_settings_list")
+            .resizable(false)
+            .exact_size(150.0)
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt("lite_plugin_settings_names")
+                    .show(ui, |ui| {
+                        for (slug, name) in &with_settings {
+                            if ui.selectable_label(*slug == selected, name).clicked() {
+                                self.selected_settings_plugin = Some(slug.clone());
+                            }
+                        }
+                    });
+            });
+
+        egui::ScrollArea::vertical()
+            .id_salt("lite_plugin_settings_view")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.heading(format!("{display_name} Configuration"));
+                ui.add_space(8.0);
+                if let Err(error) = self.plugin_mgr.render_settings(&selected, ui) {
+                    self.console
+                        .write(format!("[Console] Plugin settings error: {error}"));
+                }
+            });
     }
 
     fn render_about(&self, ui: &mut egui::Ui) {
@@ -1248,7 +1294,7 @@ impl LiteApp {
             ui.heading("Hebnix");
             ui.add_space(10.0);
             ui.label(format!(
-                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League + Spoofer + Item Changer.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide window.",
+                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide window.",
                 self.config.settings.hotkey.to_uppercase()
             ));
         });
@@ -1460,6 +1506,9 @@ impl eframe::App for LiteApp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.handle_messages(&ctx);
+        if winutil::take_show_request() && self.hidden {
+            self.set_hidden(&ctx, false);
+        }
         dpi_fix::install_on_all_windows();
         if let Some(rect) = ctx.input(|input| input.viewport().inner_rect) {
             self.last_size = (rect.width().max(0.0) as u32, rect.height().max(0.0) as u32);
@@ -1470,8 +1519,8 @@ impl eframe::App for LiteApp {
         egui::CentralPanel::default().show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.tab, Tab::Console, "Console");
-                ui.selectable_value(&mut self.tab, Tab::Plugins, "Plugins");
                 ui.selectable_value(&mut self.tab, Tab::Settings, "Settings");
+                ui.selectable_value(&mut self.tab, Tab::Plugins, "Plugins");
                 ui.selectable_value(&mut self.tab, Tab::About, "About");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(

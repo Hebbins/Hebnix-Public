@@ -8,25 +8,25 @@
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use windows::core::PCWSTR;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    AC_SRC_ALPHA, AC_SRC_OVER, ANTIALIASED_QUALITY, AlphaBlend, BI_RGB, BITMAPINFO,
-    BITMAPINFOHEADER, BLACK_BRUSH, BLENDFUNCTION, BitBlt, CLIP_DEFAULT_PRECIS,
-    CreateCompatibleBitmap, CreateCompatibleDC, CreateDIBSection, CreateFontW, CreatePen,
-    CreateSolidBrush, DEFAULT_CHARSET, DIB_RGB_COLORS, DeleteDC, DeleteObject, Ellipse, FillRect,
-    GetDC, GetStockObject, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HPEN, LineTo, MoveToEx,
-    NULL_BRUSH, OUT_DEFAULT_PRECIS, PS_SOLID, Polygon, Rectangle, ReleaseDC, SRCCOPY, SelectObject,
-    SetBkMode, SetTextAlign, SetTextColor, TA_CENTER, TA_LEFT, TA_RIGHT, TA_TOP,
-    TEXT_ALIGN_OPTIONS, TRANSPARENT, TextOutW,
+    AlphaBlend, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateDIBSection, CreateFontW,
+    CreatePen, CreateSolidBrush, DeleteDC, DeleteObject, Ellipse, FillRect, GetDC, GetStockObject,
+    LineTo, MoveToEx, Polygon, Rectangle, ReleaseDC, RoundRect, SelectObject, SetBkMode,
+    SetTextAlign, SetTextColor, TextOutW, AC_SRC_ALPHA, AC_SRC_OVER, ANTIALIASED_QUALITY,
+    BITMAPINFO, BITMAPINFOHEADER, BI_RGB, BLACK_BRUSH, BLENDFUNCTION, CLIP_DEFAULT_PRECIS,
+    DEFAULT_CHARSET, DIB_RGB_COLORS, HBITMAP, HBRUSH, HDC, HFONT, HGDIOBJ, HPEN, NULL_BRUSH,
+    NULL_PEN, OUT_DEFAULT_PRECIS, PS_SOLID, SRCCOPY, TA_CENTER, TA_LEFT, TA_RIGHT, TA_TOP,
+    TEXT_ALIGN_OPTIONS, TRANSPARENT,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, HWND_TOPMOST, IsWindowVisible, LWA_COLORKEY,
-    RegisterClassW, SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SetLayeredWindowAttributes,
-    SetWindowPos, ShowWindow, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-    WS_EX_TRANSPARENT, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, IsWindowVisible, RegisterClassW,
+    SetLayeredWindowAttributes, SetWindowPos, ShowWindow, HWND_TOPMOST, LWA_COLORKEY,
+    SWP_NOACTIVATE, SW_HIDE, SW_SHOWNOACTIVATE, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
 };
-use windows::core::PCWSTR;
 
 use super::Rgba;
 
@@ -174,18 +174,37 @@ pub fn line(hdc: HDC, x1: i32, y1: i32, x2: i32, y2: i32, color: Rgba, width: i3
     }
 }
 
-pub fn rect(hdc: HDC, x: i32, y: i32, w: i32, h: i32, color: Rgba, width: i32, filled: bool) {
+pub fn rect(
+    hdc: HDC,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    fill: Rgba,
+    border: Rgba,
+    width: i32,
+    filled: bool,
+    radius: i32,
+) {
     unsafe {
-        let c = rgb(color);
-        let pen = cached_pen(c, width.max(1));
+        let pen = if !filled || width > 0 {
+            cached_pen(rgb(border), width.max(1))
+        } else {
+            HPEN(GetStockObject(NULL_PEN).0)
+        };
         let old_pen = SelectObject(hdc, HGDIOBJ(pen.0));
         let brush = if filled {
-            cached_brush(c)
+            cached_brush(rgb(fill))
         } else {
             HBRUSH(GetStockObject(NULL_BRUSH).0)
         };
         let old_brush = SelectObject(hdc, HGDIOBJ(brush.0));
-        let _ = Rectangle(hdc, x, y, x + w, y + h);
+        if radius > 0 {
+            let diameter = (radius * 2).min(w.abs()).min(h.abs());
+            let _ = RoundRect(hdc, x, y, x + w, y + h, diameter, diameter);
+        } else {
+            let _ = Rectangle(hdc, x, y, x + w, y + h);
+        }
         SelectObject(hdc, old_brush);
         SelectObject(hdc, old_pen);
     }

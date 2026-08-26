@@ -1,15 +1,16 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND};
+use windows::core::PCWSTR;
+use windows::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS, HANDLE, HWND};
 use windows::Win32::System::Threading::{CreateMutexW, GetCurrentProcessId};
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowW, GWL_EXSTYLE, GetForegroundWindow, GetWindowLongW, GetWindowThreadProcessId,
-    HWND_NOTOPMOST, LWA_ALPHA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetForegroundWindow,
-    SetLayeredWindowAttributes, SetWindowLongW, SetWindowPos, WS_EX_LAYERED,
+    FindWindowW, GetForegroundWindow, GetWindowLongW, GetWindowThreadProcessId,
+    SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongW, SetWindowPos, GWL_EXSTYLE,
+    HWND_NOTOPMOST, HWND_TOPMOST, LWA_ALPHA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_LAYERED,
 };
-use windows::core::PCWSTR;
 
 static HIDDEN: AtomicBool = AtomicBool::new(false);
+static SHOW_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 fn wide(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
@@ -64,7 +65,7 @@ pub fn set_main_window_topmost(topmost: bool) {
             let _ = SetWindowPos(
                 window,
                 Some(if topmost {
-                    HWND_NOTOPMOST
+                    HWND_TOPMOST
                 } else {
                     HWND_NOTOPMOST
                 }),
@@ -98,6 +99,24 @@ pub fn install_minimize_hook(_: HWND, _: &eframe::egui::Context) {}
 
 pub fn main_window_hidden() -> bool {
     HIDDEN.load(Ordering::Relaxed)
+}
+
+pub fn request_show() {
+    SHOW_REQUESTED.store(true, Ordering::Relaxed);
+    if let Some(window) = main_window() {
+        unsafe {
+            let _ = SetLayeredWindowAttributes(
+                window,
+                windows::Win32::Foundation::COLORREF(0),
+                255,
+                LWA_ALPHA,
+            );
+        }
+    }
+}
+
+pub fn take_show_request() -> bool {
+    SHOW_REQUESTED.swap(false, Ordering::Relaxed)
 }
 
 pub fn set_main_window_invisible(invisible: bool) {

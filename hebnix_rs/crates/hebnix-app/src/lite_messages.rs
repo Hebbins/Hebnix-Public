@@ -22,7 +22,18 @@ pub enum AppMsg {
         status: u16,
         body: String,
     },
-    PluginFetch {
+    PluginHttpDownloadRes {
+        slug: String,
+        req_id: String,
+        status: u16,
+        body: Vec<u8>,
+    },
+    PluginHttpRedirectRes {
+        slug: String,
+        req_id: String,
+        status: u16,
+        location: String,
+    },    PluginFetch {
         result: Result<Value, String>,
     },
     PluginDownloadDone {
@@ -38,3 +49,4 @@ pub enum AppMsg {
     },
     SendWsCommand(WsCommand),
 }
+

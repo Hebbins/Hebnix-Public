@@ -33,7 +33,7 @@ pub fn enforce_hidden() {
     }
     let hwnd = windows::Win32::Foundation::HWND(raw as *mut _);
     unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible, SW_HIDE, ShowWindow};
+        use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible, ShowWindow, SW_HIDE};
         if IsWindowVisible(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_HIDE);
         }
@@ -79,7 +79,17 @@ pub fn line(x1: f32, y1: f32, x2: f32, y2: f32, color: Rgba, width: f32) {
     });
 }
 
-pub fn rect(x: f32, y: f32, w: f32, h: f32, color: Rgba, width: f32, filled: bool) {
+pub fn rect(
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    fill: Rgba,
+    border: Rgba,
+    width: f32,
+    filled: bool,
+    radius: f32,
+) {
     with_canvas(|canvas| match canvas {
         Canvas::Gdi(hdc) => gdi::rect(
             *hdc,
@@ -87,11 +97,13 @@ pub fn rect(x: f32, y: f32, w: f32, h: f32, color: Rgba, width: f32, filled: boo
             y as i32,
             w as i32,
             h as i32,
-            color,
+            fill,
+            border,
             width as i32,
             filled,
+            radius as i32,
         ),
-        Canvas::D2d(c) => c.rect(x, y, w, h, color, width, filled),
+        Canvas::D2d(c) => c.rect(x, y, w, h, fill, border, width, filled, radius),
     });
 }
 
