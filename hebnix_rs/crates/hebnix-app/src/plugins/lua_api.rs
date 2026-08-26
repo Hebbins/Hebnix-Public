@@ -1036,6 +1036,27 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         )?;
     }
 
+    // hebnix.settings.* - small settings-page helpers
+    let settings = lua.create_table()?;
+    {
+        let host = Rc::clone(&host);
+        settings.set(
+            "open_assets",
+            lua.create_function(move |_, ()| {
+                let assets_dir = host.dir.join("assets");
+                if let Err(err) = std::fs::create_dir_all(&assets_dir) {
+                    host.log(&format!("open_assets: couldn't create assets folder: {err}"));
+                    return Ok(());
+                }
+                let _ = std::process::Command::new("cmd")
+                    .args(["/C", "start", "", &assets_dir.to_string_lossy()])
+                    .spawn();
+                Ok(())
+            })?,
+        )?;
+    }
+    hebnix.set("settings", settings)?;
+
     // non-blocking tracker fetch by StatsAPI PrimaryId ("Steam|..|0")
     // Poll with hebnix.stats_result(primary_id).
     hebnix.set(
