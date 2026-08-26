@@ -657,21 +657,18 @@ impl LiteApp {
                     .inner_margin(egui::Margin::same(6))
                     .show(ui, |ui| {
                         ui.horizontal(|ui| {
-                            let checkbox = egui::Frame::group(ui.style())
-                                .inner_margin(egui::Margin::same(3))
-                                .show(ui, |ui| {
-                                    ui.checkbox(
-                                        &mut enabled,
-                                        format!(
-                                            "{} v{} by {}",
-                                            plugin.display_name(),
-                                            plugin.manifest.version,
-                                            plugin.manifest.author
-                                        ),
-                                    )
-                                })
-                                .inner;
-                            if checkbox.changed() {
+                            if ui
+                                .checkbox(
+                                    &mut enabled,
+                                    format!(
+                                        "{} v{} by {}",
+                                        plugin.display_name(),
+                                        plugin.manifest.version,
+                                        plugin.manifest.author
+                                    ),
+                                )
+                                .changed()
+                            {
                                 updates.push((plugin.slug.clone(), enabled));
                             }
                             if ui

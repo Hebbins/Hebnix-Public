@@ -2890,11 +2890,7 @@ impl HebnixApp {
                                     plugin.manifest.author,
                                     plugin.filename
                                 );
-                                let checkbox = egui::Frame::group(ui.style())
-                                    .inner_margin(egui::Margin::same(3))
-                                    .show(ui, |ui| ui.checkbox(&mut enabled, text))
-                                    .inner;
-                                if checkbox.changed() {
+                                if ui.checkbox(&mut enabled, text).changed() {
                                     toggles.push((plugin.slug.clone(), enabled));
                                 }
                                 ui.with_layout(
