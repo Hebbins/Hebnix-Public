@@ -63,7 +63,7 @@ pub fn check_for_updates(current_version: &str) -> Result<Option<UpdateInfo>, St
 }
 
 /// Downloads the update, extracts it, runs the installer, and shuts down Hebnix.
-pub fn download_and_install_update(setup_url: &str, base_dir: &Path) -> Result<(), String> {
+pub fn download_and_install_update(_setup_url: &str, base_dir: &Path) -> Result<(), String> {
     let updater_dir = base_dir.join("updater");
 
     if !updater_dir.exists() {
@@ -71,8 +71,15 @@ pub fn download_and_install_update(setup_url: &str, base_dir: &Path) -> Result<(
             .map_err(|e| format!("Failed to create updater directory: {e}"))?;
     }
 
-    let full_url = format!("https://hebnix.com{}", setup_url);
-    let zip_path = updater_dir.join("setup.zip");
+    let full_url = "https://api.hebnix.com/download-setup";
+    let update_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or(0);
+    let staging_dir = updater_dir.join(format!("update-{update_id}"));
+    std::fs::create_dir_all(&staging_dir)
+        .map_err(|e| format!("Failed to create update staging directory: {e}"))?;
+    let zip_path = staging_dir.join("setup.zip");
 
     // 1. Download the Zip
     let resp = ureq::get(&full_url)
@@ -92,14 +99,14 @@ pub fn download_and_install_update(setup_url: &str, base_dir: &Path) -> Result<(
     let mut archive =
         zip::ZipArchive::new(zip_file).map_err(|e| format!("Invalid zip archive: {e}"))?;
     archive
-        .extract(&updater_dir)
+        .extract(&staging_dir)
         .map_err(|e| format!("Failed to extract update files: {e}"))?;
 
     // Clean up the zip file so it doesn't waste space (ignore if it fails)
     let _ = std::fs::remove_file(&zip_path);
 
     // 3. Run setup.exe
-    let setup_exe = updater_dir.join("setup.exe");
+    let setup_exe = staging_dir.join("setup.exe");
     if !setup_exe.exists() {
         return Err("setup.exe was not found inside the extracted update".to_string());
     }
