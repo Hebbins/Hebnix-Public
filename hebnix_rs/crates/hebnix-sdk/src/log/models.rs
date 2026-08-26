@@ -36,6 +36,7 @@ pub struct LogGameInfo {
 pub struct LogInfo {
     pub session: LogSessionInfo,
     pub game: Option<LogGameInfo>,
+    pub build_id: Option<String>,
     pub log_path: Option<String>,
     pub parse_time: f64,
     pub stats_api_available: bool,

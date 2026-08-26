@@ -13,6 +13,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use regex::Regex;
 
 use crate::log::models::{LogGameInfo, LogInfo, LogSessionInfo};
+use crate::process::is_rocket_league_running;
 use crate::utils::psynet::{fetch_psynet_config, get_online_playlists};
 
 const STATS_HOST: &str = "127.0.0.1";
@@ -202,6 +203,7 @@ pub fn parse_launch_log(log_path: Option<&Path>, verify: bool, lang: &str) -> Lo
 
     // Game info (only after verification)
     let mut game: Option<LogGameInfo> = None;
+    let rl_running = is_rocket_league_running();
     let stats_available;
     let verified;
 
@@ -214,7 +216,8 @@ pub fn parse_launch_log(log_path: Option<&Path>, verify: bool, lang: &str) -> Lo
         stats_available = check_stats_port();
     }
 
-    if verified || !verify {
+    // rl down means the log describes a session that already ended
+    if rl_running && (verified || !verify) {
         let mut g = parse_game_info(&text, verified, &online_playlists);
 
         // in-game but map/ip missing? wait + re-read, the log fills in during join
@@ -233,6 +236,7 @@ pub fn parse_launch_log(log_path: Option<&Path>, verify: bool, lang: &str) -> Lo
     LogInfo {
         session,
         game,
+        build_id: build_id.filter(|_| rl_running),
         log_path: Some(log_path.to_string_lossy().to_string()),
         parse_time: SystemTime::now()
             .duration_since(UNIX_EPOCH)

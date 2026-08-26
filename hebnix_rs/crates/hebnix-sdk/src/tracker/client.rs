@@ -46,12 +46,14 @@ const FPS_PER_ROUND: usize = 3;
 const MAX_ROUNDS: usize = 3;
 const ROUND_WAIT: Duration = Duration::from_secs(20);
 
-// avatars are a few kb, this is only here so a bad url cant use too much memory
 const AVATAR_MAX_BYTES: u64 = 4 * 1024 * 1024;
 
 /// find the bundled curl-impersonate exe. HEBNIX_CURL_IMPERSONATE overrides,
 /// else it's in the curl-impersonate/ folder next to our exe (put there at
 /// build time). cacert.pem lives right beside it.
+const EMBEDDED_CURL: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../vendor/curl-impersonate/curl-impersonate.exe"));
+const EMBEDDED_CACERT: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../vendor/curl-impersonate/cacert.pem"));
+
 pub fn impersonate_binary() -> Option<std::path::PathBuf> {
     if let Ok(p) = std::env::var("HEBNIX_CURL_IMPERSONATE") {
         let path = std::path::PathBuf::from(p);
@@ -59,14 +61,46 @@ pub fn impersonate_binary() -> Option<std::path::PathBuf> {
             return Some(path);
         }
     }
-    let exe_name = if cfg!(windows) {
+    embedded_impersonate_binary()
+}
+
+fn embedded_impersonate_binary() -> Option<std::path::PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let edition = exe
+        .file_stem()?
+        .to_string_lossy()
+        .chars()
+        .map(|character| if character.is_ascii_alphanumeric() { character } else { '_' })
+        .collect::<String>();
+    let runtime = dirs::data_local_dir()?
+        .join("Hebnix")
+        .join("runtime")
+        .join("curl-impersonate")
+        .join(edition);
+    std::fs::create_dir_all(&runtime).ok()?;
+
+    let binary = runtime.join(if cfg!(windows) {
         "curl-impersonate.exe"
     } else {
         "curl-impersonate"
-    };
-    let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let candidate = dir.join("curl-impersonate").join(exe_name);
-    candidate.is_file().then_some(candidate)
+    });
+    let certificate = runtime.join("cacert.pem");
+    write_runtime_file(&binary, EMBEDDED_CURL)?;
+    write_runtime_file(&certificate, EMBEDDED_CACERT)?;
+    binary.is_file().then_some(binary)
+}
+
+fn write_runtime_file(path: &std::path::Path, bytes: &[u8]) -> Option<()> {
+    if std::fs::metadata(path).ok().is_some_and(|metadata| metadata.len() == bytes.len() as u64) {
+        return Some(());
+    }
+    let temporary = path.with_extension("tmp");
+    std::fs::write(&temporary, bytes).ok()?;
+    if std::fs::rename(&temporary, path).is_err() {
+        let _ = std::fs::remove_file(path);
+        std::fs::rename(&temporary, path).ok()?;
+    }
+    Some(())
 }
 
 // wall-clock derived start index. not crypto, just varies which profile we try
@@ -237,7 +271,7 @@ impl TrackerClient {
         );
         let Some(bin) = impersonate_binary() else {
             return Err(
-                "curl-impersonate not found (should be bundled at curl-impersonate/)".to_string(),
+                "embedded curl-impersonate could not be prepared".to_string(),
             );
         };
         // cloudflare throttles per fingerprint, so on a fail we try a different
@@ -671,3 +705,4 @@ fn parse_iso8601_to_unix(s: &str) -> Option<f64> {
 
     Some((days * 86400 + hour * 3600 + min * 60 + sec - offset_secs) as f64)
 }
+

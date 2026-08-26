@@ -15,6 +15,7 @@ pub struct PluginManifest {
     pub author: String,
     pub version: String,
     pub entry: String,
+    pub plugin_id: Option<String>,
 }
 
 impl Default for PluginManifest {
@@ -24,6 +25,7 @@ impl Default for PluginManifest {
             author: "Unknown".to_string(),
             version: "1.0".to_string(),
             entry: String::new(),
+            plugin_id: None,
         }
     }
 }
