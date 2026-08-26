@@ -33,8 +33,13 @@ pub enum AppMsg {
         req_id: String,
         status: u16,
         location: String,
-    },    PluginFetch {
+    },
+    PluginFetch {
         result: Result<Value, String>,
+    },
+    PluginImage {
+        key: String,
+        bytes: Vec<u8>,
     },
     PluginDownloadDone {
         result: Result<String, String>,
@@ -49,4 +54,3 @@ pub enum AppMsg {
     },
     SendWsCommand(WsCommand),
 }
-

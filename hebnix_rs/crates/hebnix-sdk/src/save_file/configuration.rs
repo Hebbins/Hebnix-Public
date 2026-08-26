@@ -1,6 +1,6 @@
 use crate::process::is_rocket_league_running;
 use crate::save_file::binary_parser::read_ue3;
-use crate::save_file::crypto::{aes_decrypt, aes_encrypt, crc32, is_type_tag, SaveError};
+use crate::save_file::crypto::{SaveError, aes_decrypt, aes_encrypt, crc32, is_type_tag};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 

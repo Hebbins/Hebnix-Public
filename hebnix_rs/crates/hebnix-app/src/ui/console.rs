@@ -287,7 +287,10 @@ mod tests {
 
     #[test]
     fn prefix_stops_where_candidates_diverge() {
-        assert_eq!(common_prefix(&v(&["plugin load ", "plugins list"])), "plugin");
+        assert_eq!(
+            common_prefix(&v(&["plugin load ", "plugins list"])),
+            "plugin"
+        );
         assert_eq!(common_prefix(&v(&["quit"])), "quit");
         assert_eq!(common_prefix(&v(&["help", "info"])), "");
         assert_eq!(common_prefix(&v(&[])), "");
@@ -295,7 +298,10 @@ mod tests {
 
     #[test]
     fn prefix_cuts_on_a_char_boundary() {
-        assert_eq!(common_prefix(&v(&["p\u{e9}che", "p\u{e9}cheur"])), "p\u{e9}che");
+        assert_eq!(
+            common_prefix(&v(&["p\u{e9}che", "p\u{e9}cheur"])),
+            "p\u{e9}che"
+        );
         assert_eq!(common_prefix(&v(&["p\u{e9}che", "porte"])), "p");
     }
 }

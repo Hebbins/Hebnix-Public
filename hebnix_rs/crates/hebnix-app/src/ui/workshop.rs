@@ -665,7 +665,8 @@ impl WorkshopState {
 
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.view, WorkshopView::Browse, "Browse Maps");
-            ui.selectable_value(&mut self.view, WorkshopView::Multiplayer, "Multiplayer");
+            // multiplayer is temporarily hidden for 2.1.2.
+            // ui.selectable_value(&mut self.view, WorkshopView::Multiplayer, "Multiplayer");
         });
         ui.separator();
         if self.view == WorkshopView::Multiplayer {

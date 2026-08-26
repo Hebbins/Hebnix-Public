@@ -33,7 +33,7 @@ pub fn enforce_hidden() {
     }
     let hwnd = windows::Win32::Foundation::HWND(raw as *mut _);
     unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible, ShowWindow, SW_HIDE};
+        use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible, SW_HIDE, ShowWindow};
         if IsWindowVisible(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_HIDE);
         }

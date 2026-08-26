@@ -1820,7 +1820,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     hebnix.set(
         "base64_encode",
         lua.create_function(|_, data: mlua::String| {
-            use base64::{engine::general_purpose::STANDARD, Engine as _};
+            use base64::{Engine as _, engine::general_purpose::STANDARD};
             Ok(STANDARD.encode(data.as_bytes().as_ref()))
         })?,
     )?;
@@ -2540,9 +2540,7 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                     }
                 } else {
                     match load_asset(&host, &path) {
-                        Some(bytes) => {
-                            (bytes, format!("bytes://plugin/{}/{}", host.slug, path))
-                        }
+                        Some(bytes) => (bytes, format!("bytes://plugin/{}/{}", host.slug, path)),
                         None => return Ok(false),
                     }
                 };

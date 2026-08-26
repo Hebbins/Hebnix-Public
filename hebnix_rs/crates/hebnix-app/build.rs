@@ -54,7 +54,10 @@ fn copy_runtime_binaries() {
         "rlapi-bridge.exe missing - run rlapi_bridge/build.bat (RLAPI off until then)",
     );
     copy_tree(
-        &manifest_dir.join("src").join("multiplayer-lan").join("tap-driver"),
+        &manifest_dir
+            .join("src")
+            .join("multiplayer-lan")
+            .join("tap-driver"),
         &profile_dir.join("tap-driver"),
         "tap-driver/ missing - Workshop LAN is unavailable",
     );

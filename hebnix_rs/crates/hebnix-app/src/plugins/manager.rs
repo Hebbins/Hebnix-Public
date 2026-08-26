@@ -481,7 +481,13 @@ impl PluginManager {
     /// on_http_response for http_download_async — body is passed as a raw
     /// Lua string (mlua strings are 8-bit clean) instead of a Rust `&str`,
     /// so binary responses like avatar images survive intact.
-    pub fn on_http_download_response(&mut self, slug: &str, req_id: &str, status: u16, body: &[u8]) {
+    pub fn on_http_download_response(
+        &mut self,
+        slug: &str,
+        req_id: &str,
+        status: u16,
+        body: &[u8],
+    ) {
         let Some(idx) = self.plugins.iter().position(|p| p.slug == slug) else {
             return;
         };
@@ -516,7 +522,13 @@ impl PluginManager {
 
     /// goes to the requesting plugin only. Result of http_get_no_redirect_async
     /// — location is the response's Location header (empty if none).
-    pub fn on_http_redirect_response(&mut self, slug: &str, req_id: &str, status: u16, location: &str) {
+    pub fn on_http_redirect_response(
+        &mut self,
+        slug: &str,
+        req_id: &str,
+        status: u16,
+        location: &str,
+    ) {
         let Some(idx) = self.plugins.iter().position(|p| p.slug == slug) else {
             return;
         };

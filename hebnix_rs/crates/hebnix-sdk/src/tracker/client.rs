@@ -52,8 +52,14 @@ const AVATAR_MAX_BYTES: u64 = 4 * 1024 * 1024;
 /// find the bundled curl-impersonate exe. HEBNIX_CURL_IMPERSONATE overrides,
 /// else it's in the curl-impersonate/ folder next to our exe (put there at
 /// build time). cacert.pem lives right beside it.
-const EMBEDDED_CURL: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../vendor/curl-impersonate/curl-impersonate.exe"));
-const EMBEDDED_CACERT: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../vendor/curl-impersonate/cacert.pem"));
+const EMBEDDED_CURL: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../vendor/curl-impersonate/curl-impersonate.exe"
+));
+const EMBEDDED_CACERT: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../vendor/curl-impersonate/cacert.pem"
+));
 
 pub fn impersonate_binary() -> Option<std::path::PathBuf> {
     if let Ok(p) = std::env::var("HEBNIX_CURL_IMPERSONATE") {
@@ -71,7 +77,13 @@ fn embedded_impersonate_binary() -> Option<std::path::PathBuf> {
         .file_stem()?
         .to_string_lossy()
         .chars()
-        .map(|character| if character.is_ascii_alphanumeric() { character } else { '_' })
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '_'
+            }
+        })
         .collect::<String>();
     let runtime = dirs::data_local_dir()?
         .join("Hebnix")
@@ -92,7 +104,10 @@ fn embedded_impersonate_binary() -> Option<std::path::PathBuf> {
 }
 
 fn write_runtime_file(path: &std::path::Path, bytes: &[u8]) -> Option<()> {
-    if std::fs::metadata(path).ok().is_some_and(|metadata| metadata.len() == bytes.len() as u64) {
+    if std::fs::metadata(path)
+        .ok()
+        .is_some_and(|metadata| metadata.len() == bytes.len() as u64)
+    {
         return Some(());
     }
     let temporary = path.with_extension("tmp");
@@ -271,9 +286,7 @@ impl TrackerClient {
             "https://api.tracker.gg/api/v2/rocket-league/standard/profile/{slug}/{target_user}"
         );
         let Some(bin) = impersonate_binary() else {
-            return Err(
-                "embedded curl-impersonate could not be prepared".to_string(),
-            );
+            return Err("embedded curl-impersonate could not be prepared".to_string());
         };
         // cloudflare throttles per fingerprint, so on a fail we try a different
         // one. FPS_PER_ROUND distinct fingerprints per round, wait ROUND_WAIT
@@ -706,4 +719,3 @@ fn parse_iso8601_to_unix(s: &str) -> Option<f64> {
 
     Some((days * 86400 + hour * 3600 + min * 60 + sec - offset_secs) as f64)
 }
-
