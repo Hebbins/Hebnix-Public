@@ -1229,13 +1229,27 @@ impl HebnixApp {
                     Ok(None) => {
                         self.console
                             .write("[Core] Hebnix is up to date. Checking for plugin updates...");
-                        let mut payload = Vec::new();
-                        for p in &self.plugin_mgr.plugins {
-                            payload.push(serde_json::json!({
-                                "name": p.manifest.name,
-                                "author": p.manifest.author,
-                                "version": p.manifest.version,
-                            }));
+                        let payload = self
+                            .plugin_mgr
+                            .plugins
+                            .iter()
+                            .filter_map(|plugin| {
+                                plugin
+                                    .manifest
+                                    .plugin_id
+                                    .as_deref()
+                                    .filter(|id| !id.is_empty())
+                                    .map(|id| {
+                                        serde_json::json!({
+                                            "plugin_id": id,
+                                            "version": plugin.manifest.version,
+                                        })
+                                    })
+                            })
+                            .collect::<Vec<_>>();
+                        if payload.is_empty() {
+                            self.console.write("[Core] All plugins are up to date.");
+                            continue;
                         }
                         let payload_json = serde_json::Value::Array(payload);
                         let tx = self.tx.clone();
@@ -1273,20 +1287,21 @@ impl HebnixApp {
                             self.console.write("[Core] All plugins are up to date.");
                         } else {
                             for update in list {
-                                let id = update.get("id").and_then(|v| v.as_str()).unwrap_or("");
-                                let name =
-                                    update.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                                let author =
-                                    update.get("author").and_then(|v| v.as_str()).unwrap_or("");
-
-                                if id.is_empty() {
+                                let plugin_id = update
+                                    .get("plugin_id")
+                                    .or_else(|| update.get("id"))
+                                    .and_then(|value| value.as_str())
+                                    .unwrap_or("");
+                                if plugin_id.is_empty() {
                                     continue;
                                 }
-
-                                if let Some(local_p) = self.plugin_mgr.plugins.iter().find(|p| {
-                                    p.manifest.name == name && p.manifest.author == author
-                                }) {
+                                if let Some(local_p) =
+                                    self.plugin_mgr.plugins.iter().find(|plugin| {
+                                        plugin.manifest.plugin_id.as_deref() == Some(plugin_id)
+                                    })
+                                {
                                     let slug = local_p.slug.clone();
+                                    let name = local_p.display_name().to_string();
                                     let was_enabled = local_p.enabled;
 
                                     self.console.write(format!(
@@ -1296,7 +1311,7 @@ impl HebnixApp {
                                     self.save_config();
 
                                     let plugin_dir = self.plugin_dir.clone();
-                                    let id_str = id.to_string();
+                                    let id_str = plugin_id.to_string();
                                     let name_str = name.to_string();
                                     let tx = self.tx.clone();
 

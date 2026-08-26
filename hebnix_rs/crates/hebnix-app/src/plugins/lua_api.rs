@@ -1310,6 +1310,13 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
+    hebnix.set(
+        "parse_launch_log",
+        lua.create_function(|lua, verify: Option<bool>| {
+            let info = hebnix_sdk::log::parse_launch_log(None, verify.unwrap_or(true), "INT");
+            to_lua(lua, &info)
+        })?,
+    )?;
     // Launch.log verify=true (default) confirms the match against the stats
     // api Returns the key to poll with hebnix.launch_log_result(key).
     hebnix.set(

@@ -1080,6 +1080,9 @@ impl LiteApp {
             })
             })
             .collect::<Vec<_>>();
+        if payload.is_empty() {
+            return;
+        }
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let result = ureq::AgentBuilder::new()
