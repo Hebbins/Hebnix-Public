@@ -77,6 +77,7 @@ pub struct WindowState {
     pub width: SizeSpec,
     pub height: SizeSpec,
     pub opacity: f32,
+    pub close_button: bool,
     /// where we ask egui to put the window, set on open only. an observed
     /// position fed back into the builder is a SetWindowPos mid drag, and over
     /// a dpi boundary the read and the write use different scales.
@@ -93,6 +94,7 @@ impl Default for WindowState {
             width: SizeSpec::Fixed(260.0),
             height: SizeSpec::Fixed(160.0),
             opacity: 0.9,
+            close_button: false,
             pos: None,
             last_pos: None,
             pos_dirty: false,
@@ -854,6 +856,27 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         lua.create_function(|_, bind: String| Ok(hebnix_sdk::input::is_bind_pressed(&bind)))?,
     )?;
     hebnix.set(
+        "get_action_binds",
+        lua.create_function(|lua, action: String| {
+            let result = lua.create_table()?;
+            for (index, bind) in hebnix_sdk::input::action_binds(&action).iter().enumerate() {
+                result.set(index + 1, bind.clone())?;
+            }
+            Ok(result)
+        })?,
+    )?;
+    hebnix.set(
+        "is_action_pressed",
+        lua.create_function(|_, action: String| Ok(hebnix_sdk::input::is_action_pressed(&action)))?,
+    )?;
+    hebnix.set(
+        "refresh_action_binds",
+        lua.create_function(|_, ()| {
+            hebnix_sdk::input::clear_action_bind_cache();
+            Ok(())
+        })?,
+    )?;
+    hebnix.set(
         "monotonic_seconds",
         lua.create_function(|_, ()| {
             static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
@@ -1045,7 +1068,9 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             lua.create_function(move |_, ()| {
                 let assets_dir = host.dir.join("assets");
                 if let Err(err) = std::fs::create_dir_all(&assets_dir) {
-                    host.log(&format!("open_assets: couldn't create assets folder: {err}"));
+                    host.log(&format!(
+                        "open_assets: couldn't create assets folder: {err}"
+                    ));
                     return Ok(());
                 }
                 let _ = std::process::Command::new("cmd")
@@ -1587,6 +1612,9 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                     if let Ok(o) = opts.get::<f32>("opacity") {
                         win.opacity = o.clamp(0.0, 1.0); // 0 for a bare overlay
                     }
+                    if let Ok(close_button) = opts.get::<bool>("close_button") {
+                        win.close_button = close_button;
+                    }
                 }
                 if win.title.is_empty() {
                     win.title = host.display_name.borrow().clone();
@@ -1646,6 +1674,16 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             "set_title",
             lua.create_function(move |_, title: String| {
                 host.window.borrow_mut().title = title;
+                Ok(())
+            })?,
+        )?;
+    }
+    {
+        let host = Rc::clone(&host);
+        window.set(
+            "set_close_button",
+            lua.create_function(move |_, enabled: bool| {
+                host.window.borrow_mut().close_button = enabled;
                 Ok(())
             })?,
         )?;

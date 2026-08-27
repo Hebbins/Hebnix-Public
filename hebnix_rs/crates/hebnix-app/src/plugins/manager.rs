@@ -645,6 +645,16 @@ impl PluginManager {
 
     /// note where a plugin window ended up. not written back into the viewport
     /// builder, see WindowState::pos.
+    pub fn close_window(&self, slug: &str) {
+        if let Some(runtime) = self
+            .plugins
+            .iter()
+            .find(|plugin| plugin.slug == slug)
+            .and_then(|plugin| plugin.runtime.as_ref())
+        {
+            runtime.host.window.borrow_mut().open = false;
+        }
+    }
     pub fn set_window_pos(&self, slug: &str, x: f32, y: f32) {
         if let Some(rt) = self
             .plugins

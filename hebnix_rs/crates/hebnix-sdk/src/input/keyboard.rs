@@ -7,7 +7,14 @@ use std::time::{Duration, Instant};
 use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
 
 // (name, vk code) for named keys
-const NAMED_KEYS: [(&str, i32); 58] = [
+const NAMED_KEYS: [(&str, i32); 65] = [
+    ("mouse_left", 0x01),
+    ("mouse_right", 0x02),
+    ("mouse_middle", 0x04),
+    ("mouse_x1", 0x05),
+    ("mouse_x2", 0x06),
+    ("left mouse button", 0x01),
+    ("right mouse button", 0x02),
     ("backspace", 0x08),
     ("tab", 0x09),
     ("enter", 0x0D),

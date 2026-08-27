@@ -16,7 +16,7 @@ local players = {}
 local seen = {}
 local current_mode = "Casual"
 local cycle_was_pressed = false
-local capture_target = nil -- "hold" | "cycle" | nil
+local capture_target = nil
 
 -- Helpers
 
@@ -88,7 +88,7 @@ function plugin.on_load()
     hebnix.log("InGameRank loaded")
     local modes = enabled_modes()
     current_mode = modes[1]
-    -- Window visibility is driven every frame in on_tick (hold bind).
+    hebnix.refresh_action_binds()
 end
 
 function plugin.on_unload()
@@ -112,12 +112,7 @@ function plugin.on_game_event(event_type, event)
 end
 
 function plugin.on_tick()
-    -- Hold bind: show the window only while the bind is held.
-    local should_show = true
-    if hebnix.get_bool("enable_hold_bind", false) then
-        local bind = hebnix.get_string("hold_bind_setting", "")
-        should_show = bind ~= "" and hebnix.is_bind_pressed(bind)
-    end
+    local should_show = hebnix.is_action_pressed("Scoreboard")
     if should_show and not hebnix.window.is_open() then
         open_window()
     elseif not should_show and hebnix.window.is_open() then
@@ -138,9 +133,8 @@ function plugin.on_tick()
     if capture_target then
         local status, bind = hebnix.capture_bind_result()
         if status == "done" then
-            local key = capture_target == "hold" and "hold_bind_setting" or "cycle_bind_setting"
-            hebnix.set(key, bind)
-            hebnix.log(capture_target .. " bind updated to: " .. bind)
+            hebnix.set("cycle_bind_setting", bind)
+            hebnix.log("cycle bind updated to: " .. bind)
             capture_target = nil
         elseif status == "timeout" then
             hebnix.log("Bind capture timed out.")
@@ -170,11 +164,6 @@ local function bind_row(ui, label, setting_key, target)
 end
 
 function plugin.on_settings(ui)
-    ui.heading("Display Styles")
-    ui.checkbox("enable_hold_bind", "Enable Hold Bind (otherwise always show)", false)
-    bind_row(ui, "Hold bind", "hold_bind_setting", "hold")
-
-    ui.space(8)
     ui.heading("Gamemode Cycling")
     bind_row(ui, "Cycle bind", "cycle_bind_setting", "cycle")
 
