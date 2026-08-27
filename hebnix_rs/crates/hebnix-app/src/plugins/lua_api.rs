@@ -166,6 +166,64 @@ fn is_http_url(path: &str) -> bool {
     path.starts_with("https://") || path.starts_with("http://")
 }
 
+const REMOTE_IMAGE_MAX_BYTES: u64 = 4 * 1024 * 1024;
+
+enum RemoteImage {
+    Pending,
+    Ready(std::sync::Arc<[u8]>),
+    Failed,
+}
+
+fn remote_images() -> &'static std::sync::Mutex<std::collections::HashMap<String, RemoteImage>> {
+    static MAP: OnceLock<std::sync::Mutex<std::collections::HashMap<String, RemoteImage>>> =
+        OnceLock::new();
+    MAP.get_or_init(Default::default)
+}
+
+/// bytes for a url ui.image is allowed to draw, fetching it once in the
+/// background. None while it is on the way, so the draw call never blocks.
+fn remote_image(url: &str) -> Option<std::sync::Arc<[u8]>> {
+    if !crate::overlay::media_host_allowed(url) {
+        return None;
+    }
+    let mut map = remote_images().lock().unwrap();
+    match map.get(url) {
+        Some(RemoteImage::Ready(bytes)) => return Some(bytes.clone()),
+        Some(_) => return None,
+        None => {}
+    }
+    map.insert(url.to_string(), RemoteImage::Pending);
+    drop(map);
+
+    let url = url.to_string();
+    std::thread::spawn(move || {
+        let fetched = ureq::get(&url)
+            .timeout(Duration::from_secs(15))
+            .call()
+            .map_err(|error| error.to_string())
+            .and_then(|response| {
+                use std::io::Read;
+                let mut bytes = Vec::new();
+                response
+                    .into_reader()
+                    .take(REMOTE_IMAGE_MAX_BYTES)
+                    .read_to_end(&mut bytes)
+                    .map_err(|error| error.to_string())?;
+                Ok(bytes)
+            });
+        let entry = match fetched {
+            Ok(bytes) if !bytes.is_empty() => RemoteImage::Ready(bytes.into()),
+            Ok(_) => RemoteImage::Failed,
+            Err(error) => {
+                tracing::warn!("ui.image {url} failed: {error}");
+                RemoteImage::Failed
+            }
+        };
+        remote_images().lock().unwrap().insert(url, entry);
+    });
+    None
+}
+
 /// cached asset bytes
 fn load_asset(host: &HostCtx, rel: &str) -> Option<std::sync::Arc<[u8]>> {
     if let Some(cached) = host.assets.borrow().get(rel) {
@@ -224,7 +282,7 @@ pub fn to_lua<T: serde::Serialize>(lua: &Lua, value: &T) -> mlua::Result<LuaValu
     )
 }
 
-fn tracker_client() -> &'static TrackerClient {
+pub fn tracker_client() -> &'static TrackerClient {
     static CLIENT: OnceLock<TrackerClient> = OnceLock::new();
     CLIENT.get_or_init(TrackerClient::default)
 }
@@ -2108,6 +2166,24 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
+    // goes through AppMsg, lua never reaches into the browser itself
+    {
+        let overlay = lua.create_table()?;
+        let host = Rc::clone(&host);
+        overlay.set(
+            "send",
+            lua.create_function(move |lua, value: LuaValue| {
+                let data: serde_json::Value = lua.from_value(value)?;
+                let _ = host.tx.send(AppMsg::OverlayPost {
+                    slug: host.slug.clone(),
+                    data,
+                });
+                Ok(())
+            })?,
+        )?;
+        hebnix.set("overlay", overlay)?;
+    }
+
     lua.globals().set("hebnix", hebnix)?;
 
     // Build the ui bridge table and stash it in the registry.
@@ -2658,8 +2734,11 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
             "image",
             lua.create_function(move |_, (path, opts): (String, Option<Table>)| {
                 let (bytes, uri) = if is_http_url(&path) {
-                    // plugin's own urls never land in this cache, only tracker profile avatars do
-                    match tracker_client().avatar_bytes(&path) {
+                    // an avatar hebnix already cached, or an allowed host
+                    let found = tracker_client()
+                        .avatar_bytes(&path)
+                        .or_else(|| remote_image(&path));
+                    match found {
                         Some(bytes) => (bytes, format!("bytes://remote/{path}")),
                         None => return Ok(false),
                     }

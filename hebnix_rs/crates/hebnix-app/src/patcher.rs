@@ -1,7 +1,7 @@
 //! UPK patching and item swapping implementation.
 //!
 //! Keeping these modules together makes the patching boundary explicit while
-//! the compatibility re-exports in `main.rs` preserve the existing call sites.
+//! the compatibility re-exports in main.rs preserve the existing call sites.
 pub mod ball;
 pub mod boost_patcher;
 pub mod cosmetic_thumbnail;

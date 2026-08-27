@@ -22,7 +22,6 @@ pub struct MonitorShared {
 }
 
 pub struct Monitor {
-    #[cfg(not(feature = "lite"))]
     shared: Arc<Mutex<MonitorShared>>,
     running: Arc<AtomicBool>,
 }
@@ -49,18 +48,14 @@ impl Monitor {
                 .expect("failed to spawn monitor thread");
         }
 
-        Self {
-            #[cfg(not(feature = "lite"))]
-            shared,
-            running,
-        }
+        Self { shared, running }
     }
 
     pub fn stop(&self) {
         self.running.store(false, Ordering::SeqCst);
     }
 
-    #[cfg(not(feature = "lite"))]
+    /// the loop reads these every 2.5s, push changes or it probes the old port
     pub fn update_shared(&self, shared: MonitorShared) {
         if let Ok(mut current) = self.shared.lock() {
             *current = shared;

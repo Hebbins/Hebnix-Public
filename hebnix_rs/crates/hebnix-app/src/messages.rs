@@ -70,6 +70,11 @@ pub enum AppMsg {
     PluginDownloadDone {
         result: Result<String, String>,
     },
+    // overlay.send from a plugin, lands in that plugin's page next frame
+    OverlayPost {
+        slug: String,
+        data: serde_json::Value,
+    },
     // http result, slug picks the plugin that asked
     PluginHttpRes {
         slug: String,
@@ -77,7 +82,7 @@ pub enum AppMsg {
         status: u16,
         body: String,
     },
-    // byte-safe variant of PluginHttpRes for http_download_async — body is
+    // byte-safe variant of PluginHttpRes for http_download_async body is
     // raw bytes, not decoded as UTF-8 text, so binary responses (e.g.
     // avatar images) survive intact.
     PluginHttpDownloadRes {
@@ -86,7 +91,7 @@ pub enum AppMsg {
         status: u16,
         body: Vec<u8>,
     },
-    // result of http_get_no_redirect_async — location is the response's
+    // result of http_get_no_redirect_async location is the response's
     // Location header (empty if none/not a redirect). Used for OAuth flows
     // that put their payload in a 302's Location header (e.g. PSN's NPSSO
     // exchange) instead of a followable body.
