@@ -4338,13 +4338,35 @@ impl HebnixApp {
                     if resp.drag_started() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
                     }
+                    let title_rect = if win.close_button {
+                        egui::Rect::from_min_max(
+                            rect.min,
+                            egui::pos2(rect.right() - header_height, rect.bottom()),
+                        )
+                    } else {
+                        rect
+                    };
                     ui.painter().text(
-                        rect.center(),
+                        title_rect.center(),
                         egui::Align2::CENTER_CENTER,
                         &win.title,
                         egui::FontId::proportional(13.0),
                         ui.visuals().strong_text_color(),
                     );
+                    if win.close_button {
+                        let close_rect = egui::Rect::from_min_max(
+                            egui::pos2(rect.right() - header_height, rect.top()),
+                            rect.max,
+                        );
+                        if ui
+                            .put(close_rect, egui::Button::new("×").frame(false))
+                            .on_hover_text("Close")
+                            .clicked()
+                        {
+                            self.plugin_mgr.close_window(&slug);
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                        }
+                    }
                     ui.separator();
 
                     if let Err(e) = self.plugin_mgr.render_window(&slug, ui) {

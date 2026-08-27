@@ -35,6 +35,9 @@ pub struct HotkeyBind {
 
 // xinput name -> mask (canonical names + "controller_" aliases)
 
+const XINPUT_LEFT_TRIGGER_BIND: u32 = 0x1_0000;
+const XINPUT_RIGHT_TRIGGER_BIND: u32 = 0x2_0000;
+
 const XI_NAMES: [(&str, u16); 16] = [
     ("a", 0x1000),
     ("b", 0x2000),
@@ -132,23 +135,55 @@ pub fn get_button_display(controller_type: &str, raw_button: u32) -> String {
 
 /// is this bind currently held (kb/xinput/dualsense)
 pub fn is_hotkey_pressed(bind: &HotkeyBind) -> bool {
-    if bind.is_controller {
-        if bind.controller_type == "dualsense" {
-            let held = get_dualsense_inputs();
-            DS4_BUTTONS
-                .get(bind.controller_button as usize)
-                .map(|name| held.iter().any(|h| h == name))
-                .unwrap_or(false)
-        } else {
-            (0..4).any(|i| {
-                get_xinput_state(i)
-                    .map(|state| state.is_pressed(bind.controller_button as u16))
-                    .unwrap_or(false)
-            })
-        }
-    } else {
-        is_key_pressed(&bind.hotkey)
+    if !bind.is_controller {
+        return is_key_pressed(&bind.hotkey);
     }
+
+    start_dualsense_monitor();
+    if bind.controller_type == "dualsense" {
+        let held = get_dualsense_inputs();
+        return DS4_BUTTONS
+            .get(bind.controller_button as usize)
+            .map(|name| held.iter().any(|input| input == name))
+            .unwrap_or(false);
+    }
+
+    let xinput_pressed = (0..4).any(|index| {
+        get_xinput_state(index)
+            .map(|state| match bind.controller_button {
+                XINPUT_LEFT_TRIGGER_BIND => state.left_trigger > 30,
+                XINPUT_RIGHT_TRIGGER_BIND => state.right_trigger > 30,
+                button => state.is_pressed(button as u16),
+            })
+            .unwrap_or(false)
+    });
+    if xinput_pressed {
+        return true;
+    }
+
+    let dualsense_index = match bind.controller_button {
+        0x1000 => Some(0),
+        0x2000 => Some(1),
+        0x4000 => Some(2),
+        0x8000 => Some(3),
+        0x0100 => Some(4),
+        0x0200 => Some(5),
+        XINPUT_LEFT_TRIGGER_BIND => Some(6),
+        XINPUT_RIGHT_TRIGGER_BIND => Some(7),
+        0x0040 => Some(8),
+        0x0080 => Some(9),
+        0x0010 => Some(10),
+        0x0020 => Some(11),
+        0x0001 => Some(15),
+        0x0002 => Some(16),
+        0x0004 => Some(17),
+        0x0008 => Some(18),
+        _ => None,
+    };
+    let held = get_dualsense_inputs();
+    dualsense_index
+        .and_then(|index| DS4_BUTTONS.get(index))
+        .is_some_and(|name| held.iter().any(|input| input == name))
 }
 
 /// parse a bind string ("tab", "controller_a", "cross") into a HotkeyBind.
@@ -159,6 +194,28 @@ pub fn resolve_bind_string(bind_str: &str) -> Option<HotkeyBind> {
     }
     let n = normalise(bind_str);
 
+    if matches!(
+        n.as_str(),
+        "lt" | "left_trigger" | "controller_lt" | "controller_left_trigger"
+    ) {
+        return Some(HotkeyBind {
+            is_controller: true,
+            hotkey: String::new(),
+            controller_type: "xinput".to_string(),
+            controller_button: XINPUT_LEFT_TRIGGER_BIND,
+        });
+    }
+    if matches!(
+        n.as_str(),
+        "rt" | "right_trigger" | "controller_rt" | "controller_right_trigger"
+    ) {
+        return Some(HotkeyBind {
+            is_controller: true,
+            hotkey: String::new(),
+            controller_type: "xinput".to_string(),
+            controller_button: XINPUT_RIGHT_TRIGGER_BIND,
+        });
+    }
     if let Some(mask) = xi_lookup(&n) {
         return Some(HotkeyBind {
             is_controller: true,
@@ -194,6 +251,10 @@ pub fn bind_to_string(bind: &HotkeyBind) -> String {
             .find(|(_, idx)| *idx == bind.controller_button)
             .map(|(name, _)| name.to_string())
             .unwrap_or_else(|| format!("ds_{}", bind.controller_button))
+    } else if bind.controller_button == XINPUT_LEFT_TRIGGER_BIND {
+        "controller_lt".to_string()
+    } else if bind.controller_button == XINPUT_RIGHT_TRIGGER_BIND {
+        "controller_rt".to_string()
     } else {
         XI_NAMES
             .iter()

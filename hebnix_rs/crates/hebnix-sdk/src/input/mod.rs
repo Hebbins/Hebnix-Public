@@ -2,6 +2,7 @@
 
 pub mod bindings;
 pub mod dualsense;
+pub mod game_actions;
 pub mod keyboard;
 pub mod xinput;
 
@@ -13,5 +14,6 @@ pub use dualsense::{
     DS4_BUTTON_DISPLAY, DS4_BUTTONS, PsModel, get_dualsense_inputs, is_dualsense_connected,
     ps_model,
 };
+pub use game_actions::{action_binds, clear_action_bind_cache, is_action_pressed};
 pub use keyboard::{detect_hotkey, is_key_pressed};
 pub use xinput::{XINPUT_BUTTON_DISPLAY, XInputState, get_xinput_state};
