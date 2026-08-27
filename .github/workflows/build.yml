@@ -1,0 +1,39 @@
+name: Build Hebnix
+
+# manual only for now: go to the "Actions" tab on GitHub, pick this workflow,
+# click "Run workflow". nothing runs automatically on push/PR.
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: hebnix_rs -> target
+
+      - name: build rlapi bridge
+        working-directory: rlapi_bridge
+        run: .\build.bat
+        shell: cmd
+
+      - name: build + package hebnix
+        working-directory: hebnix_rs
+        run: .\package.ps1
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hebnix-windows
+          path: hebnix_rs/dist/
+          if-no-files-found: error
