@@ -4608,9 +4608,6 @@ impl eframe::App for HebnixApp {
         if winutil::take_minimize_request() && !self.hidden {
             self.set_hidden(ctx, true);
         }
-        if winutil::take_show_request() && self.hidden {
-            self.set_hidden(ctx, false);
-        }
 
         crate::dpi_fix::install_on_all_windows();
 
