@@ -202,6 +202,16 @@ pub fn is_startup_enabled() -> bool {
         .is_ok()
 }
 
+pub fn kill_rocket_league() -> std::io::Result<()> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    std::process::Command::new("taskkill")
+        .args(["/F", "/IM", "RocketLeague.exe"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map(|_| ())
+}
+
 pub fn set_startup_enabled(enabled: bool) -> std::io::Result<()> {
     let hkcu = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
     let (key, _) = hkcu.create_subkey(RUN_KEY)?;

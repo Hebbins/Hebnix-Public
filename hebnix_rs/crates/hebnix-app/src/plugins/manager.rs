@@ -216,7 +216,6 @@ impl PluginManager {
     /// Recreate enabled plugin runtimes after an actual Steam/Epic transition.
     /// This intentionally emits no success messages; plugins simply receive the
     /// updated shared platform on their next `on_load` call.
-    #[cfg(not(feature = "lite"))]
     pub fn reload_enabled_silent(&mut self, config: &mut Config) {
         let enabled = self
             .plugins
@@ -620,6 +619,48 @@ impl PluginManager {
             })
             .map(|p| p.slug.clone())
             .collect()
+    }
+
+    /// enabled plugins that touch the overlay, with the dir they serve from.
+    /// page is None for draw-only, which still needs it for draw.image.
+    pub fn overlay_page_plugins(&self) -> Vec<(String, Option<String>, PathBuf)> {
+        self.plugins
+            .iter()
+            .filter(|p| p.enabled)
+            .filter_map(|p| {
+                let rt = p.runtime.as_ref()?;
+                let table = rt.lua.registry_value::<Table>(&rt.plugin_table).ok()?;
+                let draws = table
+                    .get::<LuaValue>("on_overlay")
+                    .map(|v| v.is_function())
+                    .unwrap_or(false);
+                let page = table
+                    .get::<String>("overlay_page")
+                    .ok()
+                    .map(|page| page.trim().trim_start_matches('/').to_string())
+                    .filter(|page| !page.is_empty() && !page.contains(".."));
+                if !draws && page.is_none() {
+                    return None;
+                }
+                let assets = self.plugin_dir.join(&p.slug).join("assets");
+                Some((p.slug.clone(), page, assets))
+            })
+            .collect()
+    }
+
+    /// stacking order, bottom first. unlisted slugs go on top.
+    pub fn overlay_layers(
+        &self,
+        order: &[String],
+    ) -> Vec<(String, Option<String>, PathBuf)> {
+        let mut layers = self.overlay_page_plugins();
+        layers.sort_by_key(|(slug, _, _)| {
+            order
+                .iter()
+                .position(|ordered| ordered == slug)
+                .unwrap_or(usize::MAX)
+        });
+        layers
     }
 
     /// run a plugin's on_overlay(draw, w, h). the canvas must already be the

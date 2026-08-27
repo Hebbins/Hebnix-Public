@@ -376,6 +376,8 @@ pub struct HebnixApp {
     quitting: bool,
     last_size: (u32, u32),
     overlay: crate::overlay::Overlay,
+    webview: Option<crate::webview::host::WebviewHost>,
+    overlay_unavailable_said: bool,
     overlay_rect: Option<(i32, i32, i32, i32)>,
     overlay_rect_checked: Option<std::time::Instant>,
     plugin_monitor_size: (f32, f32),
@@ -801,6 +803,8 @@ impl HebnixApp {
             quitting: false,
             last_size,
             overlay: crate::overlay::Overlay::new(),
+            webview: None,
+            overlay_unavailable_said: false,
             overlay_rect: None,
             overlay_rect_checked: None,
             plugin_monitor_size: (1920.0, 1080.0),
@@ -1541,6 +1545,13 @@ impl HebnixApp {
                         }
                     }
                 }
+                AppMsg::OverlayPost { slug, data } => {
+                    if let Some(webview) = &self.webview {
+                        if let Err(error) = webview.deliver(&slug, data) {
+                            tracing::debug!("overlay.send from '{slug}' dropped: {error}");
+                        }
+                    }
+                }
                 AppMsg::PluginHttpRes {
                     slug,
                     req_id,
@@ -1950,6 +1961,8 @@ impl HebnixApp {
                 self.console
                     .write("  server               - shows information about the connected server");
                 self.console
+                    .write("  webview              - state of the overlay webview");
+                self.console
                     .write("  clear                - clears the console output");
                 self.console
                     .write("  plugins list         - lists all plugins in the plugins folder");
@@ -2042,6 +2055,20 @@ impl HebnixApp {
                         let _ = tx.send(AppMsg::Log(format!("[Console] {reason}")));
                     }
                 });
+            }
+            "webview" => {
+                let line = match (
+                    crate::webview::runtime::is_available(),
+                    self.overlay.webview_target().is_some(),
+                    self.webview.as_ref(),
+                ) {
+                    (false, _, _) => "no WebView2 runtime, overlays are off".to_string(),
+                    (true, false, _) => "no overlay window on this machine".to_string(),
+                    (true, true, None) => "not built, no plugin uses the overlay".to_string(),
+                    (true, true, Some(webview)) => webview.status(),
+                };
+                self.console
+                    .write(format!("[Console] Overlay webview: {line}"));
             }
             "info" => {
                 self.console
@@ -2861,6 +2888,77 @@ impl HebnixApp {
             });
     }
 
+    /// topmost first. hidden with fewer than two layers.
+    fn render_overlay_order(&mut self, ui: &mut egui::Ui) {
+        let layers = self
+            .plugin_mgr
+            .overlay_layers(&self.config.overlay_order);
+        if layers.len() < 2 {
+            return;
+        }
+        let draws = self.plugin_mgr.overlay_plugins();
+
+        // top of screen first, the stack is stored bottom first
+        let mut rows: Vec<(String, String, &'static str)> = layers
+            .iter()
+            .rev()
+            .map(|(slug, page, _)| {
+                let name = self
+                    .plugin_mgr
+                    .plugins
+                    .iter()
+                    .find(|p| &p.slug == slug)
+                    .map(|p| p.display_name().to_string())
+                    .unwrap_or_else(|| slug.clone());
+                let kind = match (page.is_some(), draws.contains(slug)) {
+                    (true, true) => "page + draw",
+                    (true, false) => "page",
+                    _ => "draw",
+                };
+                (slug.clone(), name, kind)
+            })
+            .collect();
+
+        let mut moved: Option<(usize, usize)> = None;
+        egui::CollapsingHeader::new(format!("Overlay order ({} layers)", rows.len()))
+            .id_salt("overlay_order")
+            .show(ui, |ui| {
+                ui.label("Drag to reorder. Renders based on number order.");
+                ui.add_space(4.0);
+                for (index, (slug, name, kind)) in rows.iter().enumerate() {
+                    let row_id = egui::Id::new(("overlay_layer", slug));
+                    let (_, dropped) = ui.dnd_drop_zone::<usize, _>(
+                        egui::Frame::new().inner_margin(egui::Margin::symmetric(4, 2)),
+                        |ui| {
+                            ui.dnd_drag_source(row_id, index, |ui| {
+                                ui.horizontal(|ui| {
+                                    // ascii, a user font can tofu the rest
+                                    ui.weak(format!("{}.", index + 1));
+                                    ui.label(name);
+                                    ui.weak(format!("({kind})"));
+                                });
+                            });
+                        },
+                    );
+                    if let Some(from) = dropped {
+                        moved = Some((*from, index));
+                    }
+                }
+            });
+
+        if let Some((from, to)) = moved
+            && from != to
+            && from < rows.len()
+        {
+            let row = rows.remove(from);
+            rows.insert(to.min(rows.len()), row);
+            // config holds bottom first, the list is top first
+            self.config.overlay_order =
+                rows.iter().rev().map(|(slug, _, _)| slug.clone()).collect();
+            self.save_config();
+        }
+    }
+
     fn render_plugins_tab(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("Open Plugins Folder").clicked() {
@@ -2885,6 +2983,7 @@ impl HebnixApp {
             });
         });
         ui.add_space(6.0);
+        self.render_overlay_order(ui);
 
         let mut toggles: Vec<(String, bool)> = Vec::new();
         let mut open_settings: Option<String> = None;
@@ -3841,7 +3940,6 @@ impl HebnixApp {
                                             .map(|f| f.to_string_lossy().to_string())
                                             .unwrap_or_default()
                                     ));
-                                    let _ = std::fs::remove_file(&file);
                                     self.plugin_mgr.refresh(&mut self.config, true);
                                     self.save_config();
                                     close_requested = true;
@@ -4221,12 +4319,62 @@ impl HebnixApp {
         });
     }
 
-    fn render_game_overlay(&mut self) {
-        let slugs = self.plugin_mgr.overlay_plugins();
+    /// once, and only when a plugin wants it
+    fn ensure_webview(&mut self, wanted: bool) {
+        if self.webview.is_some() || !wanted {
+            return;
+        }
+        if !crate::webview::runtime::is_available() {
+            if !self.overlay_unavailable_said {
+                self.overlay_unavailable_said = true;
+                self.console.write(
+                    "[Core] Overlays need the WebView2 runtime, which is missing. Restart Hebnix to install it.",
+                );
+            }
+            return;
+        }
+        let Some((_, visual)) = self.overlay.webview_target() else {
+            if !self.overlay_unavailable_said {
+                self.overlay_unavailable_said = true;
+                self.console
+                    .write("[Core] No overlay window on this machine, plugin overlays are off.");
+            }
+            return;
+        };
+        self.webview = Some(crate::webview::host::WebviewHost::new(visual));
+        self.overlay.commit();
+    }
 
-        if slugs.is_empty() || !hebnix_sdk::process::is_rocket_league_focused() {
+    fn render_game_overlay(&mut self) {
+        let layers = self
+            .plugin_mgr
+            .overlay_layers(&self.config.overlay_order);
+        self.ensure_webview(!layers.is_empty());
+        if let Some(webview) = &mut self.webview {
+            webview.sync_pages(&layers);
+        }
+        // each plugin paints its own canvas
+        let draws = self.plugin_mgr.overlay_plugins();
+        let slugs: Vec<String> = layers
+            .iter()
+            .map(|(slug, _, _)| slug.clone())
+            .filter(|slug| draws.contains(slug))
+            .collect();
+        let webview_wants = self
+            .webview
+            .as_ref()
+            .is_some_and(|webview| webview.wants_overlay());
+        let focused = hebnix_sdk::process::is_rocket_league_focused();
+        if (slugs.is_empty() && !webview_wants) || !focused {
             self.overlay.hide();
             self.overlay_rect = None;
+            // the window is hidden, stop the browser painting into it
+            if let Some(webview) = &mut self.webview {
+                if let Some((hwnd, _)) = self.overlay.webview_target() {
+                    webview.tick(hwnd, (1, 1), false);
+                }
+            }
+            self.report_webview_error();
             return;
         }
 
@@ -4244,18 +4392,52 @@ impl HebnixApp {
             return;
         };
 
-        let mgr = &mut self.plugin_mgr;
-        let mut errors: Vec<String> = Vec::new();
-        self.overlay.frame(rect, |w, h| {
-            for slug in &slugs {
-                if let Err(e) = mgr.render_overlay_gdi(slug, w, h) {
-                    errors.push(format!("[Core] Overlay error in '{slug}': {e}"));
-                }
+        let (left, top, right, bottom) = rect;
+        let size = ((right - left).max(1) as u32, (bottom - top).max(1) as u32);
+        if let Some(webview) = &mut self.webview {
+            if let Some((hwnd, _)) = self.overlay.webview_target() {
+                webview.tick(hwnd, size, true);
             }
-        });
+        }
+        self.report_webview_error();
+
+        let ready = self
+            .webview
+            .as_ref()
+            .is_some_and(|webview| webview.is_ready())
+            && self.overlay.place(rect);
+        if !ready {
+            return; // no browser yet, nothing can paint
+        }
+
+        let mut errors: Vec<String> = Vec::new();
+        let (w, h) = (size.0 as f32, size.1 as f32);
+        crate::overlay::record_start();
+        // one message a frame, a call per primitive would be thousands a second
+        let mut batches: Vec<(String, Vec<serde_json::Value>)> = Vec::new();
+        for slug in &slugs {
+            if let Err(e) = self.plugin_mgr.render_overlay_gdi(slug, w, h) {
+                errors.push(format!("[Core] Overlay error in '{slug}': {e}"));
+            }
+            batches.push((slug.clone(), crate::overlay::record_take()));
+        }
+        crate::overlay::record_end();
+        if let Some(webview) = &self.webview {
+            if let Err(e) = webview.paint(&batches, size) {
+                tracing::debug!("overlay paint dropped: {e}");
+            }
+        }
         for e in errors {
             self.console.write(e);
         }
+    }
+
+    fn report_webview_error(&mut self) {
+        let Some(message) = self.webview.as_mut().and_then(|w| w.take_error()) else {
+            return;
+        };
+        self.console
+            .write(format!("[Core] Overlay webview failed: {message}"));
     }
 
     fn plugin_monitor_size(&mut self) -> (f32, f32) {

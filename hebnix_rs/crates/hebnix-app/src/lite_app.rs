@@ -66,6 +66,7 @@ struct InstallModal {
 pub struct LiteApp {
     base_dir: std::path::PathBuf,
     themes_dir: std::path::PathBuf,
+    fonts_dir: std::path::PathBuf,
     plugin_dir: std::path::PathBuf,
     config: Config,
     tx: Sender<AppMsg>,
@@ -102,6 +103,8 @@ pub struct LiteApp {
     window_mode: Option<hebnix_sdk::save_file::WindowMode>,
     last_size: (u32, u32),
     overlay: Overlay,
+    webview: Option<crate::webview::host::WebviewHost>,
+    overlay_unavailable_said: bool,
     overlay_rect: Option<(i32, i32, i32, i32)>,
     overlay_rect_checked: Option<std::time::Instant>,
     plugin_monitor_size: (f32, f32),
@@ -110,6 +113,8 @@ pub struct LiteApp {
     fullscreen_notice: bool,
     fullscreen_notice_dismissed: bool,
     statsapi_notice: Option<String>,
+    statsapi_blocking: bool,
+    in_match: bool,
     update_info: Option<crate::update::UpdateInfo>,
     update_downloading: bool,
     update_error: Option<String>,
@@ -122,21 +127,25 @@ impl LiteApp {
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let base_dir = crate::config::base_dir();
         let themes_dir = base_dir.join("themes");
+        let fonts_dir = base_dir.join("fonts");
         let plugin_dir = base_dir.join("plugins");
         let _ = std::fs::create_dir_all(&themes_dir);
+        let _ = std::fs::create_dir_all(&fonts_dir);
         let _ = std::fs::create_dir_all(&plugin_dir);
 
         let mut config = Config::load(&base_dir);
+        // themes name a font file, so fonts get their own dir
         if theme::apply_theme(
             &cc.egui_ctx,
             &themes_dir,
-            &themes_dir,
+            &fonts_dir,
             &config.settings.theme,
         )
         .is_err()
         {
-            let _ = theme::apply_theme(&cc.egui_ctx, &themes_dir, &themes_dir, "Dark");
+            let _ = theme::apply_theme(&cc.egui_ctx, &themes_dir, &fonts_dir, "Dark");
             config.settings.theme = "Dark".to_string();
+            let _ = config.save(&base_dir);
         }
         theme::apply_window_opacity(&cc.egui_ctx, config.settings.window_opacity);
 
@@ -216,9 +225,11 @@ impl LiteApp {
             winutil::install_minimize_hook(hwnd, &cc.egui_ctx);
         }
 
+        let start_hidden = config.settings.start_in_tray;
         let mut app = Self {
             base_dir,
             themes_dir,
+            fonts_dir,
             plugin_dir,
             config,
             tx,
@@ -250,11 +261,13 @@ impl LiteApp {
             status_text: "⌛ Waiting for Rocket League...".to_string(),
             status_color: Color32::from_rgb(0xdc, 0xe4, 0xee),
             topmost: false,
-            hidden: false,
+            hidden: start_hidden,
             capturing_hotkey: false,
             window_mode: None,
             last_size: (0, 0),
             overlay: Overlay::new(),
+            webview: None,
+            overlay_unavailable_said: false,
             overlay_rect: None,
             overlay_rect_checked: None,
             plugin_monitor_size: (1920.0, 1080.0),
@@ -263,6 +276,8 @@ impl LiteApp {
             fullscreen_notice: false,
             fullscreen_notice_dismissed: false,
             statsapi_notice: None,
+            statsapi_blocking: false,
+            in_match: false,
             update_info: None,
             update_downloading: false,
             update_error: None,
@@ -270,6 +285,7 @@ impl LiteApp {
             launch_path_notice: false,
         };
         app.theme_options = theme::list_themes(&app.themes_dir);
+        app.plugin_mgr.shared.borrow_mut().is_gui_open = !start_hidden;
         app.refresh_statsapi();
         app.check_plugin_updates();
         app
@@ -298,11 +314,17 @@ impl LiteApp {
         self.packet_rate = rate;
         self.port_value = port;
         self.web_port_value = web_port;
-        self.statsapi_notice = match self
+        self.monitor.update_shared(crate::monitor::MonitorShared {
+            api_port: self.current_api_port,
+            statsapi_path: self.config.settings.statsapi_path.clone(),
+            rl_path: self.config.settings.rl_path.clone(),
+        });
+        let parsed = self
             .packet_rate
             .as_deref()
-            .and_then(|rate| rate.parse::<i64>().ok())
-        {
+            .and_then(|rate| rate.parse::<i64>().ok());
+        self.statsapi_blocking = matches!(parsed, None | Some(0)) || parsed.is_some_and(|r| r <= 10);
+        self.statsapi_notice = match parsed {
             None | Some(0) => {
                 Some("StatsAPI is not configured. PacketSendRate must be set to 20.".to_string())
             }
@@ -358,12 +380,25 @@ impl LiteApp {
                 .dispatch_simple("GameConnected", serde_json::json!({}));
             self.console
                 .write("[Monitor] Rocket League & StatsAPI detected. Starting listener.");
+            self.console.write(format!(
+                "[Core] Connected to Rocket League StatsAPI on 127.0.0.1:{} (TCP) and {} (WS)",
+                self.current_api_port, web_port
+            ));
         } else if !ready && (self.currently_connected || self.first_status) {
             let was_connected = self.currently_connected;
             self.currently_connected = false;
             if was_connected {
                 self.stats.stop();
                 self.ws_stats.stop();
+                if self.in_match {
+                    self.in_match = false;
+                    self.console
+                        .write("[Core] Stats API connection lost. Resetting plugin metrics.");
+                    self.plugin_mgr.dispatch_simple(
+                        "GameLeft",
+                        serde_json::json!({"reason": "connection_lost"}),
+                    );
+                }
                 self.plugin_mgr.dispatch_simple(
                     "GameDisconnected",
                     serde_json::json!({"reason": "connection_lost"}),
@@ -418,8 +453,13 @@ impl LiteApp {
                             self.config.settings.rl_path_confirmed = true;
                             self.save_config();
                         }
+                        let switched = self.plugin_mgr.shared.borrow().platform
+                            != platform.as_str();
                         self.plugin_mgr.shared.borrow_mut().platform =
                             platform.as_str().to_string();
+                        if rl_open && switched {
+                            self.plugin_mgr.reload_enabled_silent(&mut self.config);
+                        }
                     }
                     self.handle_status(rl_open, api_open);
                 }
@@ -446,6 +486,13 @@ impl LiteApp {
                     if self.topmost != topmost {
                         self.topmost = topmost;
                         winutil::set_main_window_topmost(topmost);
+                    }
+                }
+                AppMsg::OverlayPost { slug, data } => {
+                    if let Some(webview) = &self.webview {
+                        if let Err(error) = webview.deliver(&slug, data) {
+                            tracing::debug!("overlay.send from '{slug}' dropped: {error}");
+                        }
                     }
                 }
                 AppMsg::PluginHttpRes {
@@ -508,6 +555,8 @@ impl LiteApp {
                 }
                 AppMsg::AppUpdateFetched { result } => {
                     if let Ok(Some(info)) = result {
+                        self.console
+                            .write(format!("[Core] Update available: v{}", info.version));
                         self.update_info = Some(info);
                     }
                 }
@@ -521,7 +570,7 @@ impl LiteApp {
                     self.update_downloading = false;
                     self.update_error = Some(error);
                 }
-                AppMsg::PluginUpdatesFound { result } => match result {
+                AppMsg::PluginUpdatesFound { updates } => match updates {
                     Ok(updates) => self.start_plugin_updates(updates),
                     Err(error) => self
                         .console
@@ -556,15 +605,25 @@ impl LiteApp {
     }
 
     fn handle_game_event(&mut self, event: StatsEvent) {
-        if event.event_type == "MatchDestroyed" {
-            if !self.config.settings.suppress_left_alerts {
-                self.console
-                    .write("[Core] Left match or game closed. Resetting plugin metrics.");
+        match event.event_type.as_str() {
+            "UpdateState" => {
+                self.in_match = true;
+                self.plugin_mgr.dispatch_game_event(&event);
             }
-            self.plugin_mgr
-                .dispatch_simple("GameLeft", event.raw_data.clone());
-        } else {
-            self.plugin_mgr.dispatch_game_event(&event);
+            "MatchEnded" => {
+                self.in_match = false;
+                self.plugin_mgr.dispatch_game_event(&event);
+            }
+            "MatchDestroyed" => {
+                self.in_match = false;
+                if !self.config.settings.suppress_left_alerts {
+                    self.console
+                        .write("[Core] Left match or game closed. Resetting plugin metrics.");
+                }
+                self.plugin_mgr
+                    .dispatch_simple("GameLeft", event.raw_data.clone());
+            }
+            _ => self.plugin_mgr.dispatch_game_event(&event),
         }
     }
 
@@ -630,29 +689,99 @@ impl LiteApp {
     fn execute_command(&mut self, raw: String) {
         let words: Vec<_> = raw.split_whitespace().collect();
         match words.first().map(|word| word.to_ascii_lowercase()).as_deref() {
-            Some("help") => self.console.write("[Console] Commands: help, info, server, clear, restart, plugins list, plugin load|reload|unload <name>"),
-            Some("info") => self.console.write(format!("[Console] Hebnix Lite {APP_VERSION} | plugins: {} | StatsAPI: {}", self.plugin_mgr.plugins.len(), self.currently_connected)),
+            Some("help") => {
+                self.console.write("[Console] Hebnix Lite Commands:");
+                self.console.write("  help                 - shows this list of commands");
+                self.console.write("  info                 - info about the current build & state");
+                self.console.write("  server               - shows information about the connected server");
+                self.console.write("  webview              - state of the overlay webview");
+                self.console.write("  clear                - clears the console output");
+                self.console.write("  plugins list         - lists all plugins in the plugins folder");
+                self.console.write("  plugin load <name>   - load a disabled plugin");
+                self.console.write("  plugin reload <name> - reload an enabled plugin");
+                self.console.write("  plugin unload <name> - unloads an enabled plugin");
+                self.console.write("  quit                 - force kills the Rocket League process");
+                self.console.write("  restart              - restarts Rocket League through Steam or Epic");
+            }
+            Some("info") => {
+                self.console.write(format!("[Console] Hebnix Lite Version: {APP_VERSION}"));
+                self.console.write(format!("[Console] Active Base Directory: {}", self.base_dir.display()));
+                self.console.write(format!("[Console] Registered Plugins In Cache: {}", self.plugin_mgr.plugins.len()));
+                self.console.write(format!("[Console] StatsAPI: 127.0.0.1:{} | game running: {} | port open: {} | listener connected: {}", self.current_api_port, self.last_rl_open, self.last_api_open, self.currently_connected));
+            }
             Some("clear") => self.console.clear(),
+            Some("quit") => {
+                self.console
+                    .write("[Console] Killing RocketLeague process threads and exiting...");
+                match winutil::kill_rocket_league() {
+                    Ok(()) => self
+                        .console
+                        .write("[Console] Process rocketleague.exe terminated successfully."),
+                    Err(error) => self.console.write(format!(
+                        "[Console] Process termination execution fault: {error}"
+                    )),
+                }
+            }
+            Some("webview") => {
+                let line = match (crate::webview::runtime::is_available(), self.overlay.webview_target().is_some(), self.webview.as_ref()) {
+                    (false, _, _) => "no WebView2 runtime, overlays are off".to_string(),
+                    (true, false, _) => "no overlay window on this machine".to_string(),
+                    (true, true, None) => "not built, no plugin uses the overlay".to_string(),
+                    (true, true, Some(webview)) => webview.status(),
+                };
+                self.console.write(format!("[Console] Overlay webview: {line}"));
+            }
             Some("restart") => match winutil::restart_rocket_league(Path::new(&self.config.settings.rl_path)) {
                 Ok(()) => self.console.write("[Console] Rocket League restarted."),
                 Err(error) => self.console.write(format!("[Console] Restart failed: {error}")),
             },
             Some("server") => {
+                let sub = words.get(1).map(|word| word.to_lowercase());
                 let tx = self.tx.clone();
                 std::thread::spawn(move || {
-                    let info = hebnix_sdk::log::parse_launch_log(None, true, "INT"); // verify so a menu or a closed game cant serve the last match
-                    let fallback = if !hebnix_sdk::process::is_rocket_league_running() {
-                        "[Console] Rocket League is not running."
-                    } else if !info.stats_api_available {
-                        "[Console] Can't read the match, the stats api is not answering."
-                    } else {
-                        "[Console] Not in a game."
+                    // verify so a menu or a closed game cant serve the last match
+                    let info = hebnix_sdk::log::parse_launch_log(None, true, "INT");
+                    let Some(game) = info.game else {
+                        let reason = if !hebnix_sdk::process::is_rocket_league_running() {
+                            "Rocket League is not running."
+                        } else if !info.stats_api_available {
+                            "Can't read the match, the stats api is not answering."
+                        } else {
+                            "Not in a game."
+                        };
+                        let _ = tx.send(AppMsg::Log(format!("[Console] {reason}")));
+                        return;
                     };
-                    let message = info.game.map(|game| format!("[Console] Server: {}:{}", game.server_ip.unwrap_or_else(|| "Unknown".to_string()), game.server_port.map(|port| port.to_string()).unwrap_or_else(|| "Unknown".to_string()))).unwrap_or_else(|| fallback.to_string());
-                    let _ = tx.send(AppMsg::Log(message));
+                    let unknown = || "Unknown".to_string();
+                    let name = game.server_name.unwrap_or_else(unknown);
+                    let ip = game.server_ip.unwrap_or_else(unknown);
+                    let port = game.server_port.map(|p| p.to_string()).unwrap_or_else(unknown);
+                    let region = game.region.unwrap_or_else(unknown);
+                    let playlist = game.playlist_id.map(|p| p.to_string()).unwrap_or_else(unknown);
+                    let lines: Vec<String> = match sub.as_deref() {
+                        Some("name") => vec![format!("[Console] Server Name: {name}")],
+                        Some("ip") | Some("port") => {
+                            vec![format!("[Console] Server IP/Port: {ip}:{port}")]
+                        }
+                        Some("region") => vec![format!("[Console] Server Region: {region}")],
+                        Some("playlist") => vec![format!("[Console] Playlist ID: {playlist}")],
+                        _ => vec![
+                            format!("[Console] Server Name: {name}"),
+                            format!("[Console] Server IP/Port: {ip}:{port}"),
+                            format!("[Console] Server Region: {region}"),
+                            format!("[Console] Playlist ID: {playlist}"),
+                        ],
+                    };
+                    for line in lines {
+                        let _ = tx.send(AppMsg::Log(line));
+                    }
                 });
             }
             Some("plugins") if words.get(1).is_some_and(|word| word.eq_ignore_ascii_case("list")) => {
+                self.console.write("[Console] Installed Plugins List:");
+                if self.plugin_mgr.plugins.is_empty() {
+                    self.console.write("[Console] no plugins loaded.");
+                }
                 for plugin in &self.plugin_mgr.plugins {
                     self.console.write(format!("[Console] {} v{} [{}]", plugin.display_name(), plugin.manifest.version, if plugin.enabled { "enabled" } else { "disabled" }));
                 }
@@ -662,12 +791,27 @@ impl LiteApp {
                 let target = words[2..].join(" ");
                 let slug = self.plugin_mgr.plugins.iter().find(|plugin| plugin.slug.eq_ignore_ascii_case(&target) || plugin.display_name().eq_ignore_ascii_case(&target)).map(|plugin| plugin.slug.clone());
                 match (action.as_str(), slug) {
-                    ("load" | "reload", Some(slug)) => { self.plugin_mgr.set_enabled(&slug, true, &mut self.config); self.save_config(); }
-                    ("unload", Some(slug)) => { self.plugin_mgr.set_enabled(&slug, false, &mut self.config); self.save_config(); }
+                    ("load" | "reload", Some(slug)) => {
+                        let ok = self.plugin_mgr.set_enabled(&slug, true, &mut self.config);
+                        self.save_config();
+                        self.console.write(if ok {
+                            format!("[Console] Plugin '{slug}' loaded.")
+                        } else {
+                            format!("[Console] Error: Unable to locate or instantiate plugin '{slug}'")
+                        });
+                    }
+                    ("unload", Some(slug)) => {
+                        self.plugin_mgr.set_enabled(&slug, false, &mut self.config);
+                        self.save_config();
+                        self.console.write(format!("[Console] Plugin '{slug}' unloaded."));
+                    }
+                    (_, None) => self.console.write(format!("[Console] plugin '{target}' not found.")),
                     _ => self.console.write("[Console] Plugin command failed. Use plugin load|reload|unload <name>."),
                 }
             }
-            _ => self.console.write("[Console] Unknown command. Type help."),
+            _ => self.console.write(
+                "[Console] Unknown command. Try: help, info, server, webview, clear, quit, restart, plugins list, plugin load|reload|unload <name>",
+            ),
         }
     }
 
@@ -680,6 +824,75 @@ impl LiteApp {
             .collect::<Vec<_>>();
         if let Some(command) = self.console.render(ui, &names) {
             self.execute_command(command);
+        }
+    }
+
+    /// topmost first. hidden with fewer than two layers.
+    fn render_overlay_order(&mut self, ui: &mut egui::Ui) {
+        let layers = self.plugin_mgr.overlay_layers(&self.config.overlay_order);
+        if layers.len() < 2 {
+            return;
+        }
+        let draws = self.plugin_mgr.overlay_plugins();
+
+        // top of screen first, the stack is stored bottom first
+        let mut rows: Vec<(String, String, &'static str)> = layers
+            .iter()
+            .rev()
+            .map(|(slug, page, _)| {
+                let name = self
+                    .plugin_mgr
+                    .plugins
+                    .iter()
+                    .find(|plugin| &plugin.slug == slug)
+                    .map(|plugin| plugin.display_name().to_string())
+                    .unwrap_or_else(|| slug.clone());
+                let kind = match (page.is_some(), draws.contains(slug)) {
+                    (true, true) => "page + draw",
+                    (true, false) => "page",
+                    _ => "draw",
+                };
+                (slug.clone(), name, kind)
+            })
+            .collect();
+
+        let mut moved: Option<(usize, usize)> = None;
+        egui::CollapsingHeader::new(format!("Overlay order ({} layers)", rows.len()))
+            .id_salt("overlay_order")
+            .show(ui, |ui| {
+                ui.label("Drag to reorder. The top one draws over the ones below it.");
+                ui.add_space(4.0);
+                for (index, (slug, name, kind)) in rows.iter().enumerate() {
+                    let row_id = egui::Id::new(("overlay_layer", slug));
+                    let (_, dropped) = ui.dnd_drop_zone::<usize, _>(
+                        egui::Frame::new().inner_margin(egui::Margin::symmetric(4, 2)),
+                        |ui| {
+                            ui.dnd_drag_source(row_id, index, |ui| {
+                                ui.horizontal(|ui| {
+                                    // ascii, a user font can tofu the rest
+                                    ui.weak(format!("{}.", index + 1));
+                                    ui.label(name);
+                                    ui.weak(format!("({kind})"));
+                                });
+                            });
+                        },
+                    );
+                    if let Some(from) = dropped {
+                        moved = Some((*from, index));
+                    }
+                }
+            });
+
+        if let Some((from, to)) = moved
+            && from != to
+            && from < rows.len()
+        {
+            let row = rows.remove(from);
+            rows.insert(to.min(rows.len()), row);
+            // config holds bottom first, the list is top first
+            self.config.overlay_order =
+                rows.iter().rev().map(|(slug, _, _)| slug.clone()).collect();
+            self.save_config();
         }
     }
 
@@ -702,6 +915,7 @@ impl LiteApp {
             });
         });
         ui.separator();
+        self.render_overlay_order(ui);
 
         let mut updates = Vec::new();
         let mut settings = None;
@@ -763,8 +977,23 @@ impl LiteApp {
             });
 
         for (slug, enabled) in updates {
-            self.plugin_mgr
+            let display = self
+                .plugin_mgr
+                .plugins
+                .iter()
+                .find(|plugin| plugin.slug == slug)
+                .map(|plugin| plugin.display_name().to_string())
+                .unwrap_or_else(|| slug.clone());
+            let ok = self
+                .plugin_mgr
                 .set_enabled(&slug, enabled, &mut self.config);
+            self.console.write(match (enabled, ok) {
+                (true, true) => format!("[Console] {display} has been enabled and reloaded."),
+                (true, false) => {
+                    format!("[Console] {display} failed to load (syntax/import error). Disabled.")
+                }
+                (false, _) => format!("[Console] {display} has been disabled and unloaded."),
+            });
             self.save_config();
         }
         if let Some(slug) = settings {
@@ -1004,6 +1233,11 @@ impl LiteApp {
                                 .get("short_description")
                                 .and_then(Value::as_str)
                                 .unwrap_or("");
+                            let hover = entry
+                                .get("long_description")
+                                .and_then(Value::as_str)
+                                .filter(|text| !text.is_empty())
+                                .unwrap_or(description);
                             let version = entry
                                 .get("version_number")
                                 .and_then(Value::as_str)
@@ -1061,7 +1295,7 @@ impl LiteApp {
                                                         .wrap()
                                                         .halign(egui::Align::Min),
                                                 )
-                                                .on_hover_text(description);
+                                                .on_hover_text(hover);
                                             },
                                         );
                                         ui.with_layout(
@@ -1128,12 +1362,18 @@ impl LiteApp {
                     }
                 });
                 if let Some(slug) = enable {
-                    self.plugin_mgr.set_enabled(&slug, true, &mut self.config);
+                    let ok = self.plugin_mgr.set_enabled(&slug, true, &mut self.config);
                     self.save_config();
+                    self.console.write(if ok {
+                        format!("[Core] Enabled '{slug}'.")
+                    } else {
+                        format!("[Core] '{slug}' failed to load (syntax/import error).")
+                    });
                 }
                 if let Some(slug) = disable {
                     self.plugin_mgr.set_enabled(&slug, false, &mut self.config);
                     self.save_config();
+                    self.console.write(format!("[Core] Disabled '{slug}'."));
                 }
                 if let Some(id) = install {
                     self.download_plugin(&id);
@@ -1237,10 +1477,11 @@ impl LiteApp {
         }
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let result = ureq::AgentBuilder::new()
+            let updates = ureq::AgentBuilder::new()
                 .try_proxy_from_env(false)
                 .build()
                 .post("https://api.hebnix.com/check")
+                .set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .timeout(Duration::from_secs(15))
                 .send_json(Value::Array(payload))
                 .map_err(|error| error.to_string())
@@ -1250,15 +1491,20 @@ impl LiteApp {
                         .map_err(|error| error.to_string())
                 })
                 .map(|value| value.as_array().cloned().unwrap_or_default());
-            let _ = tx.send(AppMsg::PluginUpdatesFound { result });
+            let _ = tx.send(AppMsg::PluginUpdatesFound { updates });
         });
     }
 
     fn start_plugin_updates(&mut self, updates: Vec<Value>) {
+        if updates.is_empty() {
+            self.console.write("[Core] All plugins are up to date.");
+            return;
+        }
         for update in updates {
             let plugin_id = update
                 .get("plugin_id")
                 .and_then(Value::as_str)
+                .or_else(|| update.get("id").and_then(Value::as_str))
                 .unwrap_or("");
             if plugin_id.is_empty() {
                 continue;
@@ -1279,6 +1525,11 @@ impl LiteApp {
             let id = plugin_id.to_string();
             self.console
                 .write(format!("[Core] Updating plugin '{name}'..."));
+            // unload first, the zip lands on top of files lua still has open
+            if was_enabled {
+                self.plugin_mgr.set_enabled(&slug, false, &mut self.config);
+                self.save_config();
+            }
             std::thread::spawn(move || {
                 let result = download_and_extract_plugin(&id, &plugin_dir)
                     .map(|_| format!("Plugin '{slug}' updated."));
@@ -1377,7 +1628,7 @@ impl LiteApp {
                     }
                 });
             if choice != self.config.settings.theme {
-                if theme::apply_theme(&ctx, &self.themes_dir, &self.themes_dir, &choice).is_ok() {
+                if theme::apply_theme(&ctx, &self.themes_dir, &self.fonts_dir, &choice).is_ok() {
                     self.config.settings.theme = choice;
                     self.save_config();
                 }
@@ -1402,7 +1653,7 @@ impl LiteApp {
                 let _ = theme::apply_theme(
                     &ctx,
                     &self.themes_dir,
-                    &self.themes_dir,
+                    &self.fonts_dir,
                     &self.config.settings.theme,
                 );
                 theme::apply_window_opacity(&ctx, self.config.settings.window_opacity);
@@ -1507,9 +1758,10 @@ impl LiteApp {
             }
         });
         ui.horizontal(|ui| {
-            ui.add_sized([180.0, 20.0], egui::Label::new("Start in Tray:"));
+            ui.add_sized([180.0, 20.0], egui::Label::new("Start Hidden:"));
             if ui
                 .checkbox(&mut self.config.settings.start_in_tray, "")
+                .on_hover_text("Starts minimised. Use the toggle hotkey to show it.")
                 .changed()
             {
                 self.save_config();
@@ -1605,8 +1857,9 @@ impl LiteApp {
                 ui.heading(format!("{display_name} Configuration"));
                 ui.add_space(8.0);
                 if let Err(error) = self.plugin_mgr.render_settings(&selected, ui) {
-                    self.console
-                        .write(format!("[Console] Plugin settings error: {error}"));
+                    self.console.write(format!(
+                        "[Console] Error rendering settings for {display_name}: {error}"
+                    ));
                 }
             });
     }
@@ -1624,7 +1877,8 @@ impl LiteApp {
     }
 
     fn render_notices(&mut self, ctx: &egui::Context) {
-        if self.fullscreen_notice {
+        // statsapi is the more urgent notice
+        if self.fullscreen_notice && self.statsapi_notice.is_none() {
             let mut dismiss = false;
             let mut suppress = false;
             egui::Window::new("Fullscreen warning")
@@ -1632,7 +1886,10 @@ impl LiteApp {
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label("Rocket League is fullscreen. Plugin overlays cannot draw in fullscreen mode.");
+                    ui.label(
+                        "Rocket League is set to Fullscreen, so the overlay won't draw over it.\n\
+                         Switch the game's video settings to Borderless or Windowed.",
+                    );
                     ui.horizontal(|ui| {
                         if ui.button("OK").clicked() { dismiss = true; }
                         if ui.button("Don't show again").clicked() { suppress = true; }
@@ -1648,8 +1905,11 @@ impl LiteApp {
                 self.save_config();
             }
         }
-        if !self.config.settings.suppress_statsapi_rate_warning {
+        let show_statsapi = self.statsapi_blocking
+            || !self.config.settings.suppress_statsapi_rate_warning;
+        if show_statsapi {
             if let Some(message) = self.statsapi_notice.clone() {
+                let blocking = self.statsapi_blocking;
                 let mut dismiss = false;
                 let mut suppress = false;
                 egui::Window::new("StatsAPI configuration")
@@ -1658,6 +1918,9 @@ impl LiteApp {
                     .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                     .show(ctx, |ui| {
                         ui.label(message);
+                        if blocking {
+                            ui.label("No game data reaches plugins until this is fixed.");
+                        }
                         ui.horizontal(|ui| {
                             if ui.button("Set PacketSendRate to 20").clicked() {
                                 self.update_ini_setting("PacketSendRate", "20");
@@ -1666,7 +1929,7 @@ impl LiteApp {
                             if ui.button("Later").clicked() {
                                 dismiss = true;
                             }
-                            if ui.button("Don't show again").clicked() {
+                            if !blocking && ui.button("Don't show again").clicked() {
                                 suppress = true;
                             }
                         });
@@ -1682,11 +1945,57 @@ impl LiteApp {
         }
     }
 
+    /// once, and only when a plugin wants it
+    fn ensure_webview(&mut self, wanted: bool) {
+        if self.webview.is_some() || !wanted {
+            return;
+        }
+        if !crate::webview::runtime::is_available() {
+            if !self.overlay_unavailable_said {
+                self.overlay_unavailable_said = true;
+                self.console.write("[Core] Overlays need the WebView2 runtime, which is missing. Restart Hebnix to install it.");
+            }
+            return;
+        }
+        let Some((_, visual)) = self.overlay.webview_target() else {
+            if !self.overlay_unavailable_said {
+                self.overlay_unavailable_said = true;
+                self.console
+                    .write("[Core] No overlay window on this machine, plugin overlays are off.");
+            }
+            return;
+        };
+        self.webview = Some(crate::webview::host::WebviewHost::new(visual));
+        self.overlay.commit();
+    }
+
     fn render_game_overlay(&mut self) {
-        let slugs = self.plugin_mgr.overlay_plugins();
-        if slugs.is_empty() || !hebnix_sdk::process::is_rocket_league_focused() {
+        let layers = self.plugin_mgr.overlay_layers(&self.config.overlay_order);
+        self.ensure_webview(!layers.is_empty());
+        if let Some(webview) = &mut self.webview {
+            webview.sync_pages(&layers);
+        }
+        // each plugin paints its own canvas
+        let draws = self.plugin_mgr.overlay_plugins();
+        let slugs: Vec<String> = layers
+            .iter()
+            .map(|(slug, _, _)| slug.clone())
+            .filter(|slug| draws.contains(slug))
+            .collect();
+        let webview_wants = self
+            .webview
+            .as_ref()
+            .is_some_and(|webview| webview.wants_overlay());
+        let focused = hebnix_sdk::process::is_rocket_league_focused();
+        if (slugs.is_empty() && !webview_wants) || !focused {
             self.overlay.hide();
             self.overlay_rect = None;
+            if let Some(webview) = &mut self.webview {
+                if let Some((hwnd, _)) = self.overlay.webview_target() {
+                    webview.tick(hwnd, (1, 1), false);
+                }
+            }
+            self.report_webview_error();
             return;
         }
         let due = self
@@ -1701,17 +2010,52 @@ impl LiteApp {
             self.overlay.hide();
             return;
         };
-        let mut errors = Vec::new();
-        self.overlay.frame(rect, |width, height| {
-            for slug in &slugs {
-                if let Err(error) = self.plugin_mgr.render_overlay_gdi(slug, width, height) {
-                    errors.push(format!("[Core] Overlay error in '{slug}': {error}"));
-                }
+        let (left, top, right, bottom) = rect;
+        let size = ((right - left).max(1) as u32, (bottom - top).max(1) as u32);
+        if let Some(webview) = &mut self.webview {
+            if let Some((hwnd, _)) = self.overlay.webview_target() {
+                webview.tick(hwnd, size, true);
             }
-        });
+        }
+        self.report_webview_error();
+
+        let ready = self
+            .webview
+            .as_ref()
+            .is_some_and(|webview| webview.is_ready())
+            && self.overlay.place(rect);
+        if !ready {
+            return; // no browser yet, nothing can paint
+        }
+
+        let mut errors = Vec::new();
+        let (width, height) = (size.0 as f32, size.1 as f32);
+        crate::overlay::record_start();
+        // one message a frame, a call per primitive would be thousands a second
+        let mut batches: Vec<(String, Vec<serde_json::Value>)> = Vec::new();
+        for slug in &slugs {
+            if let Err(error) = self.plugin_mgr.render_overlay_gdi(slug, width, height) {
+                errors.push(format!("[Core] Overlay error in '{slug}': {error}"));
+            }
+            batches.push((slug.clone(), crate::overlay::record_take()));
+        }
+        crate::overlay::record_end();
+        if let Some(webview) = &self.webview {
+            if let Err(error) = webview.paint(&batches, size) {
+                tracing::debug!("overlay paint dropped: {error}");
+            }
+        }
         for error in errors {
             self.console.write(error);
         }
+    }
+
+    fn report_webview_error(&mut self) {
+        let Some(message) = self.webview.as_mut().and_then(|w| w.take_error()) else {
+            return;
+        };
+        self.console
+            .write(format!("[Core] Overlay webview failed: {message}"));
     }
 
     fn render_plugin_windows(&mut self, ctx: &egui::Context) {
@@ -1749,6 +2093,7 @@ impl LiteApp {
                 .with_always_on_top()
                 .with_resizable(false)
                 .with_transparent(true)
+                .with_mouse_passthrough(false)
                 .with_visible(state.open)
                 .with_taskbar(false);
             if let Some((x, y)) = state.pos {
@@ -1759,7 +2104,19 @@ impl LiteApp {
                     return;
                 }
                 let ctx = ui.ctx().clone();
-                egui::CentralPanel::default().show(ui, |ui| {
+                ctx.request_repaint();
+                // window.opacity is a plugin option, 0 means a bare overlay
+                let fill = ui.visuals().window_fill;
+                let fill = Color32::from_rgba_unmultiplied(
+                    fill.r(),
+                    fill.g(),
+                    fill.b(),
+                    (state.opacity * 255.0) as u8,
+                );
+                let frame = egui::Frame::new()
+                    .fill(fill)
+                    .inner_margin(egui::Margin::same(8));
+                egui::CentralPanel::default().frame(frame).show(ui, |ui| {
                     let (rect, response) = ui.allocate_exact_size(
                         egui::vec2(ui.available_width(), 22.0),
                         egui::Sense::drag(),
@@ -1798,12 +2155,22 @@ impl LiteApp {
                     }
                     ui.separator();
                     if let Err(error) = self.plugin_mgr.render_window(&slug, ui) {
-                        ui.colored_label(Color32::LIGHT_RED, error);
+                        ui.colored_label(Color32::LIGHT_RED, format!("window error: {error}"));
                     }
                 });
                 if let Some(rect) = ctx.input(|input| input.viewport().outer_rect) {
-                    self.plugin_mgr
-                        .set_window_pos(&slug, rect.min.x, rect.min.y);
+                    let new_pos = (rect.min.x, rect.min.y);
+                    // only when moved, this reaches disk every second
+                    let moved = match state.last_pos {
+                        Some((x, y)) => {
+                            (x - new_pos.0).abs() > 1.0 || (y - new_pos.1).abs() > 1.0
+                        }
+                        None => true,
+                    };
+                    if moved {
+                        self.plugin_mgr
+                            .set_window_pos(&slug, new_pos.0, new_pos.1);
+                    }
                 }
             });
         }
@@ -1862,6 +2229,11 @@ impl eframe::App for LiteApp {
             if self.update_info.is_some() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             } else {
+                if self.last_size.0 > 0 && self.last_size.1 > 0 {
+                    self.config.window.width = self.last_size.0;
+                    self.config.window.height = self.last_size.1;
+                    self.save_config();
+                }
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
         }
@@ -1929,16 +2301,20 @@ impl eframe::App for LiteApp {
                 });
             });
             ui.separator();
-            match self.tab {
-                Tab::Console => self.render_console(ui),
-                Tab::Plugins => self.render_plugins(ui),
-                Tab::Settings => self.render_settings(ui),
-                Tab::About => self.render_about(ui),
+            // nothing behind a hidden window needs building
+            if !self.hidden {
+                match self.tab {
+                    Tab::Console => self.render_console(ui),
+                    Tab::Plugins => self.render_plugins(ui),
+                    Tab::Settings => self.render_settings(ui),
+                    Tab::About => self.render_about(ui),
+                }
             }
         });
         self.plugin_mgr.dispatch_tick();
-        self.plugin_mgr.flush_window_positions();
+        // render first, it is what records new positions to flush
         self.render_plugin_windows(&ctx);
+        self.plugin_mgr.flush_window_positions();
         self.render_game_overlay();
         self.render_install_modal(&ctx);
         self.render_notices(&ctx);
@@ -1962,14 +2338,30 @@ fn install_zip(zip_path: &std::path::Path, plugin_dir: &std::path::Path) -> Resu
         .map_err(|error| error.to_string())
 }
 
+/// three tries. a status error is final, only transport failures retry.
+fn get_retry(url: &str, timeout: Duration) -> Result<ureq::Response, String> {
+    let agent = ureq::AgentBuilder::new().try_proxy_from_env(false).build();
+    let mut last = String::new();
+    for attempt in 0..3 {
+        match agent.get(url).timeout(timeout).call() {
+            Ok(response) => return Ok(response),
+            Err(error @ ureq::Error::Status(..)) => return Err(error.to_string()),
+            Err(error) => {
+                last = error.to_string();
+                if attempt < 2 {
+                    std::thread::sleep(Duration::from_millis(600 * (attempt + 1)));
+                }
+            }
+        }
+    }
+    Err(last)
+}
+
 fn download_and_extract_plugin(id: &str, plugin_dir: &std::path::Path) -> Result<(), String> {
-    let response = ureq::AgentBuilder::new()
-        .try_proxy_from_env(false)
-        .build()
-        .get(&format!("https://api.hebnix.com/download/plugin/{id}"))
-        .timeout(Duration::from_secs(30))
-        .call()
-        .map_err(|error| error.to_string())?;
+    let response = get_retry(
+        &format!("https://api.hebnix.com/download/plugin/{id}"),
+        Duration::from_secs(30),
+    )?;
     let mut bytes = Vec::new();
     std::io::Read::read_to_end(&mut response.into_reader(), &mut bytes)
         .map_err(|error| error.to_string())?;

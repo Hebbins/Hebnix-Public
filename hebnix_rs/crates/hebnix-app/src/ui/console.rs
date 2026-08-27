@@ -16,10 +16,11 @@ pub struct ConsoleState {
     stick_to_bottom: bool,
 }
 
-const BASE_COMMANDS: [&str; 10] = [
+const BASE_COMMANDS: [&str; 11] = [
     "help",
     "info",
     "server",
+    "webview",
     "plugin load ",
     "plugin reload ",
     "plugin unload ",

@@ -79,6 +79,8 @@ pub struct Config {
     pub patcher: PatcherCfg,
     /// enabled state keyed by plugin slug
     pub plugins: BTreeMap<String, bool>,
+    /// overlay stacking, bottom first. slugs not listed go on top in load order.
+    pub overlay_order: Vec<String>,
 }
 
 impl Config {
