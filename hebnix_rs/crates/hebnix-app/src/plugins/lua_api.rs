@@ -1059,8 +1059,6 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         )?;
     }
 
-<<<<<<< Updated upstream
-=======
     // hebnix.settings.* - small settings-page helpers
     let settings = lua.create_table()?;
     {
@@ -1084,7 +1082,6 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     }
     hebnix.set("settings", settings)?;
 
->>>>>>> Stashed changes
     // non-blocking tracker fetch by StatsAPI PrimaryId ("Steam|..|0")
     // Poll with hebnix.stats_result(primary_id).
     hebnix.set(
