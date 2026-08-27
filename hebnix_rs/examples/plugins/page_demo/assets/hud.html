@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden;
+               font-family: Segoe UI, sans-serif; color: #fff; }
+  #card { position: absolute; min-width: 240px; padding: 14px 18px; border-radius: 10px;
+          background: rgba(18, 20, 26, 0.72);
+          border: 1px solid rgba(120, 200, 255, 0.35);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+  #card.tl { top: 60px; left: 40px; }
+  #card.tr { top: 60px; right: 40px; }
+  #card.bl { bottom: 60px; left: 40px; }
+  #card.br { bottom: 60px; right: 40px; }
+  h1 { margin: 0 0 8px; font-size: 15px; letter-spacing: 0.3px; }
+  .row { display: flex; justify-content: space-between; gap: 18px;
+         font-size: 13px; padding: 2px 0; }
+  .key { opacity: 0.6; }
+  .waiting { opacity: 0.6; font-size: 12px; }
+  .media { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+  .media img { width: 32px; height: 32px; border-radius: 4px;
+               background: rgba(255, 255, 255, 0.1); }
+  .media span { font-size: 11px; opacity: 0.6; }
+</style>
+</head>
+<body>
+  <div id="card" class="tl">
+    <h1>Page Demo</h1>
+    <div id="body"><div class="waiting">waiting for data...</div></div>
+    <div class="media">
+      <img src="local.png" alt="">
+      <img src="https://www.google.com/favicon.ico" alt="">
+      <span>local / remote</span>
+    </div>
+  </div>
+  <script>
+    var CORNERS = {
+      'Top left': 'tl', 'Top right': 'tr',
+      'Bottom left': 'bl', 'Bottom right': 'br',
+    };
+
+    window.addEventListener('message', function (event) {
+      var d = event.data || {};
+      document.getElementById('card').className = CORNERS[d.corner] || 'tl';
+      document.getElementById('body').innerHTML =
+        row('ticks', d.ticks) + row('platform', d.platform) + row('connected', d.connected);
+    });
+
+    function row(key, value) {
+      return '<div class="row"><span class="key">' + key + '</span><span>' +
+             String(value) + '</span></div>';
+    }
+  </script>
+</body>
+</html>

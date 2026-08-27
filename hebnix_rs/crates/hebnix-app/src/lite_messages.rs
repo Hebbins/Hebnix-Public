@@ -16,6 +16,10 @@ pub enum AppMsg {
     ToggleVisibility,
     HotkeyCaptured(Option<String>),
     Topmost(bool),
+    OverlayPost {
+        slug: String,
+        data: serde_json::Value,
+    },
     PluginHttpRes {
         slug: String,
         req_id: String,
@@ -54,7 +58,7 @@ pub enum AppMsg {
         error: String,
     },
     PluginUpdatesFound {
-        result: Result<Vec<Value>, String>,
+        updates: Result<Vec<Value>, String>,
     },
     PluginAutoUpdateDone {
         slug: String,

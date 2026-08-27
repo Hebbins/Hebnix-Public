@@ -1,19 +1,39 @@
-//! click-through game overlay, two backends behind one interface.
+//! click-through game overlay.
 //!
-//! dcomp (preferred): gpu-composited transparent window via DirectComposition
-//! (d3d11 + direct2d + premult alpha), same trick discord/game bar use, near
-//! zero cost, full #RRGGBBAA alpha. gdi (fallback when d3d11 init fails): the
-//! old layered color-key window (python W2SOverlay), opaque only, pure black =
-//! transparent.
+//! a WS_EX_NOREDIRECTIONBITMAP layered popup (no gdi redirection surface) -> a
+//! DirectComposition visual tree bound to it -> the WebView2 composition
+//! controller renders into one of those visuals. dwm blends the premult-alpha
+//! result over the game, so true per-pixel alpha, no color key.
 //!
-//! plugins draw via the free fns here (line, rect, ..) which dispatch to
-//! whichever backend's canvas is live this frame. all on the main thread.
-
-pub mod dcomp;
-pub mod gdi;
+//! nothing is painted here. plugin html lives in iframes on that page, and the
+//! draw primitives below are recorded as json and replayed on a canvas in the
+//! same page.
+//!
+//! external window, nothing injected into RL, so it's anti-cheat safe. the
+//! only cost is a topmost translucent window makes dwm compose the game
+//! instead of flipping it exclusively.
 
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+
+use windows::Win32::Foundation::{E_FAIL, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP};
+use windows::Win32::Graphics::Direct3D11::{
+    D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION, D3D11CreateDevice, ID3D11Device,
+};
+use windows::Win32::Graphics::DirectComposition::{
+    DCompositionCreateDevice, IDCompositionDevice, IDCompositionTarget, IDCompositionVisual,
+};
+use windows::Win32::Graphics::Dxgi::IDXGIDevice;
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::UI::WindowsAndMessaging::{
+    CreateWindowExW, DefWindowProcW, DestroyWindow, HWND_TOPMOST, IsWindowVisible, RegisterClassW,
+    SW_HIDE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SetWindowPos, ShowWindow, WNDCLASSW, WS_EX_LAYERED,
+    WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+};
+use windows::core::{Interface, PCWSTR, Result};
+
+const CLASS_NAME: &str = "HebnixDCompOverlayV1";
 
 /// active overlay window, readable from any thread. the monitor thread uses it
 /// to force-hide the overlay the instant the game loses focus, independent of
@@ -21,8 +41,13 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 /// stale overlay up).
 static OVERLAY_HWND: AtomicIsize = AtomicIsize::new(0);
 
-pub(crate) fn register_hwnd(hwnd: windows::Win32::Foundation::HWND) {
-    OVERLAY_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
+/// hosts a plugin may load pictures, audio and video from. 
+pub fn media_host_allowed(uri: &str) -> bool {
+    uri.split('/').nth(2).is_some_and(|authority| {
+        authority.split(':').next().is_some_and(|host| {
+            host.ends_with(".plugin.hebnix") || host == "hebnix.com" || host.ends_with(".hebnix.com")
+        })
+    })
 }
 
 /// hide the overlay now if it's visible. safe from any thread.
@@ -31,52 +56,62 @@ pub fn enforce_hidden() {
     if raw == 0 {
         return;
     }
-    let hwnd = windows::Win32::Foundation::HWND(raw as *mut _);
+    let hwnd = HWND(raw as *mut _);
     unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible, SW_HIDE, ShowWindow};
         if IsWindowVisible(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_HIDE);
         }
     }
 }
 
+// Draw primitives, called from the Lua `draw` table. Recorded rather than
+// painted, then replayed on the page's canvas. No-ops outside a frame.
+
 /// rgba color, straight (non-premultiplied) alpha 0-255
 #[derive(Clone, Copy)]
 pub struct Rgba(pub u8, pub u8, pub u8, pub u8);
 
-enum Canvas {
-    Gdi(windows::Win32::Graphics::Gdi::HDC),
-    D2d(dcomp::D2dCanvas),
-}
-
 thread_local! {
-    static CANVAS: RefCell<Option<Canvas>> = const { RefCell::new(None) };
+    /// primitives collected while a plugin's on_overlay runs
+    static RECORDER: RefCell<Option<Vec<serde_json::Value>>> = const { RefCell::new(None) };
 }
 
-fn with_canvas(f: impl FnOnce(&Canvas)) {
-    CANVAS.with(|c| {
-        if let Some(canvas) = c.borrow().as_ref() {
-            f(canvas);
+/// css color for the page's 2d context
+fn css(color: Rgba) -> String {
+    let Rgba(r, g, b, a) = color;
+    format!("rgba({r},{g},{b},{:.3})", a as f32 / 255.0)
+}
+
+fn record(command: serde_json::Value) {
+    RECORDER.with(|slot| {
+        if let Some(buffer) = slot.borrow_mut().as_mut() {
+            buffer.push(command);
         }
     });
 }
 
-// Drawing primitives called from the Lua `draw` table. No-ops outside a
-// frame (canvas unset).
+/// arm the recorder. one plugin at a time so batches can be tagged.
+pub fn record_start() {
+    RECORDER.with(|slot| *slot.borrow_mut() = Some(Vec::new()));
+}
+
+/// takes what the last plugin drew, stays armed
+pub fn record_take() -> Vec<serde_json::Value> {
+    RECORDER.with(|slot| match slot.borrow_mut().as_mut() {
+        Some(buffer) => std::mem::take(buffer),
+        None => Vec::new(),
+    })
+}
+
+pub fn record_end() {
+    RECORDER.with(|slot| *slot.borrow_mut() = None);
+}
 
 pub fn line(x1: f32, y1: f32, x2: f32, y2: f32, color: Rgba, width: f32) {
-    with_canvas(|canvas| match canvas {
-        Canvas::Gdi(hdc) => gdi::line(
-            *hdc,
-            x1 as i32,
-            y1 as i32,
-            x2 as i32,
-            y2 as i32,
-            color,
-            width as i32,
-        ),
-        Canvas::D2d(c) => c.line(x1, y1, x2, y2, color, width),
-    });
+    record(serde_json::json!({
+        "op": "line", "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+        "color": css(color), "width": width,
+    }));
 }
 
 pub fn rect(
@@ -90,110 +125,259 @@ pub fn rect(
     filled: bool,
     radius: f32,
 ) {
-    with_canvas(|canvas| match canvas {
-        Canvas::Gdi(hdc) => gdi::rect(
-            *hdc,
-            x as i32,
-            y as i32,
-            w as i32,
-            h as i32,
-            fill,
-            border,
-            width as i32,
-            filled,
-            radius as i32,
-        ),
-        Canvas::D2d(c) => c.rect(x, y, w, h, fill, border, width, filled, radius),
-    });
+    record(serde_json::json!({
+        "op": "rect", "x": x, "y": y, "w": w, "h": h,
+        "fill": css(fill), "border": css(border),
+        "width": width, "filled": filled, "radius": radius,
+    }));
 }
 
 pub fn circle(x: f32, y: f32, radius: f32, color: Rgba, width: f32, filled: bool) {
-    with_canvas(|canvas| match canvas {
-        Canvas::Gdi(hdc) => gdi::circle(
-            *hdc,
-            x as i32,
-            y as i32,
-            radius as i32,
-            color,
-            width as i32,
-            filled,
-        ),
-        Canvas::D2d(c) => c.circle(x, y, radius, color, width, filled),
-    });
+    record(serde_json::json!({
+        "op": "circle", "x": x, "y": y, "r": radius,
+        "color": css(color), "width": width, "filled": filled,
+    }));
 }
 
 pub fn text(x: f32, y: f32, s: &str, color: Rgba, size: f32, halign: &str) {
-    with_canvas(|canvas| match canvas {
-        Canvas::Gdi(hdc) => gdi::text(*hdc, x as i32, y as i32, s, color, size as i32, halign),
-        Canvas::D2d(c) => c.text(x, y, s, color, size, halign),
-    });
+    record(serde_json::json!({
+        "op": "text", "x": x, "y": y, "text": s,
+        "color": css(color), "size": size, "halign": halign,
+    }));
 }
 
 pub fn polygon(points: &[(f32, f32)], color: Rgba) {
     if points.len() < 3 {
         return;
     }
-    with_canvas(|canvas| match canvas {
-        Canvas::Gdi(hdc) => {
-            let pts: Vec<(i32, i32)> = points.iter().map(|&(x, y)| (x as i32, y as i32)).collect();
-            gdi::polygon(*hdc, &pts, color);
-        }
-        Canvas::D2d(c) => c.polygon(points, color),
-    });
+    let points: Vec<serde_json::Value> = points
+        .iter()
+        .map(|&(x, y)| serde_json::json!([x, y]))
+        .collect();
+    record(serde_json::json!({ "op": "polygon", "points": points, "color": css(color) }));
 }
 
 pub fn image(path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32) {
-    with_canvas(|canvas| match canvas {
-        Canvas::Gdi(hdc) => gdi::image(*hdc, path, x as i32, y as i32, w as i32, h as i32, opacity),
-        Canvas::D2d(c) => c.image(path, x, y, w, h, opacity),
-    });
+    record(serde_json::json!({
+        "op": "image", "path": path, "x": x, "y": y, "w": w, "h": h, "opacity": opacity,
+    }));
 }
 
-/// the overlay window, whichever backend the machine supports
-pub enum Overlay {
-    Dcomp(dcomp::DcompOverlay),
-    Gdi(gdi::GdiOverlay),
+/// the overlay window. inner is None when DirectComposition would not start,
+/// then every method no-ops and there is no overlay at all.
+pub struct Overlay {
+    inner: Option<Window>,
 }
 
 impl Overlay {
     pub fn new() -> Self {
-        match dcomp::DcompOverlay::new() {
-            Ok(o) => {
+        match Window::new() {
+            Ok(window) => {
                 tracing::info!("game overlay: DirectComposition backend");
-                Overlay::Dcomp(o)
+                Self {
+                    inner: Some(window),
+                }
             }
-            Err(e) => {
-                tracing::warn!("DirectComposition overlay unavailable ({e}); using GDI fallback");
-                Overlay::Gdi(gdi::GdiOverlay::new())
+            Err(error) => {
+                tracing::warn!("no DirectComposition overlay ({error}), overlays are off");
+                Self { inner: None }
             }
         }
     }
 
-    /// position over rect, let draw_fn paint, present. draw_fn gets the overlay
-    /// size in pixels.
-    pub fn frame(&mut self, rect: (i32, i32, i32, i32), draw_fn: impl FnOnce(f32, f32)) {
-        match self {
-            Overlay::Dcomp(o) => {
-                o.frame(rect, |canvas, w, h| {
-                    CANVAS.with(|c| *c.borrow_mut() = Some(Canvas::D2d(canvas)));
-                    draw_fn(w, h);
-                    CANVAS.with(|c| *c.borrow_mut() = None);
-                });
-            }
-            Overlay::Gdi(o) => {
-                o.frame(rect, |hdc, w, h| {
-                    CANVAS.with(|c| *c.borrow_mut() = Some(Canvas::Gdi(hdc)));
-                    draw_fn(w, h);
-                    CANVAS.with(|c| *c.borrow_mut() = None);
-                });
+    /// hwnd + the visual the page renders into
+    pub fn webview_target(&self) -> Option<(HWND, IDCompositionVisual)> {
+        let window = self.inner.as_ref()?;
+        Some((window.hwnd, window.webview_visual.clone()))
+    }
+
+    /// visual tree edits land on screen only after this
+    pub fn commit(&self) {
+        if let Some(window) = &self.inner {
+            unsafe {
+                let _ = window.dcomp_device.Commit();
             }
         }
+    }
+
+    /// sit over rect and stay visible. false when there is no overlay window.
+    pub fn place(&mut self, rect: (i32, i32, i32, i32)) -> bool {
+        let Some(window) = &mut self.inner else {
+            return false;
+        };
+        let (left, top, right, bottom) = rect;
+        let (w, h) = ((right - left).max(1) as u32, (bottom - top).max(1) as u32);
+        unsafe {
+            if window.last_rect != Some(rect) {
+                let _ = SetWindowPos(
+                    window.hwnd,
+                    Some(HWND_TOPMOST),
+                    left,
+                    top,
+                    w as i32,
+                    h as i32,
+                    SWP_NOACTIVATE,
+                );
+                window.last_rect = Some(rect);
+            }
+            let _ = window.dcomp_device.Commit();
+            // the monitor thread can hide us, so ask rather than cache
+            if !IsWindowVisible(window.hwnd).as_bool() {
+                let _ = ShowWindow(window.hwnd, SW_SHOWNOACTIVATE);
+            }
+        }
+        true
     }
 
     pub fn hide(&mut self) {
-        match self {
-            Overlay::Dcomp(o) => o.hide(),
-            Overlay::Gdi(o) => o.hide(),
+        if let Some(window) = &self.inner {
+            unsafe {
+                if IsWindowVisible(window.hwnd).as_bool() {
+                    let _ = ShowWindow(window.hwnd, SW_HIDE);
+                }
+            }
         }
+    }
+}
+
+/// the window plus the composition device the browser renders into
+struct Window {
+    hwnd: HWND,
+    last_rect: Option<(i32, i32, i32, i32)>,
+    #[allow(dead_code)]
+    d3d: ID3D11Device,
+    dcomp_device: IDCompositionDevice,
+    #[allow(dead_code)]
+    dcomp_target: IDCompositionTarget,
+    #[allow(dead_code)]
+    dcomp_root: IDCompositionVisual,
+    /// handed to the WebView2 composition controller, empty until then
+    webview_visual: IDCompositionVisual,
+}
+
+impl Window {
+    fn new() -> Result<Self> {
+        unsafe {
+            let hwnd = create_window()?;
+            OVERLAY_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
+
+            // D3D11 device (hardware, WARP fallback), BGRA for the composition surface
+            let mut device: Option<ID3D11Device> = None;
+            let flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+            let mut hr = D3D11CreateDevice(
+                None,
+                D3D_DRIVER_TYPE_HARDWARE,
+                Default::default(),
+                flags,
+                None,
+                D3D11_SDK_VERSION,
+                Some(&mut device),
+                None,
+                None,
+            );
+            if hr.is_err() {
+                hr = D3D11CreateDevice(
+                    None,
+                    D3D_DRIVER_TYPE_WARP,
+                    Default::default(),
+                    flags,
+                    None,
+                    D3D11_SDK_VERSION,
+                    Some(&mut device),
+                    None,
+                    None,
+                );
+            }
+            hr?;
+            let d3d = device.ok_or_else(|| windows::core::Error::from_hresult(E_FAIL))?;
+            let dxgi_device: IDXGIDevice = d3d.cast()?;
+
+            let dcomp_device: IDCompositionDevice = DCompositionCreateDevice(&dxgi_device)?;
+            let dcomp_target = dcomp_device.CreateTargetForHwnd(hwnd, true)?;
+            let dcomp_root = dcomp_device.CreateVisual()?;
+            let webview_visual = dcomp_device.CreateVisual()?;
+            dcomp_target.SetRoot(&dcomp_root)?;
+            dcomp_root.AddVisual(&webview_visual, true, None)?;
+
+            Ok(Self {
+                hwnd,
+                last_rect: None,
+                d3d,
+                dcomp_device,
+                dcomp_target,
+                dcomp_root,
+                webview_visual,
+            })
+        }
+    }
+}
+
+impl Drop for Window {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = DestroyWindow(self.hwnd);
+        }
+    }
+}
+
+static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
+
+unsafe extern "system" fn wnd_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    // Never own a hit-test: every click/hover falls through to whatever is
+    // underneath (the game), independent of window styles.
+    const WM_NCHITTEST: u32 = 0x0084;
+    const HTTRANSPARENT: isize = -1;
+    if msg == WM_NCHITTEST {
+        return LRESULT(HTTRANSPARENT);
+    }
+    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+fn create_window() -> Result<HWND> {
+    unsafe {
+        let class_wide: Vec<u16> = format!("{CLASS_NAME}\0").encode_utf16().collect();
+        let hinstance = GetModuleHandleW(None).ok();
+        let hinst = hinstance.map(|h| windows::Win32::Foundation::HINSTANCE(h.0));
+
+        if !CLASS_REGISTERED.swap(true, Ordering::SeqCst) {
+            let wc = WNDCLASSW {
+                lpfnWndProc: Some(wnd_proc),
+                hInstance: hinst.unwrap_or_default(),
+                lpszClassName: PCWSTR(class_wide.as_ptr()),
+                ..Default::default()
+            };
+            RegisterClassW(&wc);
+        }
+
+        // NOREDIRECTIONBITMAP: no GDI surface; content comes only from the
+        // composition tree. LAYERED+TRANSPARENT: click-through, the TRANSPARENT
+        // bit only passes input through when LAYERED is also set (we never call
+        // SetLayeredWindowAttributes; with no redirection bitmap there is
+        // nothing for it to affect).
+        let ex_style = WS_EX_NOREDIRECTIONBITMAP
+            | WS_EX_LAYERED
+            | WS_EX_TRANSPARENT
+            | WS_EX_TOPMOST
+            | WS_EX_TOOLWINDOW;
+        let empty: Vec<u16> = "\0".encode_utf16().collect();
+        CreateWindowExW(
+            ex_style,
+            PCWSTR(class_wide.as_ptr()),
+            PCWSTR(empty.as_ptr()),
+            WS_POPUP,
+            0,
+            0,
+            100,
+            100,
+            None,
+            None,
+            hinst,
+            None,
+        )
     }
 }

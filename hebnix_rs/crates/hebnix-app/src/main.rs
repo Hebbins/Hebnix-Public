@@ -43,6 +43,7 @@ mod upk_keys {
     pub use crate::patcher::upk_keys::*;
 }
 mod watchdog;
+mod webview;
 mod winutil;
 
 use app::HebnixApp;
@@ -163,6 +164,8 @@ fn main() -> eframe::Result {
 
     spoofer::restore_if_crashed(&base_dir);
     let _ = watchdog::spawn();
+
+    webview::runtime::ensure_present();
 
     let mut viewport = eframe::egui::ViewportBuilder::default()
         .with_title("Hebnix")
