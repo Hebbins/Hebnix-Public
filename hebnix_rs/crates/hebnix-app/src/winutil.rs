@@ -6,8 +6,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use windows::Win32::Foundation::{
     ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND, LPARAM, LRESULT, WPARAM,
 };
+use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
 use windows::Win32::System::Threading::{CreateMutexW, GetCurrentProcessId};
-use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+use windows::Win32::UI::Shell::{DefSubclassProc, ITaskbarList, SetWindowSubclass, TaskbarList};
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowW, GetForegroundWindow, GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST,
     IsIconic, IsWindow, IsWindowVisible, SW_RESTORE, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE,
@@ -134,7 +135,8 @@ fn focus_window(hwnd: HWND) -> bool {
     }
 }
 
-/// note which program we came from
+/// note which program we came from. ours doesnt count, the monitor calls this
+/// on its tick so it tracks whatever you were last actually in.
 pub fn note_foreground() {
     if foreground_window_is_ours() {
         return;
@@ -147,8 +149,12 @@ pub fn note_foreground() {
 
 /// hand the foreground back, but only when the game is what we came from.
 pub fn restore_foreground() -> bool {
-    if !CAME_FROM_GAME.load(Ordering::Relaxed) {
+    // alt-tabbed off and hid it from there, whoever holds focus keeps it
+    if !foreground_window_is_ours() {
         return false;
+    }
+    if !CAME_FROM_GAME.swap(false, Ordering::Relaxed) {
+        return false; // one shot
     }
     let Some(hwnd) = hebnix_sdk::process::rocket_league_hwnd() else {
         return false;
@@ -171,19 +177,13 @@ pub fn focus_main_window() -> bool {
 // hide function since minimization cause bugs
 
 const WM_SYSCOMMAND: u32 = 0x0112;
-const WM_ACTIVATE: u32 = 0x0006;
 const SC_MINIMIZE: usize = 0xF020;
 
 static MINIMIZE_REQUESTED: AtomicBool = AtomicBool::new(false);
-static SHOW_REQUESTED: AtomicBool = AtomicBool::new(false);
 static REPAINT_CTX: std::sync::OnceLock<eframe::egui::Context> = std::sync::OnceLock::new();
 
 pub fn take_minimize_request() -> bool {
     MINIMIZE_REQUESTED.swap(false, Ordering::Relaxed)
-}
-
-pub fn take_show_request() -> bool {
-    SHOW_REQUESTED.swap(false, Ordering::Relaxed)
 }
 
 fn wake_ui() {
@@ -201,25 +201,11 @@ unsafe extern "system" fn minimize_proc(
     _data: usize,
 ) -> LRESULT {
     unsafe {
-        match msg {
-            // low 4 bits are reserved
-            WM_SYSCOMMAND if (wparam.0 & 0xFFF0) == SC_MINIMIZE => {
-                // taskbar click on an already focused window minimizes it, so
-                // while hidden that same click is a request to come back
-                if MAIN_HIDDEN.load(Ordering::Relaxed) {
-                    SHOW_REQUESTED.store(true, Ordering::Relaxed);
-                } else {
-                    MINIMIZE_REQUESTED.store(true, Ordering::Relaxed);
-                }
-                wake_ui();
-                return LRESULT(0);
-            }
-            // taskbar or alt-tab onto a window thats invisible at alpha 0
-            WM_ACTIVATE if (wparam.0 & 0xFFFF) != 0 && MAIN_HIDDEN.load(Ordering::Relaxed) => {
-                SHOW_REQUESTED.store(true, Ordering::Relaxed);
-                wake_ui();
-            }
-            _ => {}
+        // low 4 bits are reserved
+        if msg == WM_SYSCOMMAND && (wparam.0 & 0xFFF0) == SC_MINIMIZE {
+            MINIMIZE_REQUESTED.store(true, Ordering::Relaxed);
+            wake_ui();
+            return LRESULT(0);
         }
         DefSubclassProc(hwnd, msg, wparam, lparam)
     }
@@ -550,8 +536,42 @@ fn clear_epic_multihome() -> Result<(), String> {
     Ok(())
 }
 
+thread_local! {
+    // com object, not Send
+    static TASKBAR: std::cell::RefCell<Option<ITaskbarList>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+fn set_taskbar_button(hwnd: HWND, shown: bool) {
+    TASKBAR.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if slot.is_none() {
+            let list = unsafe {
+                CoCreateInstance::<_, ITaskbarList>(&TaskbarList, None, CLSCTX_INPROC_SERVER).ok()
+            };
+            if let Some(list) = &list {
+                unsafe {
+                    let _ = list.HrInit();
+                }
+            }
+            *slot = list;
+        }
+        if let Some(list) = slot.as_ref() {
+            unsafe {
+                let _ = if shown {
+                    list.AddTab(hwnd)
+                } else {
+                    list.DeleteTab(hwnd)
+                };
+            }
+        }
+    });
+}
+
 /// hide by dropping the os alpha to 0. SW_HIDE crashes wgpu and takes the
-/// plugin child windows with it.
+/// plugin child windows with it. an alpha 0 window is still a normal one to the
+/// os though, so NOACTIVATE stops it being handed the foreground when whatever
+/// sat on top goes away, and TOOLWINDOW drops it from alt-tab.
 pub fn set_main_window_invisible(invisible: bool) {
     MAIN_HIDDEN.store(invisible, Ordering::Relaxed);
     if let Some(hwnd) = find_hebnix_window(true) {
@@ -559,14 +579,18 @@ pub fn set_main_window_invisible(invisible: bool) {
             use windows::Win32::Foundation::COLORREF;
             use windows::Win32::UI::WindowsAndMessaging::{
                 GWL_EXSTYLE, GetWindowLongW, LWA_ALPHA, SetLayeredWindowAttributes, SetWindowLongW,
-                WS_EX_LAYERED,
+                WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
             };
+            let away = (WS_EX_NOACTIVATE.0 | WS_EX_TOOLWINDOW.0) as i32; // read live, no frame change
             let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
             if invisible {
-                SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED.0 as i32);
+                SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED.0 as i32 | away);
                 let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 0, LWA_ALPHA);
+                set_taskbar_button(hwnd, false);
             } else {
+                SetWindowLongW(hwnd, GWL_EXSTYLE, ex_style & !away);
                 let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
+                set_taskbar_button(hwnd, true);
             }
         }
     }

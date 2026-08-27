@@ -1,16 +1,20 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND};
+use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
 use windows::Win32::System::Threading::{CreateMutexW, GetCurrentProcessId};
+use windows::Win32::UI::Shell::{ITaskbarList, TaskbarList};
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowW, GWL_EXSTYLE, GetForegroundWindow, GetWindowLongW, GetWindowThreadProcessId,
-    HWND_NOTOPMOST, HWND_TOPMOST, LWA_ALPHA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, LWA_ALPHA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
     SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongW, SetWindowPos, WS_EX_LAYERED,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
 };
 use windows::core::PCWSTR;
 
 static HIDDEN: AtomicBool = AtomicBool::new(false);
 static SHOW_REQUESTED: AtomicBool = AtomicBool::new(false);
+static CAME_FROM_GAME: AtomicBool = AtomicBool::new(false);
 
 fn wide(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
@@ -57,7 +61,17 @@ pub fn foreground_window_is_ours() -> bool {
     }
 }
 
-pub fn note_foreground() {}
+/// note which program we came from. ours doesnt count, the monitor calls this
+/// on its tick so it tracks whatever you were last actually in.
+pub fn note_foreground() {
+    if foreground_window_is_ours() {
+        return;
+    }
+    CAME_FROM_GAME.store(
+        hebnix_sdk::process::is_rocket_league_focused(),
+        Ordering::Relaxed,
+    );
+}
 
 pub fn set_main_window_topmost(topmost: bool) {
     if let Some(window) = main_window() {
@@ -87,9 +101,21 @@ pub fn focus_main_window() {
     }
 }
 
+/// hand the foreground back, but only when the game is what we came from.
 pub fn focus_rocket_league() {
+    // alt-tabbed off and hid it from there, whoever holds focus keeps it
+    if !foreground_window_is_ours() {
+        return;
+    }
+    if !CAME_FROM_GAME.swap(false, Ordering::Relaxed) {
+        return; // one shot
+    }
     if let Some(window) = hebnix_sdk::process::rocket_league_hwnd() {
         unsafe {
+            // a minimised game stays minimised, thats the user's call
+            if IsIconic(window).as_bool() {
+                return;
+            }
             let _ = SetForegroundWindow(window);
         }
     }
@@ -105,12 +131,15 @@ pub fn request_show() {
     SHOW_REQUESTED.store(true, Ordering::Relaxed);
     if let Some(window) = main_window() {
         unsafe {
+            let style = GetWindowLongW(window, GWL_EXSTYLE);
+            SetWindowLongW(window, GWL_EXSTYLE, style & !hidden_bits());
             let _ = SetLayeredWindowAttributes(
                 window,
                 windows::Win32::Foundation::COLORREF(0),
                 255,
                 LWA_ALPHA,
             );
+            set_taskbar_button(window, true);
         }
     }
 }
@@ -119,26 +148,72 @@ pub fn take_show_request() -> bool {
     SHOW_REQUESTED.swap(false, Ordering::Relaxed)
 }
 
+thread_local! {
+    // com object, not Send
+    static TASKBAR: std::cell::RefCell<Option<ITaskbarList>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+fn set_taskbar_button(window: HWND, shown: bool) {
+    TASKBAR.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if slot.is_none() {
+            let list = unsafe {
+                CoCreateInstance::<_, ITaskbarList>(&TaskbarList, None, CLSCTX_INPROC_SERVER).ok()
+            };
+            if let Some(list) = &list {
+                unsafe {
+                    let _ = list.HrInit();
+                }
+            }
+            *slot = list;
+        }
+        if let Some(list) = slot.as_ref() {
+            unsafe {
+                let _ = if shown {
+                    list.AddTab(window)
+                } else {
+                    list.DeleteTab(window)
+                };
+            }
+        }
+    });
+}
+
+/// an alpha 0 window is still a normal one to the os. NOACTIVATE stops it being
+/// handed the foreground, TOOLWINDOW drops it from alt-tab. read live, no frame
+/// change, that would resize the client area.
+fn hidden_bits() -> i32 {
+    (WS_EX_NOACTIVATE.0 | WS_EX_TOOLWINDOW.0) as i32
+}
+
 pub fn set_main_window_invisible(invisible: bool) {
     HIDDEN.store(invisible, Ordering::Relaxed);
     if let Some(window) = main_window() {
         unsafe {
             let style = GetWindowLongW(window, GWL_EXSTYLE);
             if invisible {
-                SetWindowLongW(window, GWL_EXSTYLE, style | WS_EX_LAYERED.0 as i32);
+                SetWindowLongW(
+                    window,
+                    GWL_EXSTYLE,
+                    style | WS_EX_LAYERED.0 as i32 | hidden_bits(),
+                );
                 let _ = SetLayeredWindowAttributes(
                     window,
                     windows::Win32::Foundation::COLORREF(0),
                     0,
                     LWA_ALPHA,
                 );
+                set_taskbar_button(window, false);
             } else {
+                SetWindowLongW(window, GWL_EXSTYLE, style & !hidden_bits());
                 let _ = SetLayeredWindowAttributes(
                     window,
                     windows::Win32::Foundation::COLORREF(0),
                     255,
                     LWA_ALPHA,
                 );
+                set_taskbar_button(window, true);
             }
         }
     }
