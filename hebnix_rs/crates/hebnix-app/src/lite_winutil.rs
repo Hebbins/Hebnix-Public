@@ -144,6 +144,24 @@ pub fn set_main_window_invisible(invisible: bool) {
     }
 }
 
+pub fn start_rocket_league(game_path: &std::path::Path) -> std::io::Result<()> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let path = game_path.to_string_lossy().to_ascii_lowercase();
+    let launch = if path.contains("steamapps")
+        || path.contains("steam\\common")
+        || path.contains("steam/library")
+    {
+        "steam://rungameid/252950"
+    } else {
+        "com.epicgames.launcher://apps/9773aa1aa54f4f7b80e44bef04986cea%3A530145df28a24424923f5828cc9031a1%3ASugar?action=launch&silent=true"
+    };
+    std::process::Command::new("cmd")
+        .args(["/C", "start", "", launch])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(|_| ())
+}
 pub fn restart_rocket_league(game_path: &std::path::Path) -> std::io::Result<()> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
