@@ -11,6 +11,7 @@ mod overlay;
 mod plugins;
 mod statsapi_ini;
 mod theme;
+mod update;
 mod ui {
     pub mod console;
 }

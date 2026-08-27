@@ -382,9 +382,10 @@ pub struct HebnixApp {
     plugin_monitor_checked: Option<std::time::Instant>,
 
     update_info: Option<crate::update::UpdateInfo>,
-    update_modal_open: bool,
     update_downloading: bool,
     update_error: Option<String>,
+    changelog_popup: Option<crate::update::ChangelogEntry>,
+    launch_path_notice: bool,
 
     spoofer_mgr: Arc<SpooferManager>,
     spoofer_master: bool,
@@ -475,14 +476,27 @@ impl HebnixApp {
 
         let (tx, rx) = crossbeam_channel::unbounded::<AppMsg>();
 
+        let show_changelog = base_dir.join(".first").exists();
+        let launch_marker = base_dir.join(".launch");
+        if launch_marker.exists() {
+            let _ = std::fs::remove_file(&launch_marker);
+        }
         let tx_update = tx.clone();
         let ctx_update = cc.egui_ctx.clone();
         std::thread::Builder::new()
             .name("update-checker".into())
             .spawn(move || {
-                let result = crate::update::check_for_updates(APP_VERSION);
-                let _ = tx_update.send(AppMsg::AppUpdateFetched { result });
-                ctx_update.request_repaint();
+                if let Ok(info) = crate::update::fetch_info(APP_VERSION) {
+                    let _ = tx_update.send(AppMsg::AppUpdateFetched {
+                        result: Ok(info.update),
+                    });
+                    if show_changelog {
+                        let _ = tx_update.send(AppMsg::ChangelogFetched {
+                            result: Ok(info.newest_changelog),
+                        });
+                    }
+                    ctx_update.request_repaint();
+                }
             })
             .ok();
 
@@ -793,9 +807,10 @@ impl HebnixApp {
             plugin_monitor_checked: None,
 
             update_info: None,
-            update_modal_open: false,
             update_downloading: false,
             update_error: None,
+            changelog_popup: None,
+            launch_path_notice: false,
             spoofer_mgr,
             spoofer_master,
             spoofer_http_proxy,
@@ -1224,7 +1239,6 @@ impl HebnixApp {
                         self.console
                             .write(format!("[Core] Update available: v{}", info.version));
                         self.update_info = Some(info);
-                        self.update_modal_open = true;
                     }
                     Ok(None) => {
                         self.console
@@ -1273,10 +1287,14 @@ impl HebnixApp {
                             ctx_local.request_repaint();
                         });
                     }
-                    Err(e) => self
-                        .console
-                        .write(format!("[Core] Update check failed: {e}")),
+                    Err(_) => {}
                 },
+                AppMsg::ChangelogFetched { result } => {
+                    if let Ok(Some(entry)) = result {
+                        self.changelog_popup = Some(entry);
+                        let _ = std::fs::remove_file(self.base_dir.join(".first"));
+                    }
+                }
                 AppMsg::AppUpdateFailed { error } => {
                     self.update_downloading = false;
                     self.update_error = Some(error);
@@ -1405,7 +1423,11 @@ impl HebnixApp {
                         self.set_hidden(ctx, false);
                     }
                 }
-                AppMsg::TrayQuit => self.force_quit(ctx),
+                AppMsg::TrayQuit => {
+                    if self.update_info.is_none() {
+                        self.force_quit(ctx);
+                    }
+                }
                 AppMsg::HotkeyCaptured(name) => {
                     self.capturing_hotkey = false;
                     if let Some(name) = name {
@@ -1693,6 +1715,11 @@ impl HebnixApp {
     fn auto_resolve_paths(&mut self, root_dir: &str) {
         let norm = |s: &str| s.trim_end_matches(['\\', '/']).to_lowercase();
         let mut changed = false;
+
+        if !self.config.settings.rl_path_confirmed {
+            self.config.settings.rl_path_confirmed = true;
+            changed = true;
+        }
 
         if norm(&self.config.settings.rl_path) != norm(root_dir) {
             self.config.settings.rl_path = root_dir.to_string();
@@ -3677,61 +3704,86 @@ impl HebnixApp {
     }
 
     fn render_update_modal(&mut self, ctx: &egui::Context) {
-        if !self.update_modal_open {
+        let Some(info) = self.update_info.clone() else {
             return;
-        }
+        };
 
-        if let Some(info) = &self.update_info {
-            let mut open = self.update_modal_open;
+        egui::Window::new("Update Required")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.heading(format!("Hebnix v{} is required", info.version));
+                ui.label("Hebnix is locked until the required update is installed.");
+                ui.add_space(8.0);
 
-            egui::Window::new("Update Available!")
-                .open(&mut open)
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    ui.heading(format!("Hebnix v{} is now available!", info.version));
+                if let Some(err) = &self.update_error {
+                    ui.colored_label(egui::Color32::from_rgb(0xe7, 0x4c, 0x3c), err);
                     ui.add_space(8.0);
+                }
 
-                    if let Some(err) = &self.update_error {
-                        ui.colored_label(egui::Color32::from_rgb(0xe7, 0x4c, 0x3c), err);
-                        ui.add_space(8.0);
-                    }
-
-                    ui.horizontal(|ui| {
-                        if self.update_downloading {
-                            ui.add_enabled(false, egui::Button::new("Downloading & Installing..."));
-                            ui.spinner();
-                        } else {
-                            if ui
-                                .add(
-                                    egui::Button::new("Update Now")
-                                        .fill(egui::Color32::from_rgb(0x2e, 0xcc, 0x71)),
-                                )
-                                .clicked()
-                            {
-                                self.update_downloading = true;
-                                self.update_error = None;
-
-                                let setup_url = info.setup_url.clone();
-                                let base_dir = self.base_dir.clone();
-                                let tx = self.tx.clone();
-                                let ctx = ctx.clone();
-
-                                std::thread::spawn(move || {
-                                    if let Err(e) = crate::update::download_and_install_update(
-                                        &setup_url, &base_dir,
-                                    ) {
-                                        let _ = tx.send(AppMsg::AppUpdateFailed { error: e });
-                                        ctx.request_repaint();
-                                    }
-                                });
-                            }
+                if self.update_downloading {
+                    ui.add_enabled(false, egui::Button::new("Downloading & Installing..."));
+                    ui.spinner();
+                } else if ui
+                    .add(
+                        egui::Button::new("Update Hebnix")
+                            .fill(egui::Color32::from_rgb(0x2e, 0xcc, 0x71)),
+                    )
+                    .clicked()
+                {
+                    self.update_downloading = true;
+                    self.update_error = None;
+                    let setup_url = info.setup_url;
+                    let base_dir = self.base_dir.clone();
+                    let tx = self.tx.clone();
+                    let ctx = ctx.clone();
+                    std::thread::spawn(move || {
+                        if let Err(error) =
+                            crate::update::download_and_install_update(&setup_url, &base_dir)
+                        {
+                            let _ = tx.send(AppMsg::AppUpdateFailed { error });
+                            ctx.request_repaint();
                         }
                     });
-                });
+                }
+            });
+    }
 
-            self.update_modal_open = open;
+    fn render_changelog_popup(&mut self, ctx: &egui::Context) {
+        let Some(entry) = self.changelog_popup.clone() else {
+            return;
+        };
+        let mut open = true;
+        egui::Window::new("Change Log")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .default_width(520.0)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| crate::update::render_changelog(ui, &entry));
+        if !open {
+            self.changelog_popup = None;
+        }
+    }
+
+    fn render_launch_path_notice(&mut self, ctx: &egui::Context) {
+        if !self.launch_path_notice {
+            return;
+        }
+        let mut close = false;
+        egui::Window::new("Rocket League")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.label("You must start Rocket League at least once with Hebnix running to use this function.");
+                if ui.button("OK").clicked() {
+                    close = true;
+                }
+            });
+        if close {
+            self.launch_path_notice = false;
         }
     }
 
@@ -4366,7 +4418,26 @@ impl eframe::App for HebnixApp {
         }
 
         if ctx.input(|i| i.viewport().close_requested()) && !self.quitting {
-            self.force_quit(ctx);
+            if self.update_info.is_some() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            } else {
+                self.force_quit(ctx);
+            }
+        }
+
+        if self.update_info.is_some() {
+            if self.hidden {
+                self.set_hidden(ctx, false);
+            }
+            egui::CentralPanel::default().show(ui, |ui| {
+                ui.disable();
+                ui.centered_and_justified(|ui| {
+                    ui.heading("A required Hebnix update is available");
+                });
+            });
+            self.render_update_modal(ctx);
+            ctx.request_repaint_after(Duration::from_millis(100));
+            return;
         }
 
         if !self.hidden {
@@ -4388,27 +4459,45 @@ impl eframe::App for HebnixApp {
                                 .size(12.0)
                                 .color(self.status_color),
                         );
-                        let restart = ui
-                            .add_enabled(
-                                self.last_rl_open,
-                                egui::Button::new("Restart Rocket League"),
-                            )
-                            .on_hover_text("Restart the currently attached Steam or Epic install");
-                        if restart.clicked() {
+                        let running = self.last_rl_open;
+                        let label = if running {
+                            "Restart Rocket League"
+                        } else {
+                            "Start Rocket League"
+                        };
+                        if ui.button(label).clicked() {
                             let path = self.config.settings.rl_path.clone();
-                            let tx = self.tx.clone();
-                            self.console.write("[Core] Restarting Rocket League...");
-                            std::thread::spawn(move || {
-                                let message = match crate::winutil::restart_rocket_league(
-                                    std::path::Path::new(&path),
-                                ) {
-                                    Ok(()) => "[Core] Rocket League restarted.".to_string(),
-                                    Err(error) => {
-                                        format!("[Core] Rocket League restart failed: {error}")
-                                    }
-                                };
-                                let _ = tx.send(AppMsg::Log(message));
-                            });
+                            if !self.config.settings.rl_path_confirmed
+                                || path.trim().is_empty()
+                                || !std::path::Path::new(&path).is_dir()
+                            {
+                                self.launch_path_notice = true;
+                            } else {
+                                let tx = self.tx.clone();
+                                std::thread::spawn(move || {
+                                    let result = if running {
+                                        crate::winutil::restart_rocket_league(
+                                            std::path::Path::new(&path),
+                                        )
+                                    } else {
+                                        crate::winutil::start_rocket_league(
+                                            std::path::Path::new(&path),
+                                        )
+                                    };
+                                    let action = if running { "restart" } else { "start" };
+                                    let message = match result {
+                                        Ok(()) => format!(
+                                            "[Core] Rocket League {} requested.",
+                                            action
+                                        ),
+                                        Err(error) => format!(
+                                            "[Core] Rocket League {} failed: {}",
+                                            action, error
+                                        ),
+                                    };
+                                    let _ = tx.send(AppMsg::Log(message));
+                                });
+                            }
                         }
                     });
                 });
@@ -4742,6 +4831,8 @@ impl eframe::App for HebnixApp {
             self.render_statsapi_notice(ctx);
             self.render_web_port_notice(ctx);
             self.render_fullscreen_notice(ctx);
+            self.render_launch_path_notice(ctx);
+            self.render_changelog_popup(ctx);
             self.render_update_modal(ctx);
             self.render_install_modal(ctx);
         }

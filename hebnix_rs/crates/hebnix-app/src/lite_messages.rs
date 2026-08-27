@@ -44,6 +44,15 @@ pub enum AppMsg {
     PluginDownloadDone {
         result: Result<String, String>,
     },
+    AppUpdateFetched {
+        result: Result<Option<crate::update::UpdateInfo>, String>,
+    },
+    ChangelogFetched {
+        result: Result<Option<crate::update::ChangelogEntry>, String>,
+    },
+    AppUpdateFailed {
+        error: String,
+    },
     PluginUpdatesFound {
         result: Result<Vec<Value>, String>,
     },

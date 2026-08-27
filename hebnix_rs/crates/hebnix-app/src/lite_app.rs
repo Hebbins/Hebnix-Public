@@ -110,6 +110,11 @@ pub struct LiteApp {
     fullscreen_notice: bool,
     fullscreen_notice_dismissed: bool,
     statsapi_notice: Option<String>,
+    update_info: Option<crate::update::UpdateInfo>,
+    update_downloading: bool,
+    update_error: Option<String>,
+    changelog_popup: Option<crate::update::ChangelogEntry>,
+    launch_path_notice: bool,
 }
 
 impl LiteApp {
@@ -136,6 +141,29 @@ impl LiteApp {
         theme::apply_window_opacity(&cc.egui_ctx, config.settings.window_opacity);
 
         let (tx, rx) = crossbeam_channel::unbounded();
+        let show_changelog = base_dir.join(".first").exists();
+        let launch_marker = base_dir.join(".launch");
+        if launch_marker.exists() {
+            let _ = std::fs::remove_file(&launch_marker);
+        }
+        let tx_update = tx.clone();
+        let ctx_update = cc.egui_ctx.clone();
+        std::thread::Builder::new()
+            .name("lite-update-checker".into())
+            .spawn(move || {
+                if let Ok(info) = crate::update::fetch_info(APP_VERSION) {
+                    let _ = tx_update.send(AppMsg::AppUpdateFetched {
+                        result: Ok(info.update),
+                    });
+                    if show_changelog {
+                        let _ = tx_update.send(AppMsg::ChangelogFetched {
+                            result: Ok(info.newest_changelog),
+                        });
+                    }
+                    ctx_update.request_repaint();
+                }
+            })
+            .ok();
         let stats = Arc::new(StatsClient::new("127.0.0.1", 49123));
         let (stats_tx, stats_rx) = crossbeam_channel::unbounded();
         {
@@ -235,6 +263,11 @@ impl LiteApp {
             fullscreen_notice: false,
             fullscreen_notice_dismissed: false,
             statsapi_notice: None,
+            update_info: None,
+            update_downloading: false,
+            update_error: None,
+            changelog_popup: None,
+            launch_path_notice: false,
         };
         app.theme_options = theme::list_themes(&app.themes_dir);
         app.refresh_statsapi();
@@ -370,6 +403,7 @@ impl LiteApp {
                             .rl_path
                             .trim_end_matches(['\\', '/'])
                             .eq_ignore_ascii_case(root.trim_end_matches(['\\', '/']));
+                        let newly_confirmed = !self.config.settings.rl_path_confirmed;
                         if changed {
                             self.config.settings.rl_path = root.clone();
                             self.config.settings.statsapi_path = Path::new(&root)
@@ -379,6 +413,9 @@ impl LiteApp {
                                 .to_string_lossy()
                                 .to_string();
                             self.refresh_statsapi();
+                        }
+                        if changed || newly_confirmed {
+                            self.config.settings.rl_path_confirmed = true;
                             self.save_config();
                         }
                         self.plugin_mgr.shared.borrow_mut().platform =
@@ -468,6 +505,21 @@ impl LiteApp {
                             .console
                             .write(format!("[Console] Plugin installation failed: {error}")),
                     }
+                }
+                AppMsg::AppUpdateFetched { result } => {
+                    if let Ok(Some(info)) = result {
+                        self.update_info = Some(info);
+                    }
+                }
+                AppMsg::ChangelogFetched { result } => {
+                    if let Ok(Some(entry)) = result {
+                        self.changelog_popup = Some(entry);
+                        let _ = std::fs::remove_file(self.base_dir.join(".first"));
+                    }
+                }
+                AppMsg::AppUpdateFailed { error } => {
+                    self.update_downloading = false;
+                    self.update_error = Some(error);
                 }
                 AppMsg::PluginUpdatesFound { result } => match result {
                     Ok(updates) => self.start_plugin_updates(updates),
@@ -642,51 +694,74 @@ impl LiteApp {
                     ..Default::default()
                 };
             }
-            if ui.button("Reload").clicked() {
-                self.plugin_mgr.refresh(&mut self.config, true);
-                self.save_config();
-            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button("Reload").clicked() {
+                    self.plugin_mgr.refresh(&mut self.config, true);
+                    self.save_config();
+                }
+            });
         });
         ui.separator();
+
         let mut updates = Vec::new();
         let mut settings = None;
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            for plugin in &self.plugin_mgr.plugins {
-                let mut enabled = plugin.enabled;
-                egui::Frame::group(ui.style())
-                    .inner_margin(egui::Margin::same(6))
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            if ui
-                                .checkbox(
-                                    &mut enabled,
-                                    format!(
-                                        "{} v{} by {}",
-                                        plugin.display_name(),
-                                        plugin.manifest.version,
-                                        plugin.manifest.author
-                                    ),
-                                )
-                                .changed()
-                            {
-                                updates.push((plugin.slug.clone(), enabled));
-                            }
-                            if ui
-                                .add_enabled(
-                                    plugin.enabled && plugin.has_settings(),
-                                    egui::Button::new("⚙"),
-                                )
-                                .clicked()
-                            {
-                                settings = Some(plugin.slug.clone());
+        egui::ScrollArea::vertical()
+            .id_salt("lite_plugins_list")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for plugin in &self.plugin_mgr.plugins {
+                    let row_width = ui.available_width();
+                    let mut enabled = plugin.enabled;
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(6))
+                        .show(ui, |ui| {
+                            ui.set_width((row_width - 12.0).max(0.0));
+                            ui.horizontal(|ui| {
+                                ui.set_min_height(24.0);
+                                let text = format!(
+                                    "{} v{} by {} ({})",
+                                    plugin.display_name(),
+                                    plugin.manifest.version,
+                                    plugin.manifest.author,
+                                    plugin.filename
+                                );
+                                if plugin.load_error.is_some() {
+                                    ui.add_enabled(false, egui::Checkbox::new(&mut enabled, text));
+                                } else if ui.checkbox(&mut enabled, text).changed() {
+                                    updates.push((plugin.slug.clone(), enabled));
+                                }
+
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        if plugin.load_error.is_none()
+                                            && ui
+                                                .add_enabled(
+                                                    plugin.enabled && plugin.has_settings(),
+                                                    egui::Button::new("⚙"),
+                                                )
+                                                .clicked()
+                                        {
+                                            settings = Some(plugin.slug.clone());
+                                        }
+                                    },
+                                );
+                            });
+                            if let Some(error) = &plugin.load_error {
+                                ui.colored_label(Color32::LIGHT_RED, error);
                             }
                         });
-                    });
-                if let Some(error) = &plugin.load_error {
-                    ui.colored_label(Color32::LIGHT_RED, error);
+                    ui.add_space(2.0);
                 }
-            }
-        });
+
+                if self.plugin_mgr.plugins.is_empty() {
+                    ui.add_space(30.0);
+                    ui.vertical_centered(|ui| {
+                        ui.label("No plugins installed. Drop a plugin folder into plugins/.");
+                    });
+                }
+            });
+
         for (slug, enabled) in updates {
             self.plugin_mgr
                 .set_enabled(&slug, enabled, &mut self.config);
@@ -699,6 +774,86 @@ impl LiteApp {
         }
     }
 
+    fn render_update_modal(&mut self, ctx: &egui::Context) {
+        let Some(info) = self.update_info.clone() else {
+            return;
+        };
+        egui::Window::new("Update Required")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.heading(format!("Hebnix Lite v{} is required", info.version));
+                ui.label("Hebnix Lite is locked until the required update is installed.");
+                ui.add_space(8.0);
+                if let Some(error) = &self.update_error {
+                    ui.colored_label(Color32::from_rgb(0xe7, 0x4c, 0x3c), error);
+                    ui.add_space(8.0);
+                }
+                if self.update_downloading {
+                    ui.add_enabled(false, egui::Button::new("Downloading & Installing..."));
+                    ui.spinner();
+                } else if ui
+                    .add(
+                        egui::Button::new("Update Hebnix")
+                            .fill(Color32::from_rgb(0x2e, 0xcc, 0x71)),
+                    )
+                    .clicked()
+                {
+                    self.update_downloading = true;
+                    self.update_error = None;
+                    let setup_url = info.setup_url;
+                    let base_dir = self.base_dir.clone();
+                    let tx = self.tx.clone();
+                    let ctx = ctx.clone();
+                    std::thread::spawn(move || {
+                        if let Err(error) =
+                            crate::update::download_and_install_update(&setup_url, &base_dir)
+                        {
+                            let _ = tx.send(AppMsg::AppUpdateFailed { error });
+                            ctx.request_repaint();
+                        }
+                    });
+                }
+            });
+    }
+
+    fn render_changelog_popup(&mut self, ctx: &egui::Context) {
+        let Some(entry) = self.changelog_popup.clone() else {
+            return;
+        };
+        let mut open = true;
+        egui::Window::new("Change Log")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .default_width(520.0)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| crate::update::render_changelog(ui, &entry));
+        if !open {
+            self.changelog_popup = None;
+        }
+    }
+
+    fn render_launch_path_notice(&mut self, ctx: &egui::Context) {
+        if !self.launch_path_notice {
+            return;
+        }
+        let mut close = false;
+        egui::Window::new("Rocket League")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.label("You must start Rocket League at least once with Hebnix running to use this function.");
+                if ui.button("OK").clicked() {
+                    close = true;
+                }
+            });
+        if close {
+            self.launch_path_notice = false;
+        }
+    }
     fn render_install_modal(&mut self, ctx: &egui::Context) {
         if !self.install_modal.open {
             return;
@@ -1682,7 +1837,25 @@ impl eframe::App for LiteApp {
             self.last_size = (rect.width().max(0.0) as u32, rect.height().max(0.0) as u32);
         }
         if ctx.input(|input| input.viewport().close_requested()) {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            if self.update_info.is_some() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            } else {
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            }
+        }
+        if self.update_info.is_some() {
+            if self.hidden {
+                self.set_hidden(&ctx, false);
+            }
+            egui::CentralPanel::default().show(ui, |ui| {
+                ui.disable();
+                ui.centered_and_justified(|ui| {
+                    ui.heading("A required Hebnix Lite update is available");
+                });
+            });
+            self.render_update_modal(&ctx);
+            ctx.request_repaint_after(Duration::from_millis(100));
+            return;
         }
         egui::CentralPanel::default().show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -1697,23 +1870,39 @@ impl eframe::App for LiteApp {
                             .size(12.0)
                             .color(self.status_color),
                     );
-                    if ui
-                        .add_enabled(
-                            self.last_rl_open,
-                            egui::Button::new("Restart Rocket League"),
-                        )
-                        .clicked()
-                    {
+                    let running = self.last_rl_open;
+                    let label = if running {
+                        "Restart Rocket League"
+                    } else {
+                        "Start Rocket League"
+                    };
+                    if ui.button(label).clicked() {
                         let path = self.config.settings.rl_path.clone();
-                        let tx = self.tx.clone();
-                        std::thread::spawn(move || {
-                            let _ = tx.send(AppMsg::Log(
-                                match winutil::restart_rocket_league(Path::new(&path)) {
-                                    Ok(()) => "[Console] Rocket League restarted.".to_string(),
-                                    Err(error) => format!("[Console] Restart failed: {error}"),
-                                },
-                            ));
-                        });
+                        if !self.config.settings.rl_path_confirmed
+                            || path.trim().is_empty()
+                            || !Path::new(&path).is_dir()
+                        {
+                            self.launch_path_notice = true;
+                        } else {
+                            let tx = self.tx.clone();
+                            std::thread::spawn(move || {
+                                let result = if running {
+                                    winutil::restart_rocket_league(Path::new(&path))
+                                } else {
+                                    winutil::start_rocket_league(Path::new(&path))
+                                };
+                                let action = if running { "restart" } else { "start" };
+                                let _ = tx.send(AppMsg::Log(match result {
+                                    Ok(()) => {
+                                        format!("[Console] Rocket League {} requested.", action)
+                                    }
+                                    Err(error) => format!(
+                                        "[Console] Rocket League {} failed: {}",
+                                        action, error
+                                    ),
+                                }));
+                            });
+                        }
                     }
                 });
             });
@@ -1731,6 +1920,8 @@ impl eframe::App for LiteApp {
         self.render_game_overlay();
         self.render_install_modal(&ctx);
         self.render_notices(&ctx);
+        self.render_launch_path_notice(&ctx);
+        self.render_changelog_popup(&ctx);
         ctx.request_repaint_after(
             if self.plugin_mgr.has_tick_plugins() || !self.plugin_mgr.overlay_plugins().is_empty() {
                 Duration::from_millis(50)
