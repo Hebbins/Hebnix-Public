@@ -93,6 +93,9 @@ pub struct LiteApp {
     last_rl_open: bool,
     last_api_open: bool,
     currently_connected: bool,
+    /// true once MatchEnded fires, until MatchDestroyed/disconnect. see the
+    /// comment on the same field in app.rs.
+    match_ended: bool,
     first_status: bool,
     status_text: String,
     status_color: Color32,
@@ -246,6 +249,7 @@ impl LiteApp {
             last_rl_open: false,
             last_api_open: false,
             currently_connected: false,
+            match_ended: false,
             first_status: true,
             status_text: "⌛ Waiting for Rocket League...".to_string(),
             status_color: Color32::from_rgb(0xdc, 0xe4, 0xee),
@@ -362,6 +366,8 @@ impl LiteApp {
             let was_connected = self.currently_connected;
             self.currently_connected = false;
             if was_connected {
+                self.match_ended = false;
+                self.plugin_mgr.shared.borrow_mut().in_match = false;
                 self.stats.stop();
                 self.ws_stats.stop();
                 self.plugin_mgr.dispatch_simple(
@@ -556,15 +562,29 @@ impl LiteApp {
     }
 
     fn handle_game_event(&mut self, event: StatsEvent) {
-        if event.event_type == "MatchDestroyed" {
-            if !self.config.settings.suppress_left_alerts {
-                self.console
-                    .write("[Core] Left match or game closed. Resetting plugin metrics.");
+        match event.event_type.as_str() {
+            "UpdateState" => {
+                if !self.match_ended {
+                    self.plugin_mgr.shared.borrow_mut().in_match = true;
+                }
+                self.plugin_mgr.dispatch_game_event(&event);
             }
-            self.plugin_mgr
-                .dispatch_simple("GameLeft", event.raw_data.clone());
-        } else {
-            self.plugin_mgr.dispatch_game_event(&event);
+            "MatchEnded" => {
+                self.match_ended = true;
+                self.plugin_mgr.shared.borrow_mut().in_match = false;
+                self.plugin_mgr.dispatch_game_event(&event);
+            }
+            "MatchDestroyed" => {
+                self.match_ended = false;
+                self.plugin_mgr.shared.borrow_mut().in_match = false;
+                if !self.config.settings.suppress_left_alerts {
+                    self.console
+                        .write("[Core] Left match or game closed. Resetting plugin metrics.");
+                }
+                self.plugin_mgr
+                    .dispatch_simple("GameLeft", event.raw_data.clone());
+            }
+            _ => self.plugin_mgr.dispatch_game_event(&event),
         }
     }
 

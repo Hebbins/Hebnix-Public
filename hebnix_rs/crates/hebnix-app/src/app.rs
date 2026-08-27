@@ -348,6 +348,11 @@ pub struct HebnixApp {
     last_rl_open: bool,
     last_api_open: bool,
     in_match: bool,
+    /// true once MatchEnded fires, until MatchDestroyed/disconnect. while
+    /// set, UpdateState (which keeps arriving through the post-game screen)
+    /// doesn't re-set in_match, so hebnix.input.send unlocks right at the
+    /// final whistle instead of staying locked until the lobby is left.
+    match_ended: bool,
     first_status: bool,
     status_text: String,
     status_color: Color32,
@@ -775,6 +780,7 @@ impl HebnixApp {
             last_rl_open: false,
             last_api_open: false,
             in_match: false,
+            match_ended: false,
             first_status: true,
             status_text: String::new(),
             status_color: Color32::from_rgb(0xDC, 0xE4, 0xEE),
@@ -1578,7 +1584,10 @@ impl HebnixApp {
     fn handle_game_event(&mut self, event: hebnix_sdk::stats::StatsEvent) {
         match event.event_type.as_str() {
             "UpdateState" => {
-                self.in_match = true;
+                if !self.match_ended {
+                    self.in_match = true;
+                    self.plugin_mgr.shared.borrow_mut().in_match = true;
+                }
                 if let Some(state) = event.update_state() {
                     self.workshop
                         .update_workshop_map_from_stats(&state.game.arena, &self.tx);
@@ -1587,10 +1596,14 @@ impl HebnixApp {
             }
             "MatchEnded" => {
                 self.in_match = false;
+                self.match_ended = true;
+                self.plugin_mgr.shared.borrow_mut().in_match = false;
                 self.plugin_mgr.dispatch_game_event(&event);
             }
             "MatchDestroyed" => {
                 self.in_match = false;
+                self.match_ended = false;
+                self.plugin_mgr.shared.borrow_mut().in_match = false;
                 if !self.config.settings.suppress_left_alerts {
                     self.console
                         .write("[Core] Left match or game closed. Resetting plugin metrics.");
@@ -1648,8 +1661,10 @@ impl HebnixApp {
                 if !rl_open {
                     self.workshop.shutdown_multiplayer();
                 }
+                self.match_ended = false;
                 if self.in_match {
                     self.in_match = false;
+                    self.plugin_mgr.shared.borrow_mut().in_match = false;
                     self.console
                         .write("[Core] Stats API connection lost. Resetting plugin metrics.");
                     self.plugin_mgr.dispatch_simple(
