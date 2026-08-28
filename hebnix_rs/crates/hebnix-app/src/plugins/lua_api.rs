@@ -855,6 +855,13 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     {
         let host = Rc::clone(&host);
         hebnix.set(
+            "in_match",
+            lua.create_function(move |_, ()| Ok(host.shared.borrow().in_match))?,
+        )?;
+    }
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
             "rl_connected",
             lua.create_function(move |_, ()| Ok(host.shared.borrow().rl_connected))?,
         )?;
