@@ -1,6 +1,9 @@
 # Hebnix
 
-Hebnix is a Rocket League desktop application with an egui interface and Lua plugins.
+Hebnix serves as an intelligent gateway to Rocket League's Stats API, Configuration Files, game files and plugins.\
+The purpose is to consolidate several Rocket League Quality of Life tools into 1 platform that is simple to work with, user friendly and feature rich.
+
+[Website](https://hebnix.com) | [Plugins](https://hebnix.com/plugins) | [Download](https://hebnix.com/download) | [Developer Documentation](https://docs.hebnix.com) | [Discord](https://discord.gg/yr6xXb5wQd)
 
 ## Build
 
