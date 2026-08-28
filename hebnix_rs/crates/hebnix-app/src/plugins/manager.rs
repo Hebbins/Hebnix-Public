@@ -71,6 +71,7 @@ impl PluginManager {
             shared: Rc::new(RefCell::new(HostShared {
                 is_gui_open: true,
                 rl_connected: false,
+                in_match: false,
                 app_version: app_version.to_string(),
                 platform: String::new(),
             })),
