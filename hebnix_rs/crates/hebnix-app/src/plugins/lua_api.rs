@@ -24,6 +24,9 @@ use rodio::{Decoder, OutputStream, Sink};
 pub struct HostShared {
     pub is_gui_open: bool,
     pub rl_connected: bool,
+    /// true from UpdateState until MatchEnded/MatchDestroyed/disconnect. gates
+    /// hebnix.input.send so plugins can't turn it into a gameplay macro.
+    pub in_match: bool,
     pub app_version: String,
     /// detected game platform ("steam", "epic", or "" if unknown). default for
     /// eos/rlapi calls that don't pass one.
@@ -1356,6 +1359,62 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         )?;
     }
     hebnix.set("audio", audio)?;
+
+    // Synthetic keyboard input.
+    //
+    // input.send taps arbitrary keys and is disabled while a match is in
+    // progress, so it can't be turned into a gameplay macro (jump/boost/flip
+    // sequences, etc). chat.send is a separate, narrower endpoint that only
+    // opens a chat channel, types a message, and hits enter — that's allowed
+    // mid-match because sending chat isn't a competitive advantage, it's the
+    // point of the feature.
+    let input = lua.create_table()?;
+    {
+        let host = Rc::clone(&host);
+        input.set(
+            "send",
+            lua.create_function(move |_, keys: Variadic<String>| {
+                if host.shared.borrow().in_match {
+                    return Err(mlua::Error::runtime(
+                        "hebnix.input.send is disabled while a match is in progress",
+                    ));
+                }
+                for key in keys.iter() {
+                    if !hebnix_sdk::input::tap_key(key) {
+                        return Err(mlua::Error::runtime(format!(
+                            "hebnix.input.send: unknown key '{key}'"
+                        )));
+                    }
+                }
+                Ok(())
+            })?,
+        )?;
+    }
+    hebnix.set("input", input)?;
+
+    let chat = lua.create_table()?;
+    chat.set(
+        "send",
+        lua.create_function(|_, (channel, message): (String, String)| {
+            let open_key = match channel.to_lowercase().as_str() {
+                "global" => "t",
+                "team" => "y",
+                "party" => "u",
+                other => {
+                    return Err(mlua::Error::runtime(format!(
+                        "hebnix.chat.send: unknown channel '{other}', expected global, team or party"
+                    )));
+                }
+            };
+            hebnix_sdk::input::tap_key(open_key);
+            std::thread::sleep(Duration::from_millis(100));
+            hebnix_sdk::input::type_text(&message);
+            std::thread::sleep(Duration::from_millis(30));
+            hebnix_sdk::input::tap_key("enter");
+            Ok(())
+        })?,
+    )?;
+    hebnix.set("chat", chat)?;
 
     // Read UTF-8 text bundled beneath a plugin's assets directory.  This keeps
     // plugin data files sandboxed while allowing small lookup tables.
