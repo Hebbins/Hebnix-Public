@@ -1059,8 +1059,6 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         )?;
     }
 
-<<<<<<< Updated upstream
-=======
     // hebnix.settings.* - small settings-page helpers
     let settings = lua.create_table()?;
     {
@@ -1084,7 +1082,6 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     }
     hebnix.set("settings", settings)?;
 
->>>>>>> Stashed changes
     // non-blocking tracker fetch by StatsAPI PrimaryId ("Steam|..|0")
     // Poll with hebnix.stats_result(primary_id).
     hebnix.set(
@@ -2524,6 +2521,36 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         )?;
     }
 
+    // caller-owned combo box for live data paths
+    ui.set(
+        "combo_box_value",
+        lua.create_function(
+            |_, (id, label, current, options): (String, String, String, Table)| {
+                let opts: Vec<String> = options
+                    .sequence_values::<String>()
+                    .filter_map(Result::ok)
+                    .collect();
+                let mut selected = if current.is_empty() {
+                    opts.first().cloned().unwrap_or_default()
+                } else {
+                    current
+                };
+                let _ = with_current_ui(|ui| {
+                    ui.horizontal(|ui| {
+                        ui.label(&label);
+                        egui::ComboBox::from_id_salt(&id)
+                            .selected_text(&selected)
+                            .show_ui(ui, |ui| {
+                                for option in &opts {
+                                    ui.selectable_value(&mut selected, option.clone(), option);
+                                }
+                            });
+                    });
+                });
+                Ok(selected)
+            },
+        )?,
+    )?;
     // Persisted checkbox: ui.checkbox("key", "Label", default) -> bool
     {
         let host = Rc::clone(&host);
