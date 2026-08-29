@@ -9,13 +9,12 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use webview2_com::Microsoft::Web::WebView2::Win32::{
-    COREWEBVIEW2_COLOR, CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2,
-    ICoreWebView2CompositionController, ICoreWebView2Controller, ICoreWebView2Controller2,
-    COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS,
+    COREWEBVIEW2_COLOR, COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS,
     COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_MEDIA,
-    COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_ALL, ICoreWebView2Environment,
-    ICoreWebView2Environment3, ICoreWebView2WebResourceResponse, ICoreWebView2_3,
-    ICoreWebView2_22,
+    COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_ALL, CreateCoreWebView2EnvironmentWithOptions,
+    ICoreWebView2, ICoreWebView2_3, ICoreWebView2_22, ICoreWebView2CompositionController,
+    ICoreWebView2Controller, ICoreWebView2Controller2, ICoreWebView2Environment,
+    ICoreWebView2Environment3, ICoreWebView2WebResourceResponse,
 };
 use webview2_com::{
     CreateCoreWebView2CompositionControllerCompletedHandler,
@@ -167,7 +166,6 @@ fn virtual_host(slug: &str) -> String {
         format!("{cleaned}.plugin.hebnix")
     }
 }
-
 
 enum Stage {
     Environment,
@@ -328,34 +326,6 @@ impl WebviewHost {
         self.post_json(&message)
     }
 
-    /// one message a frame. per plugin so draw.image resolves to its own host
-    pub fn paint(
-        &self,
-        batches: &[(String, Vec<serde_json::Value>)],
-        size: (u32, u32),
-    ) -> Result<(), String> {
-        let payload: Vec<serde_json::Value> = batches
-            .iter()
-            .map(|(slug, ops)| {
-                let assets = self
-                    .pages
-                    .iter()
-                    .find(|spec| &spec.slug == slug)
-                    .map(|spec| format!("https://{}", spec.host))
-                    .unwrap_or_default();
-                serde_json::json!({ "slug": slug, "assets": assets, "ops": ops })
-            })
-            .collect();
-        let message = serde_json::json!({
-            "kind": "paint",
-            "batches": payload,
-            "w": size.0,
-            "h": size.1,
-        })
-        .to_string();
-        self.post_json(&message)
-    }
-
     fn post_json(&self, message: &str) -> Result<(), String> {
         let stage = self.stage.borrow();
         let Stage::Ready(ready) = &*stage else {
@@ -456,7 +426,8 @@ impl WebviewHost {
                 Ok(())
             },
         ));
-        if let Err(error) = unsafe { env3.CreateCoreWebView2CompositionController(hwnd, &handler) } {
+        if let Err(error) = unsafe { env3.CreateCoreWebView2CompositionController(hwnd, &handler) }
+        {
             *self.stage.borrow_mut() = Stage::Failed(error.message());
         }
     }
@@ -488,8 +459,8 @@ fn install_media_gate(webview: &ICoreWebView2, environment: &ICoreWebView2Enviro
     }
 
     let environment = environment.clone();
-    let handler = webview2_com::WebResourceRequestedEventHandler::create(Box::new(
-        move |_, args| {
+    let handler =
+        webview2_com::WebResourceRequestedEventHandler::create(Box::new(move |_, args| {
             let Some(args) = args else {
                 return Ok(());
             };
@@ -502,9 +473,7 @@ fn install_media_gate(webview: &ICoreWebView2, environment: &ICoreWebView2Enviro
                     return Ok(());
                 }
                 // same rule as ui.image, only what hebnix already fetched
-                if let Some(bytes) =
-                    crate::plugins::lua_api::tracker_client().avatar_bytes(&uri)
-                {
+                if let Some(bytes) = crate::plugins::lua_api::tracker_client().avatar_bytes(&uri) {
                     if let Ok(response) = cached_response(&environment, &bytes) {
                         args.SetResponse(&response)?;
                         return Ok(());
@@ -516,8 +485,7 @@ fn install_media_gate(webview: &ICoreWebView2, environment: &ICoreWebView2Enviro
                 }
             }
             Ok(())
-        },
-    ));
+        }));
     let mut token = 0i64;
     unsafe {
         if let Err(error) = webview.add_WebResourceRequested(&handler, &mut token) {

@@ -24,13 +24,12 @@ use rodio::{Decoder, OutputStream, Sink};
 pub struct HostShared {
     pub is_gui_open: bool,
     pub rl_connected: bool,
-    /// true from UpdateState until MatchEnded/MatchDestroyed/disconnect. gates
-    /// hebnix.input.send so plugins can't turn it into a gameplay macro.
     pub in_match: bool,
     pub app_version: String,
     /// detected game platform ("steam", "epic", or "" if unknown). default for
     /// eos/rlapi calls that don't pass one.
     pub platform: String,
+    pub suppress_plugin_logs: bool,
 }
 
 /// a window side, either a size in points or a share of the monitor RL is on
@@ -79,8 +78,8 @@ pub struct WindowState {
     pub title: String,
     pub width: SizeSpec,
     pub height: SizeSpec,
-    pub opacity: f32,
     pub close_button: bool,
+    pub opacity: f32,
     /// where we ask egui to put the window, set on open only. an observed
     /// position fed back into the builder is a SetWindowPos mid drag, and over
     /// a dpi boundary the read and the write use different scales.
@@ -96,8 +95,8 @@ impl Default for WindowState {
             title: String::new(),
             width: SizeSpec::Fixed(260.0),
             height: SizeSpec::Fixed(160.0),
-            opacity: 0.9,
             close_button: false,
+            opacity: 0.9,
             pos: None,
             last_pos: None,
             pos_dirty: false,
@@ -123,6 +122,9 @@ pub struct HostCtx {
 
 impl HostCtx {
     pub fn log(&self, msg: &str) {
+        if self.shared.borrow().suppress_plugin_logs {
+            return;
+        }
         let name = self.display_name.borrow();
         let _ = self.tx.send(AppMsg::Log(format!("[{}] {}", name, msg)));
     }
@@ -164,64 +166,6 @@ fn asset_path(plugin_dir: &std::path::Path, rel: &str) -> Result<std::path::Path
 
 fn is_http_url(path: &str) -> bool {
     path.starts_with("https://") || path.starts_with("http://")
-}
-
-const REMOTE_IMAGE_MAX_BYTES: u64 = 4 * 1024 * 1024;
-
-enum RemoteImage {
-    Pending,
-    Ready(std::sync::Arc<[u8]>),
-    Failed,
-}
-
-fn remote_images() -> &'static std::sync::Mutex<std::collections::HashMap<String, RemoteImage>> {
-    static MAP: OnceLock<std::sync::Mutex<std::collections::HashMap<String, RemoteImage>>> =
-        OnceLock::new();
-    MAP.get_or_init(Default::default)
-}
-
-/// bytes for a url ui.image is allowed to draw, fetching it once in the
-/// background. None while it is on the way, so the draw call never blocks.
-fn remote_image(url: &str) -> Option<std::sync::Arc<[u8]>> {
-    if !crate::overlay::media_host_allowed(url) {
-        return None;
-    }
-    let mut map = remote_images().lock().unwrap();
-    match map.get(url) {
-        Some(RemoteImage::Ready(bytes)) => return Some(bytes.clone()),
-        Some(_) => return None,
-        None => {}
-    }
-    map.insert(url.to_string(), RemoteImage::Pending);
-    drop(map);
-
-    let url = url.to_string();
-    std::thread::spawn(move || {
-        let fetched = ureq::get(&url)
-            .timeout(Duration::from_secs(15))
-            .call()
-            .map_err(|error| error.to_string())
-            .and_then(|response| {
-                use std::io::Read;
-                let mut bytes = Vec::new();
-                response
-                    .into_reader()
-                    .take(REMOTE_IMAGE_MAX_BYTES)
-                    .read_to_end(&mut bytes)
-                    .map_err(|error| error.to_string())?;
-                Ok(bytes)
-            });
-        let entry = match fetched {
-            Ok(bytes) if !bytes.is_empty() => RemoteImage::Ready(bytes.into()),
-            Ok(_) => RemoteImage::Failed,
-            Err(error) => {
-                tracing::warn!("ui.image {url} failed: {error}");
-                RemoteImage::Failed
-            }
-        };
-        remote_images().lock().unwrap().insert(url, entry);
-    });
-    None
 }
 
 /// cached asset bytes
@@ -282,9 +226,60 @@ pub fn to_lua<T: serde::Serialize>(lua: &Lua, value: &T) -> mlua::Result<LuaValu
     )
 }
 
-pub fn tracker_client() -> &'static TrackerClient {
+pub(crate) fn tracker_client() -> &'static TrackerClient {
     static CLIENT: OnceLock<TrackerClient> = OnceLock::new();
     CLIENT.get_or_init(TrackerClient::default)
+}
+
+fn xinput_controllers(lua: &Lua) -> mlua::Result<Option<Table>> {
+    use hebnix_sdk::input::xinput as xi;
+
+    let list = lua.create_table()?;
+    let mut output_index = 1;
+    for user_index in 0..4 {
+        let Some(state) = xi::get_xinput_state(user_index) else {
+            continue;
+        };
+        let axis = |value: i16| {
+            if value >= 0 {
+                value as f32 / i16::MAX as f32
+            } else {
+                value as f32 / 32768.0
+            }
+        };
+        let pad = lua.create_table()?;
+        pad.set("id", format!("xinput-{user_index}"))?;
+        pad.set("name", format!("XInput Controller {}", user_index + 1))?;
+        pad.set("kind", "xinput")?;
+        pad.set("lx", axis(state.thumb_lx))?;
+        pad.set("ly", axis(state.thumb_ly))?;
+        pad.set("rx", axis(state.thumb_rx))?;
+        pad.set("ry", axis(state.thumb_ry))?;
+        pad.set("lt", state.left_trigger as f32 / 255.0)?;
+        pad.set("rt", state.right_trigger as f32 / 255.0)?;
+        pad.set("btn_south", state.is_pressed(xi::XINPUT_A))?;
+        pad.set("btn_east", state.is_pressed(xi::XINPUT_B))?;
+        pad.set("btn_west", state.is_pressed(xi::XINPUT_X))?;
+        pad.set("btn_north", state.is_pressed(xi::XINPUT_Y))?;
+        pad.set("dpad_up", state.is_pressed(xi::XINPUT_DPAD_UP))?;
+        pad.set("dpad_down", state.is_pressed(xi::XINPUT_DPAD_DOWN))?;
+        pad.set("dpad_left", state.is_pressed(xi::XINPUT_DPAD_LEFT))?;
+        pad.set("dpad_right", state.is_pressed(xi::XINPUT_DPAD_RIGHT))?;
+        pad.set("bumper_l", state.is_pressed(xi::XINPUT_LB))?;
+        pad.set("bumper_r", state.is_pressed(xi::XINPUT_RB))?;
+        pad.set("trigger_l", state.left_trigger > 30)?;
+        pad.set("trigger_r", state.right_trigger > 30)?;
+        pad.set("stick_l", state.is_pressed(xi::XINPUT_LS))?;
+        pad.set("stick_r", state.is_pressed(xi::XINPUT_RS))?;
+        pad.set("select", state.is_pressed(xi::XINPUT_SELECT))?;
+        pad.set("start", state.is_pressed(xi::XINPUT_START))?;
+        pad.set("touchpad", false)?;
+        pad.set("meta", false)?;
+        list.set(output_index, pad)?;
+        output_index += 1;
+    }
+
+    Ok((output_index > 1).then_some(list))
 }
 
 // Async tracker fetches (shared across plugins; results poll-able from Lua)
@@ -917,27 +912,6 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         lua.create_function(|_, bind: String| Ok(hebnix_sdk::input::is_bind_pressed(&bind)))?,
     )?;
     hebnix.set(
-        "get_action_binds",
-        lua.create_function(|lua, action: String| {
-            let result = lua.create_table()?;
-            for (index, bind) in hebnix_sdk::input::action_binds(&action).iter().enumerate() {
-                result.set(index + 1, bind.clone())?;
-            }
-            Ok(result)
-        })?,
-    )?;
-    hebnix.set(
-        "is_action_pressed",
-        lua.create_function(|_, action: String| Ok(hebnix_sdk::input::is_action_pressed(&action)))?,
-    )?;
-    hebnix.set(
-        "refresh_action_binds",
-        lua.create_function(|_, ()| {
-            hebnix_sdk::input::clear_action_bind_cache();
-            Ok(())
-        })?,
-    )?;
-    hebnix.set(
         "monotonic_seconds",
         lua.create_function(|_, ()| {
             static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
@@ -952,6 +926,9 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     hebnix.set(
         "controllers",
         lua.create_function(|lua, ()| {
+            if let Some(list) = xinput_controllers(lua)? {
+                return Ok(list);
+            }
             // Use a static OnceLock so the hardware context stays alive across frames
             static GAMEPADS: std::sync::OnceLock<std::sync::Mutex<gamepads::Gamepads>> =
                 std::sync::OnceLock::new();
@@ -1119,29 +1096,6 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             })?,
         )?;
     }
-
-    // hebnix.settings.* - small settings-page helpers
-    let settings = lua.create_table()?;
-    {
-        let host = Rc::clone(&host);
-        settings.set(
-            "open_assets",
-            lua.create_function(move |_, ()| {
-                let assets_dir = host.dir.join("assets");
-                if let Err(err) = std::fs::create_dir_all(&assets_dir) {
-                    host.log(&format!(
-                        "open_assets: couldn't create assets folder: {err}"
-                    ));
-                    return Ok(());
-                }
-                let _ = std::process::Command::new("cmd")
-                    .args(["/C", "start", "", &assets_dir.to_string_lossy()])
-                    .spawn();
-                Ok(())
-            })?,
-        )?;
-    }
-    hebnix.set("settings", settings)?;
 
     // non-blocking tracker fetch by StatsAPI PrimaryId ("Steam|..|0")
     // Poll with hebnix.stats_result(primary_id).
@@ -1360,62 +1314,6 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     }
     hebnix.set("audio", audio)?;
 
-    // Synthetic keyboard input.
-    //
-    // input.send taps arbitrary keys and is disabled while a match is in
-    // progress, so it can't be turned into a gameplay macro (jump/boost/flip
-    // sequences, etc). chat.send is a separate, narrower endpoint that only
-    // opens a chat channel, types a message, and hits enter — that's allowed
-    // mid-match because sending chat isn't a competitive advantage, it's the
-    // point of the feature.
-    let input = lua.create_table()?;
-    {
-        let host = Rc::clone(&host);
-        input.set(
-            "send",
-            lua.create_function(move |_, keys: Variadic<String>| {
-                if host.shared.borrow().in_match {
-                    return Err(mlua::Error::runtime(
-                        "hebnix.input.send is disabled while a match is in progress",
-                    ));
-                }
-                for key in keys.iter() {
-                    if !hebnix_sdk::input::tap_key(key) {
-                        return Err(mlua::Error::runtime(format!(
-                            "hebnix.input.send: unknown key '{key}'"
-                        )));
-                    }
-                }
-                Ok(())
-            })?,
-        )?;
-    }
-    hebnix.set("input", input)?;
-
-    let chat = lua.create_table()?;
-    chat.set(
-        "send",
-        lua.create_function(|_, (channel, message): (String, String)| {
-            let open_key = match channel.to_lowercase().as_str() {
-                "global" => "t",
-                "team" => "y",
-                "party" => "u",
-                other => {
-                    return Err(mlua::Error::runtime(format!(
-                        "hebnix.chat.send: unknown channel '{other}', expected global, team or party"
-                    )));
-                }
-            };
-            hebnix_sdk::input::tap_key(open_key);
-            std::thread::sleep(Duration::from_millis(100));
-            hebnix_sdk::input::type_text(&message);
-            std::thread::sleep(Duration::from_millis(30));
-            hebnix_sdk::input::tap_key("enter");
-            Ok(())
-        })?,
-    )?;
-    hebnix.set("chat", chat)?;
-
     // Read UTF-8 text bundled beneath a plugin's assets directory.  This keeps
     // plugin data files sandboxed while allowing small lookup tables.
     {
@@ -1480,6 +1378,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             to_lua(lua, &info)
         })?,
     )?;
+
     // Launch.log verify=true (default) confirms the match against the stats
     // api Returns the key to poll with hebnix.launch_log_result(key).
     hebnix.set(
@@ -1726,11 +1625,11 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                             win.height = spec;
                         }
                     }
-                    if let Ok(o) = opts.get::<f32>("opacity") {
-                        win.opacity = o.clamp(0.0, 1.0); // 0 for a bare overlay
-                    }
                     if let Ok(close_button) = opts.get::<bool>("close_button") {
                         win.close_button = close_button;
+                    }
+                    if let Ok(o) = opts.get::<f32>("opacity") {
+                        win.opacity = o.clamp(0.0, 1.0); // 0 for a bare overlay
                     }
                 }
                 if win.title.is_empty() {
@@ -1791,16 +1690,6 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             "set_title",
             lua.create_function(move |_, title: String| {
                 host.window.borrow_mut().title = title;
-                Ok(())
-            })?,
-        )?;
-    }
-    {
-        let host = Rc::clone(&host);
-        window.set(
-            "set_close_button",
-            lua.create_function(move |_, enabled: bool| {
-                host.window.borrow_mut().close_button = enabled;
                 Ok(())
             })?,
         )?;
@@ -2166,7 +2055,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
-    // goes through AppMsg, lua never reaches into the browser itself
+    // html overlays receive plugin data through the app message queue
     {
         let overlay = lua.create_table()?;
         let host = Rc::clone(&host);
@@ -2344,14 +2233,21 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         "image",
         lua.create_function(
             move |_, (path, x, y, w, h, opts): (String, f32, f32, f32, f32, Option<Table>)| {
-                // Ensure images are resolved cleanly relative to the plugin's folder so they can just bundle them!
-                let full_path = crate::config::base_dir()
-                    .join("plugins")
-                    .join(&host_clone.slug)
-                    .join(&path);
-
-                let path_str = full_path.to_string_lossy().to_string();
-                overlay::image(&path_str, x, y, w, h, opt_f32(&opts, "opacity", 1.0));
+                let requested = std::path::Path::new(&path);
+                let full_path = if requested.is_absolute() {
+                    requested.to_path_buf()
+                } else {
+                    host_clone.dir.join(requested)
+                };
+                let full_path = full_path.canonicalize().unwrap_or(full_path);
+                overlay::image(
+                    &full_path.to_string_lossy(),
+                    x,
+                    y,
+                    w,
+                    h,
+                    opt_f32(&opts, "opacity", 1.0),
+                );
                 Ok(())
             },
         )?,
@@ -2656,36 +2552,6 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         )?;
     }
 
-    // caller-owned combo box for live data paths
-    ui.set(
-        "combo_box_value",
-        lua.create_function(
-            |_, (id, label, current, options): (String, String, String, Table)| {
-                let opts: Vec<String> = options
-                    .sequence_values::<String>()
-                    .filter_map(Result::ok)
-                    .collect();
-                let mut selected = if current.is_empty() {
-                    opts.first().cloned().unwrap_or_default()
-                } else {
-                    current
-                };
-                let _ = with_current_ui(|ui| {
-                    ui.horizontal(|ui| {
-                        ui.label(&label);
-                        egui::ComboBox::from_id_salt(&id)
-                            .selected_text(&selected)
-                            .show_ui(ui, |ui| {
-                                for option in &opts {
-                                    ui.selectable_value(&mut selected, option.clone(), option);
-                                }
-                            });
-                    });
-                });
-                Ok(selected)
-            },
-        )?,
-    )?;
     // Persisted checkbox: ui.checkbox("key", "Label", default) -> bool
     {
         let host = Rc::clone(&host);
@@ -2764,11 +2630,8 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
             "image",
             lua.create_function(move |_, (path, opts): (String, Option<Table>)| {
                 let (bytes, uri) = if is_http_url(&path) {
-                    // an avatar hebnix already cached, or an allowed host
-                    let found = tracker_client()
-                        .avatar_bytes(&path)
-                        .or_else(|| remote_image(&path));
-                    match found {
+                    // plugin's own urls never land in this cache, only tracker profile avatars do
+                    match tracker_client().avatar_bytes(&path) {
                         Some(bytes) => (bytes, format!("bytes://remote/{path}")),
                         None => return Ok(false),
                     }

@@ -41,6 +41,21 @@ pub fn is_admin() -> bool {
 }
 
 pub const SKIP_ELEVATE_ARG: &str = "--no-elevate";
+pub fn disable_saved_master(base_dir: &Path) -> std::io::Result<()> {
+    let path = base_dir.join("spoofer_settings.json");
+    if !path.is_file() {
+        return Ok(());
+    }
+    let text = std::fs::read_to_string(&path)?;
+    let mut settings: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+    if let Some(object) = settings.as_object_mut() {
+        object.insert("spoofer_master".to_string(), serde_json::Value::Bool(false));
+    }
+    let output = serde_json::to_vec_pretty(&settings)
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
+    std::fs::write(path, output)
+}
 pub fn spawn_elevated_relaunch() -> bool {
     use std::os::windows::process::CommandExt;
 

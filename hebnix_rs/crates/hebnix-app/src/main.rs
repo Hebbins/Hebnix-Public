@@ -144,11 +144,16 @@ fn main() -> eframe::Result {
     setup_panic_hook(&base_dir);
     tracing::info!("Hebnix {} starting", app::APP_VERSION);
 
-    let cfg = config::Config::load(&base_dir);
+    let mut cfg = config::Config::load(&base_dir);
 
     // relaunch elevated if the user asked for it. --no-elevate comes back when
     // uac was declined
     let skip_elevate = std::env::args().any(|a| a == spoofer::SKIP_ELEVATE_ARG);
+    if skip_elevate && !spoofer::is_admin() {
+        cfg.settings.run_as_admin = false;
+        let _ = cfg.save(&base_dir);
+        let _ = spoofer::disable_saved_master(&base_dir);
+    }
     if cfg.settings.run_as_admin && !skip_elevate && !spoofer::is_admin() {
         if spoofer::spawn_elevated_relaunch() {
             return Ok(());

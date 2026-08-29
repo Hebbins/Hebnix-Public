@@ -40,6 +40,8 @@ pub struct SettingsCfg {
     pub suppress_left_alerts: bool,
     pub suppress_fullscreen_warning: bool,
     pub suppress_statsapi_rate_warning: bool,
+    pub allow_draw_on_hebnix_focus: bool,
+    pub restrict_hotkey_to_hebnix_or_rocket_league: bool,
     /// relaunch elevated on start, the hosts file needs admin
     pub run_as_admin: bool,
 }
@@ -57,6 +59,8 @@ impl Default for SettingsCfg {
             suppress_left_alerts: false,
             suppress_fullscreen_warning: false,
             suppress_statsapi_rate_warning: false,
+            allow_draw_on_hebnix_focus: true,
+            restrict_hotkey_to_hebnix_or_rocket_league: true,
             run_as_admin: false,
         }
     }

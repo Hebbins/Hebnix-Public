@@ -1,8 +1,13 @@
 //! windows bits: single-instance mutex, run-at-startup registry, focus handoff,
 //! minimize hook, killing RL.
 
+use std::num::NonZeroIsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use raw_window_handle::{
+    DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, RawWindowHandle,
+    Win32WindowHandle, WindowHandle,
+};
 use windows::Win32::Foundation::{
     ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND, LPARAM, LRESULT, WPARAM,
 };
@@ -117,6 +122,28 @@ pub fn foreground_window_is_ours() -> bool {
 
 pub fn main_window_hidden() -> bool {
     MAIN_HIDDEN.load(Ordering::Relaxed)
+}
+
+struct DialogParent(HWND);
+
+impl HasWindowHandle for DialogParent {
+    fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {
+        let hwnd = NonZeroIsize::new(self.0.0 as isize).ok_or(HandleError::Unavailable)?;
+        let handle = Win32WindowHandle::new(hwnd);
+        Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::Win32(handle)) })
+    }
+}
+
+impl HasDisplayHandle for DialogParent {
+    fn display_handle(&self) -> Result<DisplayHandle<'_>, HandleError> {
+        Ok(DisplayHandle::windows())
+    }
+}
+
+pub fn parent_file_dialog(dialog: rfd::FileDialog) -> rfd::FileDialog {
+    find_hebnix_window(true)
+        .map(|hwnd| dialog.clone().set_parent(&DialogParent(hwnd)))
+        .unwrap_or(dialog)
 }
 
 fn focus_window(hwnd: HWND) -> bool {

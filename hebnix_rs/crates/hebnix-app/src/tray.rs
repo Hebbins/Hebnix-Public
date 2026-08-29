@@ -8,6 +8,7 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 pub struct Tray {
     // keep this alive, dropping it removes the tray icon
     pub _icon: TrayIcon,
+    visibility_item: MenuItem,
     pub open_id: tray_icon::menu::MenuId,
     pub quit_id: tray_icon::menu::MenuId,
 }
@@ -40,24 +41,30 @@ fn load_icon(base_dir: &Path) -> Icon {
 }
 
 impl Tray {
-    pub fn new(base_dir: &Path) -> Option<Self> {
+    pub fn new(base_dir: &Path, tooltip: &str, hidden: bool) -> Option<Self> {
         let menu = Menu::new();
-        let open_item = MenuItem::new("Open", true, None);
+        let open_item = MenuItem::new(if hidden { "Show" } else { "Hide" }, true, None);
         let quit_item = MenuItem::new("Close", true, None);
         menu.append(&open_item).ok()?;
         menu.append(&quit_item).ok()?;
 
         let icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
-            .with_tooltip("Hebnix")
+            .with_tooltip(tooltip)
             .with_icon(load_icon(base_dir))
             .build()
             .ok()?;
 
         Some(Self {
             _icon: icon,
+            visibility_item: open_item.clone(),
             open_id: open_item.id().clone(),
             quit_id: quit_item.id().clone(),
         })
+    }
+
+    pub fn set_hidden(&self, hidden: bool) {
+        self.visibility_item
+            .set_text(if hidden { "Show" } else { "Hide" });
     }
 }

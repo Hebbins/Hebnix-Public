@@ -22,7 +22,6 @@ crossbeam-channel.workspace = true
 dirs = "6.0.0"
 eframe = "0.35.0"
 egui_extras = { version = "0.35.0", features = ["image", "svg"] }
-global-hotkey = "0.8.0"
 hebnix-sdk = { version = "0.1.0", path = "../hebnix-sdk" }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "ico", "bmp", "webp"] }
 libloading = "0.8"
@@ -32,6 +31,7 @@ httparse = "1"
 open = "5.3.6"
 rand = "0.8"
 rcgen = { version = "0.14", features = ["x509-parser"] }
+raw-window-handle = "0.6.2"
 rfd = "0.17.2"
 rsa = "0.9"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
@@ -45,7 +45,8 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tray-icon = "0.24.1"
 ureq = { workspace = true, features = ["json"] }
 webview2-com = "0.39.1"
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_DirectComposition", "Win32_Graphics_Dxgi", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Networking_WinInet"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Direct2D", "Win32_Graphics_Direct2D_Common", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_DirectComposition", "Win32_Graphics_Dxgi", "Win32_Graphics_DirectWrite", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_LibraryLoader", "Win32_System_Threading", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Networking_WinInet"] }
+windows-numerics = "0.3.1"
 winreg = "0.56.0"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
 reqwest = { version = "0.11", features = ["blocking"] }

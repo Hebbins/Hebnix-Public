@@ -13,7 +13,10 @@
 //! only cost is a topmost translucent window makes dwm compose the game
 //! instead of flipping it exclusively.
 
-use std::cell::RefCell;
+pub mod dcomp;
+pub mod gdi;
+pub mod native;
+
 use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
 
 use windows::Win32::Foundation::{E_FAIL, HWND, LPARAM, LRESULT, WPARAM};
@@ -39,27 +42,52 @@ const CLASS_NAME: &str = "HebnixDCompOverlayV1";
 /// to force-hide the overlay the instant the game loses focus, independent of
 /// egui's loop (which can stall while the main window's hidden, leaving a
 /// stale overlay up).
-static OVERLAY_HWND: AtomicIsize = AtomicIsize::new(0);
+static WEBVIEW_OVERLAY_HWND: AtomicIsize = AtomicIsize::new(0);
+static NATIVE_OVERLAY_HWND: AtomicIsize = AtomicIsize::new(0);
+static ALLOW_DRAW_ON_HEBNIX_FOCUS: AtomicBool = AtomicBool::new(true);
 
-/// hosts a plugin may load pictures, audio and video from. 
+pub(crate) fn register_hwnd(hwnd: HWND) {
+    NATIVE_OVERLAY_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
+}
+
+/// hosts a plugin may load pictures, audio and video from.
 pub fn media_host_allowed(uri: &str) -> bool {
     uri.split('/').nth(2).is_some_and(|authority| {
         authority.split(':').next().is_some_and(|host| {
-            host.ends_with(".plugin.hebnix") || host == "hebnix.com" || host.ends_with(".hebnix.com")
+            host.ends_with(".plugin.hebnix")
+                || host == "hebnix.com"
+                || host.ends_with(".hebnix.com")
         })
     })
 }
 
+pub fn set_allow_draw_on_hebnix_focus(allow: bool) {
+    ALLOW_DRAW_ON_HEBNIX_FOCUS.store(allow, Ordering::Relaxed);
+}
+
+pub fn has_render_focus() -> bool {
+    hebnix_sdk::process::is_rocket_league_focused()
+        || (ALLOW_DRAW_ON_HEBNIX_FOCUS.load(Ordering::Relaxed)
+            && crate::winutil::foreground_window_is_ours())
+}
+
 /// hide the overlay now if it's visible. safe from any thread.
 pub fn enforce_hidden() {
-    let raw = OVERLAY_HWND.load(Ordering::Relaxed);
-    if raw == 0 {
+    if has_render_focus() {
         return;
     }
-    let hwnd = HWND(raw as *mut _);
-    unsafe {
-        if IsWindowVisible(hwnd).as_bool() {
-            let _ = ShowWindow(hwnd, SW_HIDE);
+    for raw in [
+        WEBVIEW_OVERLAY_HWND.load(Ordering::Relaxed),
+        NATIVE_OVERLAY_HWND.load(Ordering::Relaxed),
+    ] {
+        if raw == 0 {
+            continue;
+        }
+        let hwnd = HWND(raw as *mut _);
+        unsafe {
+            if IsWindowVisible(hwnd).as_bool() {
+                let _ = ShowWindow(hwnd, SW_HIDE);
+            }
         }
     }
 }
@@ -71,47 +99,8 @@ pub fn enforce_hidden() {
 #[derive(Clone, Copy)]
 pub struct Rgba(pub u8, pub u8, pub u8, pub u8);
 
-thread_local! {
-    /// primitives collected while a plugin's on_overlay runs
-    static RECORDER: RefCell<Option<Vec<serde_json::Value>>> = const { RefCell::new(None) };
-}
-
-/// css color for the page's 2d context
-fn css(color: Rgba) -> String {
-    let Rgba(r, g, b, a) = color;
-    format!("rgba({r},{g},{b},{:.3})", a as f32 / 255.0)
-}
-
-fn record(command: serde_json::Value) {
-    RECORDER.with(|slot| {
-        if let Some(buffer) = slot.borrow_mut().as_mut() {
-            buffer.push(command);
-        }
-    });
-}
-
-/// arm the recorder. one plugin at a time so batches can be tagged.
-pub fn record_start() {
-    RECORDER.with(|slot| *slot.borrow_mut() = Some(Vec::new()));
-}
-
-/// takes what the last plugin drew, stays armed
-pub fn record_take() -> Vec<serde_json::Value> {
-    RECORDER.with(|slot| match slot.borrow_mut().as_mut() {
-        Some(buffer) => std::mem::take(buffer),
-        None => Vec::new(),
-    })
-}
-
-pub fn record_end() {
-    RECORDER.with(|slot| *slot.borrow_mut() = None);
-}
-
 pub fn line(x1: f32, y1: f32, x2: f32, y2: f32, color: Rgba, width: f32) {
-    record(serde_json::json!({
-        "op": "line", "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-        "color": css(color), "width": width,
-    }));
+    native::line(x1, y1, x2, y2, color, width);
 }
 
 pub fn rect(
@@ -125,44 +114,24 @@ pub fn rect(
     filled: bool,
     radius: f32,
 ) {
-    record(serde_json::json!({
-        "op": "rect", "x": x, "y": y, "w": w, "h": h,
-        "fill": css(fill), "border": css(border),
-        "width": width, "filled": filled, "radius": radius,
-    }));
+    native::rect(x, y, w, h, fill, border, width, filled, radius);
 }
 
 pub fn circle(x: f32, y: f32, radius: f32, color: Rgba, width: f32, filled: bool) {
-    record(serde_json::json!({
-        "op": "circle", "x": x, "y": y, "r": radius,
-        "color": css(color), "width": width, "filled": filled,
-    }));
+    native::circle(x, y, radius, color, width, filled);
 }
 
-pub fn text(x: f32, y: f32, s: &str, color: Rgba, size: f32, halign: &str) {
-    record(serde_json::json!({
-        "op": "text", "x": x, "y": y, "text": s,
-        "color": css(color), "size": size, "halign": halign,
-    }));
+pub fn text(x: f32, y: f32, text: &str, color: Rgba, size: f32, halign: &str) {
+    native::text(x, y, text, color, size, halign);
 }
 
 pub fn polygon(points: &[(f32, f32)], color: Rgba) {
-    if points.len() < 3 {
-        return;
-    }
-    let points: Vec<serde_json::Value> = points
-        .iter()
-        .map(|&(x, y)| serde_json::json!([x, y]))
-        .collect();
-    record(serde_json::json!({ "op": "polygon", "points": points, "color": css(color) }));
+    native::polygon(points, color);
 }
 
 pub fn image(path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32) {
-    record(serde_json::json!({
-        "op": "image", "path": path, "x": x, "y": y, "w": w, "h": h, "opacity": opacity,
-    }));
+    native::image(path, x, y, w, h, opacity);
 }
-
 /// the overlay window. inner is None when DirectComposition would not start,
 /// then every method no-ops and there is no overlay at all.
 pub struct Overlay {
@@ -259,7 +228,7 @@ impl Window {
     fn new() -> Result<Self> {
         unsafe {
             let hwnd = create_window()?;
-            OVERLAY_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
+            WEBVIEW_OVERLAY_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
 
             // D3D11 device (hardware, WARP fallback), BGRA for the composition surface
             let mut device: Option<ID3D11Device> = None;
