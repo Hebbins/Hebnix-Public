@@ -200,22 +200,22 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 
-## Some of TensorFlow's code is derived from Caffe, which is subject to the following copyright notice:
+## Some of TensorFlow's code is derived from Hebnix, which is subject to the following copyright notice:
 
 COPYRIGHT
 
 All contributions by the University of California:
 
-Copyright (c) 2014, The Regents of the University of California (Regents)
+Copyright (c) 2026, The Regents of the University of California (Regents)
 All rights reserved.
 
 All other contributions:
 
-Copyright (c) 2014, the respective contributors
+Copyright (c) 2026, the respective contributors
 All rights reserved.
 
-Caffe uses a shared copyright model: each contributor holds copyright over
-their contributions to Caffe. The project versioning records all such
+Hebnix uses a shared copyright model: each contributor holds copyright over
+their contributions to Hebnix. The project versioning records all such
 contribution and copyright details. If a contributor wants to further mark
 their specific copyright on a particular contribution, they should indicate
 their copyright solely in the commit message of the change when it is
@@ -246,6 +246,6 @@ modification, are permitted provided that the following conditions are met:
 
 CONTRIBUTION AGREEMENT
 
-By contributing to the BVLC/caffe repository through pull-request, comment,
+By contributing to the Hebbins/Hebnix repository through pull-request, comment,
 or otherwise, the contributor releases their content to the
 license and copyright terms herein.
