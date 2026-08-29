@@ -25,7 +25,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.2";
+pub const APP_VERSION: &str = "2.1.3";
 
 pub const DEFAULT_WIDTH: f32 = 1000.0;
 pub const DEFAULT_HEIGHT: f32 = 600.0;
@@ -381,6 +381,7 @@ pub struct HebnixApp {
     quitting: bool,
     last_size: (u32, u32),
     overlay: crate::overlay::Overlay,
+    native_overlay: crate::overlay::native::NativeOverlay,
     webview: Option<crate::webview::host::WebviewHost>,
     overlay_unavailable_said: bool,
     overlay_rect: Option<(i32, i32, i32, i32)>,
@@ -542,7 +543,8 @@ impl HebnixApp {
         plugin_mgr.refresh(&mut config, true);
         let _ = config.save(&base_dir);
 
-        let tray = Tray::new(&base_dir);
+        let hidden = config.settings.start_in_tray;
+        let tray = Tray::new(&base_dir, "Hebnix", hidden);
         if let Some(tray) = &tray {
             let open_id = tray.open_id.clone();
             let quit_id = tray.quit_id.clone();
@@ -568,21 +570,13 @@ impl HebnixApp {
         if let Some(hk) = &mut hotkey {
             hk.rebind(&config.settings.hotkey);
         }
-        {
+        if let Some(hotkey) = &hotkey {
             let tx = tx.clone();
             let ctx = cc.egui_ctx.clone();
-            std::thread::Builder::new()
-                .name("hotkey-forwarder".into())
-                .spawn(move || {
-                    let receiver = global_hotkey::GlobalHotKeyEvent::receiver();
-                    while let Ok(event) = receiver.recv() {
-                        if event.state() == global_hotkey::HotKeyState::Pressed {
-                            let _ = tx.send(AppMsg::ToggleVisibility);
-                            ctx.request_repaint();
-                        }
-                    }
-                })
-                .ok();
+            hotkey.listen(move || {
+                let _ = tx.send(AppMsg::ToggleVisibility);
+                ctx.request_repaint();
+            });
         }
 
         if let Some(hwnd) = winutil::main_window_hwnd() {
@@ -595,7 +589,6 @@ impl HebnixApp {
         let mut workshop = WorkshopState::new(&base_dir);
         workshop.fetch_catalog(tx.clone(), cc.egui_ctx.clone());
 
-        let hidden = config.settings.start_in_tray;
         let last_size = (config.window.width, config.window.height);
         let startup_enabled = winutil::is_startup_enabled();
 
@@ -809,6 +802,7 @@ impl HebnixApp {
             quitting: false,
             last_size,
             overlay: crate::overlay::Overlay::new(),
+            native_overlay: crate::overlay::native::NativeOverlay::new(),
             webview: None,
             overlay_unavailable_said: false,
             overlay_rect: None,
@@ -1140,11 +1134,16 @@ impl HebnixApp {
 
     fn set_hidden(&mut self, ctx: &egui::Context, hidden: bool) {
         tracing::info!(hidden, "toggling main window visibility");
+        let rocket_league_had_focus =
+            !hidden && hebnix_sdk::process::is_rocket_league_focused();
         if !hidden {
             winutil::note_foreground();
         }
         self.hidden = hidden;
 
+        if let Some(tray) = &self.tray {
+            tray.set_hidden(hidden);
+        }
         winutil::set_main_window_invisible(hidden);
         ctx.send_viewport_cmd(egui::ViewportCommand::MousePassthrough(hidden));
 
@@ -1159,13 +1158,29 @@ impl HebnixApp {
             }
             let game_fullscreen =
                 self.last_rl_open && self.window_mode == Some(WindowMode::Fullscreen);
-            if !game_fullscreen {
+            if !game_fullscreen && !rocket_league_had_focus {
                 winutil::focus_main_window();
             }
         }
 
         ctx.request_repaint();
         self.plugin_mgr.dispatch_gui_visibility(!hidden);
+    }
+
+    fn handle_toggle_visibility(&mut self, ctx: &egui::Context) {
+        let hebnix_focused = winutil::foreground_window_is_ours();
+        let rocket_league_focused = hebnix_sdk::process::is_rocket_league_focused();
+        if self
+            .config
+            .settings
+            .restrict_hotkey_to_hebnix_or_rocket_league
+            && !hebnix_focused
+            && !rocket_league_focused
+        {
+            return;
+        }
+
+        self.set_hidden(ctx, !self.hidden);
     }
 
     fn force_quit(&mut self, _ctx: &egui::Context) {
@@ -1425,13 +1440,10 @@ impl HebnixApp {
                     self.check_web_port();
                 }
                 AppMsg::ToggleVisibility => {
-                    let hidden = !self.hidden;
-                    self.set_hidden(ctx, hidden);
+                    self.handle_toggle_visibility(ctx);
                 }
                 AppMsg::TrayOpen => {
-                    if self.hidden {
-                        self.set_hidden(ctx, false);
-                    }
+                    self.set_hidden(ctx, !self.hidden);
                 }
                 AppMsg::TrayQuit => {
                     if self.update_info.is_none() {
@@ -2905,9 +2917,7 @@ impl HebnixApp {
 
     /// topmost first. hidden with fewer than two layers.
     fn render_overlay_order(&mut self, ui: &mut egui::Ui) {
-        let layers = self
-            .plugin_mgr
-            .overlay_layers(&self.config.overlay_order);
+        let layers = self.plugin_mgr.overlay_layers(&self.config.overlay_order);
         if layers.len() < 2 {
             return;
         }
@@ -2992,7 +3002,7 @@ impl HebnixApp {
                     )
                     .clicked()
                 {
-                    self.plugin_mgr.refresh(&mut self.config, true);
+                    self.plugin_mgr.reload_all(&mut self.config);
                     self.save_config();
                 }
             });
@@ -3121,7 +3131,7 @@ impl HebnixApp {
 
         egui::Panel::left("hebnix_settings_list")
             .resizable(false)
-            .exact_size(150.0)
+            .exact_size(200.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("hebnix_settings_names")
@@ -3427,6 +3437,36 @@ impl HebnixApp {
                                     .color(egui::Color32::GRAY),
                             );
                             ui.horizontal(|ui| {
+                                ui.add_sized(
+                                    [130.0, 20.0],
+                                    egui::Label::new("Allow Draw on Hebnix Focus:"),
+                                );
+                                if ui
+                                    .checkbox(
+                                        &mut self.config.settings.allow_draw_on_hebnix_focus,
+                                        "",
+                                    )
+                                    .changed()
+                                {
+                                    self.save_config();
+                                }
+                            });
+                            ui.horizontal(|ui| {
+                                ui.add_sized(
+                                    [130.0, 20.0],
+                                    egui::Label::new("Limit Hotkey to Hebnix/Rocket League:"),
+                                );
+                                if ui
+                                    .checkbox(
+                                        &mut self.config.settings.restrict_hotkey_to_hebnix_or_rocket_league,
+                                        "",
+                                    )
+                                    .changed()
+                                {
+                                    self.save_config();
+                                }
+                            });
+                            ui.horizontal(|ui| {
                                 ui.add_sized([130.0, 20.0], egui::Label::new("StatsAPI Rate Warning:"));
                                 let mut show = !self.config.settings.suppress_statsapi_rate_warning;
                                 if ui.checkbox(&mut show, "").changed() {
@@ -3504,7 +3544,7 @@ impl HebnixApp {
 
         egui::Panel::left("plugin_settings_list")
             .resizable(false)
-            .exact_size(150.0)
+            .exact_size(200.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("plugin_settings_names")
@@ -3943,9 +3983,9 @@ impl HebnixApp {
                         .add_sized([160.0, 120.0], egui::Button::new("📁\n\nInstall from .ZIP"))
                         .clicked()
                     {
-                        if let Some(file) = rfd::FileDialog::new()
-                            .add_filter("Plugin Archives", &["zip"])
-                            .pick_file()
+                        let dialog = rfd::FileDialog::new()
+                            .add_filter("Plugin Archives", &["zip"]);
+                        if let Some(file) = winutil::parent_file_dialog(dialog).pick_file()
                         {
                             match install_zip(&file, &self.plugin_dir) {
                                 Ok(()) => {
@@ -4361,29 +4401,35 @@ impl HebnixApp {
     }
 
     fn render_game_overlay(&mut self) {
-        let layers = self
-            .plugin_mgr
-            .overlay_layers(&self.config.overlay_order);
-        self.ensure_webview(!layers.is_empty());
+        let layers = self.plugin_mgr.overlay_layers(&self.config.overlay_order);
+        let html_layers = layers
+            .iter()
+            .filter(|(_, page, _)| page.is_some())
+            .cloned()
+            .collect::<Vec<_>>();
+        self.ensure_webview(!html_layers.is_empty());
         if let Some(webview) = &mut self.webview {
-            webview.sync_pages(&layers);
+            webview.sync_pages(&html_layers);
         }
-        // each plugin paints its own canvas
+
         let draws = self.plugin_mgr.overlay_plugins();
-        let slugs: Vec<String> = layers
+        let slugs = layers
             .iter()
             .map(|(slug, _, _)| slug.clone())
             .filter(|slug| draws.contains(slug))
-            .collect();
+            .collect::<Vec<_>>();
         let webview_wants = self
             .webview
             .as_ref()
             .is_some_and(|webview| webview.wants_overlay());
-        let focused = hebnix_sdk::process::is_rocket_league_focused();
+        crate::overlay::set_allow_draw_on_hebnix_focus(
+            self.config.settings.allow_draw_on_hebnix_focus,
+        );
+        let focused = crate::overlay::has_render_focus();
         if (slugs.is_empty() && !webview_wants) || !focused {
             self.overlay.hide();
+            self.native_overlay.hide();
             self.overlay_rect = None;
-            // the window is hidden, stop the browser painting into it
             if let Some(webview) = &mut self.webview {
                 if let Some((hwnd, _)) = self.overlay.webview_target() {
                     webview.tick(hwnd, (1, 1), false);
@@ -4396,7 +4442,7 @@ impl HebnixApp {
         let now = std::time::Instant::now();
         let refresh_due = self
             .overlay_rect_checked
-            .map(|t| now.duration_since(t).as_millis() > 250)
+            .map(|checked| now.duration_since(checked).as_millis() > 250)
             .unwrap_or(true);
         if refresh_due {
             self.overlay_rect_checked = Some(now);
@@ -4404,49 +4450,49 @@ impl HebnixApp {
         }
         let Some(rect) = self.overlay_rect else {
             self.overlay.hide();
+            self.native_overlay.hide();
             return;
         };
 
         let (left, top, right, bottom) = rect;
         let size = ((right - left).max(1) as u32, (bottom - top).max(1) as u32);
-        if let Some(webview) = &mut self.webview {
-            if let Some((hwnd, _)) = self.overlay.webview_target() {
-                webview.tick(hwnd, size, true);
+        if webview_wants {
+            if let Some(webview) = &mut self.webview {
+                if let Some((hwnd, _)) = self.overlay.webview_target() {
+                    webview.tick(hwnd, size, true);
+                }
             }
+            self.report_webview_error();
+            if self
+                .webview
+                .as_ref()
+                .is_some_and(|webview| webview.is_ready())
+            {
+                self.overlay.place(rect);
+            } else {
+                self.overlay.hide();
+            }
+        } else {
+            self.overlay.hide();
         }
-        self.report_webview_error();
 
-        let ready = self
-            .webview
-            .as_ref()
-            .is_some_and(|webview| webview.is_ready())
-            && self.overlay.place(rect);
-        if !ready {
-            return; // no browser yet, nothing can paint
+        let mut errors = Vec::new();
+        if slugs.is_empty() {
+            self.native_overlay.hide();
+        } else {
+            let plugin_manager = &mut self.plugin_mgr;
+            self.native_overlay.frame(rect, |width, height| {
+                for slug in &slugs {
+                    if let Err(error) = plugin_manager.render_overlay_gdi(slug, width, height) {
+                        errors.push(format!("[Core] Overlay error in '{slug}': {error}"));
+                    }
+                }
+            });
         }
-
-        let mut errors: Vec<String> = Vec::new();
-        let (w, h) = (size.0 as f32, size.1 as f32);
-        crate::overlay::record_start();
-        // one message a frame, a call per primitive would be thousands a second
-        let mut batches: Vec<(String, Vec<serde_json::Value>)> = Vec::new();
-        for slug in &slugs {
-            if let Err(e) = self.plugin_mgr.render_overlay_gdi(slug, w, h) {
-                errors.push(format!("[Core] Overlay error in '{slug}': {e}"));
-            }
-            batches.push((slug.clone(), crate::overlay::record_take()));
-        }
-        crate::overlay::record_end();
-        if let Some(webview) = &self.webview {
-            if let Err(e) = webview.paint(&batches, size) {
-                tracing::debug!("overlay paint dropped: {e}");
-            }
-        }
-        for e in errors {
-            self.console.write(e);
+        for error in errors {
+            self.console.write(error);
         }
     }
-
     fn report_webview_error(&mut self) {
         let Some(message) = self.webview.as_mut().and_then(|w| w.take_error()) else {
             return;

@@ -15,9 +15,10 @@ use crate::messages::AppMsg;
 use crate::monitor::{Monitor, MonitorShared};
 use crate::overlay::Overlay;
 use crate::plugins::PluginManager;
+use crate::tray::Tray;
 use crate::{dpi_fix, statsapi_ini, theme, winutil};
 
-pub const APP_VERSION: &str = "2.1.2";
+pub const APP_VERSION: &str = "2.1.3";
 pub const DEFAULT_WIDTH: f32 = 760.0;
 pub const DEFAULT_HEIGHT: f32 = 520.0;
 pub const MIN_WIDTH: f32 = 520.0;
@@ -76,6 +77,7 @@ pub struct LiteApp {
     stats_tx: Sender<StatsEvent>,
     monitor: Monitor,
     plugin_mgr: PluginManager,
+    tray: Option<Tray>,
     hotkey: Option<ToggleHotkey>,
     tab: Tab,
     settings_tab: SettingsTab,
@@ -106,6 +108,7 @@ pub struct LiteApp {
     window_mode: Option<hebnix_sdk::save_file::WindowMode>,
     last_size: (u32, u32),
     overlay: Overlay,
+    native_overlay: crate::overlay::native::NativeOverlay,
     webview: Option<crate::webview::host::WebviewHost>,
     overlay_unavailable_said: bool,
     overlay_rect: Option<(i32, i32, i32, i32)>,
@@ -123,6 +126,7 @@ pub struct LiteApp {
     update_error: Option<String>,
     changelog_popup: Option<crate::update::ChangelogEntry>,
     launch_path_notice: bool,
+    quitting: bool,
 }
 
 impl LiteApp {
@@ -201,25 +205,39 @@ impl LiteApp {
         let mut plugin_mgr = PluginManager::new(plugin_dir.clone(), tx.clone(), APP_VERSION);
         plugin_mgr.refresh(&mut config, true);
         let _ = config.save(&base_dir);
+        let start_hidden = config.settings.start_in_tray;
+        let tray = Tray::new(&base_dir, "Hebnix Lite", start_hidden);
+        if let Some(tray) = &tray {
+            let open_id = tray.open_id.clone();
+            let quit_id = tray.quit_id.clone();
+            let tx = tx.clone();
+            let ctx = cc.egui_ctx.clone();
+            std::thread::Builder::new()
+                .name("lite-tray-forwarder".into())
+                .spawn(move || {
+                    let receiver = tray_icon::menu::MenuEvent::receiver();
+                    while let Ok(event) = receiver.recv() {
+                        if event.id == open_id {
+                            let _ = tx.send(AppMsg::TrayOpen);
+                        } else if event.id == quit_id {
+                            let _ = tx.send(AppMsg::TrayQuit);
+                        }
+                        ctx.request_repaint();
+                    }
+                })
+                .ok();
+        }
 
         let mut hotkey = ToggleHotkey::new();
         if let Some(hotkey) = &mut hotkey {
             hotkey.rebind(&config.settings.hotkey);
         }
-        {
+        if let Some(hotkey) = &hotkey {
             let tx = tx.clone();
             let ctx = cc.egui_ctx.clone();
-            std::thread::spawn(move || {
-                let receiver = global_hotkey::GlobalHotKeyEvent::receiver();
-                while let Ok(event) = receiver.recv() {
-                    if event.state() == global_hotkey::HotKeyState::Pressed {
-                        if winutil::main_window_hidden() {
-                            winutil::request_show();
-                        }
-                        let _ = tx.send(AppMsg::ToggleVisibility);
-                        ctx.request_repaint();
-                    }
-                }
+            hotkey.listen(move || {
+                let _ = tx.send(AppMsg::ToggleVisibility);
+                ctx.request_repaint();
             });
         }
 
@@ -228,7 +246,6 @@ impl LiteApp {
             winutil::install_minimize_hook(hwnd, &cc.egui_ctx);
         }
 
-        let start_hidden = config.settings.start_in_tray;
         let mut app = Self {
             base_dir,
             themes_dir,
@@ -242,6 +259,7 @@ impl LiteApp {
             stats_tx,
             monitor,
             plugin_mgr,
+            tray,
             hotkey,
             tab: Tab::Console,
             settings_tab: SettingsTab::Hebnix,
@@ -270,6 +288,7 @@ impl LiteApp {
             window_mode: None,
             last_size: (0, 0),
             overlay: Overlay::new(),
+            native_overlay: crate::overlay::native::NativeOverlay::new(),
             webview: None,
             overlay_unavailable_said: false,
             overlay_rect: None,
@@ -287,6 +306,7 @@ impl LiteApp {
             update_error: None,
             changelog_popup: None,
             launch_path_notice: false,
+            quitting: false,
         };
         app.theme_options = theme::list_themes(&app.themes_dir);
         app.plugin_mgr.shared.borrow_mut().is_gui_open = !start_hidden;
@@ -327,7 +347,8 @@ impl LiteApp {
             .packet_rate
             .as_deref()
             .and_then(|rate| rate.parse::<i64>().ok());
-        self.statsapi_blocking = matches!(parsed, None | Some(0)) || parsed.is_some_and(|r| r <= 10);
+        self.statsapi_blocking =
+            matches!(parsed, None | Some(0)) || parsed.is_some_and(|r| r <= 10);
         self.statsapi_notice = match parsed {
             None | Some(0) => {
                 Some("StatsAPI is not configured. PacketSendRate must be set to 20.".to_string())
@@ -459,8 +480,8 @@ impl LiteApp {
                             self.config.settings.rl_path_confirmed = true;
                             self.save_config();
                         }
-                        let switched = self.plugin_mgr.shared.borrow().platform
-                            != platform.as_str();
+                        let switched =
+                            self.plugin_mgr.shared.borrow().platform != platform.as_str();
                         self.plugin_mgr.shared.borrow_mut().platform =
                             platform.as_str().to_string();
                         if rl_open && switched {
@@ -480,7 +501,15 @@ impl LiteApp {
                         && !self.fullscreen_notice_dismissed;
                 }
                 AppMsg::ToggleVisibility => {
+                    self.handle_toggle_visibility(ctx);
+                }
+                AppMsg::TrayOpen => {
                     self.set_hidden(ctx, !self.hidden);
+                }
+                AppMsg::TrayQuit => {
+                    if self.update_info.is_none() {
+                        self.force_quit();
+                    }
                 }
                 AppMsg::HotkeyCaptured(value) => {
                     self.capturing_hotkey = false;
@@ -659,10 +688,15 @@ impl LiteApp {
     }
 
     fn set_hidden(&mut self, ctx: &egui::Context, hidden: bool) {
+        let rocket_league_had_focus =
+            !hidden && hebnix_sdk::process::is_rocket_league_focused();
         if !hidden {
             winutil::note_foreground();
         }
         self.hidden = hidden;
+        if let Some(tray) = &self.tray {
+            tray.set_hidden(hidden);
+        }
         winutil::set_main_window_invisible(hidden);
         ctx.send_viewport_cmd(egui::ViewportCommand::MousePassthrough(hidden));
 
@@ -677,7 +711,7 @@ impl LiteApp {
             }
             let game_fullscreen = self.last_rl_open
                 && self.window_mode == Some(hebnix_sdk::save_file::WindowMode::Fullscreen);
-            if !game_fullscreen {
+            if !game_fullscreen && !rocket_league_had_focus {
                 winutil::focus_main_window();
             }
         }
@@ -685,6 +719,37 @@ impl LiteApp {
         self.plugin_mgr.dispatch_gui_visibility(!hidden);
         ctx.request_repaint();
     }
+
+    fn handle_toggle_visibility(&mut self, ctx: &egui::Context) {
+        let hebnix_focused = winutil::foreground_window_is_ours();
+        let rocket_league_focused = hebnix_sdk::process::is_rocket_league_focused();
+        if self
+            .config
+            .settings
+            .restrict_hotkey_to_hebnix_or_rocket_league
+            && !hebnix_focused
+            && !rocket_league_focused
+        {
+            return;
+        }
+
+        self.set_hidden(ctx, !self.hidden);
+    }
+    fn force_quit(&mut self) {
+        self.quitting = true;
+        if self.last_size.0 > 0 && self.last_size.1 > 0 {
+            self.config.window.width = self.last_size.0;
+            self.config.window.height = self.last_size.1;
+        }
+        self.save_config();
+        self.plugin_mgr.unload_all();
+        self.stats.stop();
+        self.ws_stats.stop();
+        self.monitor.stop();
+        self.tray = None;
+        std::process::exit(0);
+    }
+
     fn start_hotkey_capture(&mut self, ctx: &egui::Context) {
         if self.capturing_hotkey {
             return;
@@ -922,7 +987,7 @@ impl LiteApp {
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Reload").clicked() {
-                    self.plugin_mgr.refresh(&mut self.config, true);
+                    self.plugin_mgr.reload_all(&mut self.config);
                     self.save_config();
                 }
             });
@@ -1132,9 +1197,9 @@ impl LiteApp {
                             .add_sized([160.0, 120.0], egui::Button::new("📁\n\nInstall from .ZIP"))
                             .clicked()
                         {
-                            if let Some(file) = rfd::FileDialog::new()
-                                .add_filter("Plugin archive", &["zip"])
-                                .pick_file()
+                            let dialog = rfd::FileDialog::new()
+                                .add_filter("Plugin archive", &["zip"]);
+                            if let Some(file) = winutil::parent_file_dialog(dialog).pick_file()
                             {
                                 match install_zip(&file, &self.plugin_dir) {
                                     Ok(()) => {
@@ -1578,7 +1643,7 @@ impl LiteApp {
     fn render_hebnix_settings(&mut self, ui: &mut egui::Ui) {
         egui::Panel::left("lite_hebnix_settings_list")
             .resizable(false)
-            .exact_size(150.0)
+            .exact_size(200.0)
             .show(ui, |ui| {
                 ui.selectable_value(
                     &mut self.hebnix_settings_tab,
@@ -1802,6 +1867,36 @@ impl LiteApp {
         });
         ui.weak("Warns when the game is fullscreen and overlays cannot draw.");
         ui.horizontal(|ui| {
+            ui.add_sized(
+                [180.0, 20.0],
+                egui::Label::new("Allow Draw on Hebnix Focus:"),
+            );
+            if ui
+                .checkbox(
+                    &mut self.config.settings.allow_draw_on_hebnix_focus,
+                    "",
+                )
+                .changed()
+            {
+                self.save_config();
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.add_sized(
+                [180.0, 20.0],
+                egui::Label::new("Limit Hotkey to Hebnix/Rocket League:"),
+            );
+            if ui
+                .checkbox(
+                    &mut self.config.settings.restrict_hotkey_to_hebnix_or_rocket_league,
+                    "",
+                )
+                .changed()
+            {
+                self.save_config();
+            }
+        });
+        ui.horizontal(|ui| {
             ui.add_sized([180.0, 20.0], egui::Label::new("StatsAPI Rate Warning:"));
             let mut show = !self.config.settings.suppress_statsapi_rate_warning;
             if ui.checkbox(&mut show, "").changed() {
@@ -1850,7 +1945,7 @@ impl LiteApp {
 
         egui::Panel::left("lite_plugin_settings_list")
             .resizable(false)
-            .exact_size(150.0)
+            .exact_size(200.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("lite_plugin_settings_names")
@@ -1904,8 +1999,12 @@ impl LiteApp {
                          Switch the game's video settings to Borderless or Windowed.",
                     );
                     ui.horizontal(|ui| {
-                        if ui.button("OK").clicked() { dismiss = true; }
-                        if ui.button("Don't show again").clicked() { suppress = true; }
+                        if ui.button("OK").clicked() {
+                            dismiss = true;
+                        }
+                        if ui.button("Don't show again").clicked() {
+                            suppress = true;
+                        }
                     });
                 });
             if dismiss {
@@ -1918,8 +2017,8 @@ impl LiteApp {
                 self.save_config();
             }
         }
-        let show_statsapi = self.statsapi_blocking
-            || !self.config.settings.suppress_statsapi_rate_warning;
+        let show_statsapi =
+            self.statsapi_blocking || !self.config.settings.suppress_statsapi_rate_warning;
         if show_statsapi {
             if let Some(message) = self.statsapi_notice.clone() {
                 let blocking = self.statsapi_blocking;
@@ -1984,24 +2083,33 @@ impl LiteApp {
 
     fn render_game_overlay(&mut self) {
         let layers = self.plugin_mgr.overlay_layers(&self.config.overlay_order);
-        self.ensure_webview(!layers.is_empty());
+        let html_layers = layers
+            .iter()
+            .filter(|(_, page, _)| page.is_some())
+            .cloned()
+            .collect::<Vec<_>>();
+        self.ensure_webview(!html_layers.is_empty());
         if let Some(webview) = &mut self.webview {
-            webview.sync_pages(&layers);
+            webview.sync_pages(&html_layers);
         }
-        // each plugin paints its own canvas
+
         let draws = self.plugin_mgr.overlay_plugins();
-        let slugs: Vec<String> = layers
+        let slugs = layers
             .iter()
             .map(|(slug, _, _)| slug.clone())
             .filter(|slug| draws.contains(slug))
-            .collect();
+            .collect::<Vec<_>>();
         let webview_wants = self
             .webview
             .as_ref()
             .is_some_and(|webview| webview.wants_overlay());
-        let focused = hebnix_sdk::process::is_rocket_league_focused();
+        crate::overlay::set_allow_draw_on_hebnix_focus(
+            self.config.settings.allow_draw_on_hebnix_focus,
+        );
+        let focused = crate::overlay::has_render_focus();
         if (slugs.is_empty() && !webview_wants) || !focused {
             self.overlay.hide();
+            self.native_overlay.hide();
             self.overlay_rect = None;
             if let Some(webview) = &mut self.webview {
                 if let Some((hwnd, _)) = self.overlay.webview_target() {
@@ -2011,58 +2119,61 @@ impl LiteApp {
             self.report_webview_error();
             return;
         }
-        let due = self
+
+        let now = std::time::Instant::now();
+        let refresh_due = self
             .overlay_rect_checked
-            .map(|time| time.elapsed() > Duration::from_millis(250))
+            .map(|checked| now.duration_since(checked).as_millis() > 250)
             .unwrap_or(true);
-        if due {
-            self.overlay_rect_checked = Some(std::time::Instant::now());
+        if refresh_due {
+            self.overlay_rect_checked = Some(now);
             self.overlay_rect = hebnix_sdk::process::get_rocket_league_window_rect();
         }
         let Some(rect) = self.overlay_rect else {
             self.overlay.hide();
+            self.native_overlay.hide();
             return;
         };
+
         let (left, top, right, bottom) = rect;
         let size = ((right - left).max(1) as u32, (bottom - top).max(1) as u32);
-        if let Some(webview) = &mut self.webview {
-            if let Some((hwnd, _)) = self.overlay.webview_target() {
-                webview.tick(hwnd, size, true);
+        if webview_wants {
+            if let Some(webview) = &mut self.webview {
+                if let Some((hwnd, _)) = self.overlay.webview_target() {
+                    webview.tick(hwnd, size, true);
+                }
             }
-        }
-        self.report_webview_error();
-
-        let ready = self
-            .webview
-            .as_ref()
-            .is_some_and(|webview| webview.is_ready())
-            && self.overlay.place(rect);
-        if !ready {
-            return; // no browser yet, nothing can paint
+            self.report_webview_error();
+            if self
+                .webview
+                .as_ref()
+                .is_some_and(|webview| webview.is_ready())
+            {
+                self.overlay.place(rect);
+            } else {
+                self.overlay.hide();
+            }
+        } else {
+            self.overlay.hide();
         }
 
         let mut errors = Vec::new();
-        let (width, height) = (size.0 as f32, size.1 as f32);
-        crate::overlay::record_start();
-        // one message a frame, a call per primitive would be thousands a second
-        let mut batches: Vec<(String, Vec<serde_json::Value>)> = Vec::new();
-        for slug in &slugs {
-            if let Err(error) = self.plugin_mgr.render_overlay_gdi(slug, width, height) {
-                errors.push(format!("[Core] Overlay error in '{slug}': {error}"));
-            }
-            batches.push((slug.clone(), crate::overlay::record_take()));
-        }
-        crate::overlay::record_end();
-        if let Some(webview) = &self.webview {
-            if let Err(error) = webview.paint(&batches, size) {
-                tracing::debug!("overlay paint dropped: {error}");
-            }
+        if slugs.is_empty() {
+            self.native_overlay.hide();
+        } else {
+            let plugin_manager = &mut self.plugin_mgr;
+            self.native_overlay.frame(rect, |width, height| {
+                for slug in &slugs {
+                    if let Err(error) = plugin_manager.render_overlay_gdi(slug, width, height) {
+                        errors.push(format!("[Core] Overlay error in '{slug}': {error}"));
+                    }
+                }
+            });
         }
         for error in errors {
             self.console.write(error);
         }
     }
-
     fn report_webview_error(&mut self) {
         let Some(message) = self.webview.as_mut().and_then(|w| w.take_error()) else {
             return;
@@ -2175,14 +2286,11 @@ impl LiteApp {
                     let new_pos = (rect.min.x, rect.min.y);
                     // only when moved, this reaches disk every second
                     let moved = match state.last_pos {
-                        Some((x, y)) => {
-                            (x - new_pos.0).abs() > 1.0 || (y - new_pos.1).abs() > 1.0
-                        }
+                        Some((x, y)) => (x - new_pos.0).abs() > 1.0 || (y - new_pos.1).abs() > 1.0,
                         None => true,
                     };
                     if moved {
-                        self.plugin_mgr
-                            .set_window_pos(&slug, new_pos.0, new_pos.1);
+                        self.plugin_mgr.set_window_pos(&slug, new_pos.0, new_pos.1);
                     }
                 }
             });
@@ -2231,14 +2339,11 @@ impl eframe::App for LiteApp {
     fn ui(&mut self, ui: &mut egui::Ui, _: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.handle_messages(&ctx);
-        if winutil::take_show_request() && self.hidden {
-            self.set_hidden(&ctx, false);
-        }
         dpi_fix::install_on_all_windows();
         if let Some(rect) = ctx.input(|input| input.viewport().inner_rect) {
             self.last_size = (rect.width().max(0.0) as u32, rect.height().max(0.0) as u32);
         }
-        if ctx.input(|input| input.viewport().close_requested()) {
+        if ctx.input(|input| input.viewport().close_requested()) && !self.quitting {
             if self.update_info.is_some() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             } else {

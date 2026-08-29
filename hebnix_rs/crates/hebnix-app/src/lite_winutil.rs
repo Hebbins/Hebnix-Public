@@ -1,5 +1,10 @@
+use std::num::NonZeroIsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use raw_window_handle::{
+    DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, RawWindowHandle,
+    Win32WindowHandle, WindowHandle,
+};
 use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND};
 use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance};
 use windows::Win32::System::Threading::{CreateMutexW, GetCurrentProcessId};
@@ -13,7 +18,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::PCWSTR;
 
 static HIDDEN: AtomicBool = AtomicBool::new(false);
-static SHOW_REQUESTED: AtomicBool = AtomicBool::new(false);
 static CAME_FROM_GAME: AtomicBool = AtomicBool::new(false);
 
 fn wide(value: &str) -> Vec<u16> {
@@ -59,6 +63,28 @@ pub fn foreground_window_is_ours() -> bool {
         GetWindowThreadProcessId(window, Some(&mut process_id));
         process_id == GetCurrentProcessId()
     }
+}
+
+struct DialogParent(HWND);
+
+impl HasWindowHandle for DialogParent {
+    fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {
+        let hwnd = NonZeroIsize::new(self.0.0 as isize).ok_or(HandleError::Unavailable)?;
+        let handle = Win32WindowHandle::new(hwnd);
+        Ok(unsafe { WindowHandle::borrow_raw(RawWindowHandle::Win32(handle)) })
+    }
+}
+
+impl HasDisplayHandle for DialogParent {
+    fn display_handle(&self) -> Result<DisplayHandle<'_>, HandleError> {
+        Ok(DisplayHandle::windows())
+    }
+}
+
+pub fn parent_file_dialog(dialog: rfd::FileDialog) -> rfd::FileDialog {
+    main_window()
+        .map(|hwnd| dialog.clone().set_parent(&DialogParent(hwnd)))
+        .unwrap_or(dialog)
 }
 
 /// note which program we came from. ours doesnt count, the monitor calls this
@@ -125,27 +151,6 @@ pub fn install_minimize_hook(_: HWND, _: &eframe::egui::Context) {}
 
 pub fn main_window_hidden() -> bool {
     HIDDEN.load(Ordering::Relaxed)
-}
-
-pub fn request_show() {
-    SHOW_REQUESTED.store(true, Ordering::Relaxed);
-    if let Some(window) = main_window() {
-        unsafe {
-            let style = GetWindowLongW(window, GWL_EXSTYLE);
-            SetWindowLongW(window, GWL_EXSTYLE, style & !hidden_bits());
-            let _ = SetLayeredWindowAttributes(
-                window,
-                windows::Win32::Foundation::COLORREF(0),
-                255,
-                LWA_ALPHA,
-            );
-            set_taskbar_button(window, true);
-        }
-    }
-}
-
-pub fn take_show_request() -> bool {
-    SHOW_REQUESTED.swap(false, Ordering::Relaxed)
 }
 
 thread_local! {

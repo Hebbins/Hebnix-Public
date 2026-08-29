@@ -82,11 +82,9 @@ fn monitor_loop(
         // every 0.5s: topmost tracking
         let rl_focused = hebnix_sdk::process::is_rocket_league_focused();
         // overlay must never outlive game focus. the ui loop hides it too but
-        // can stall while the main window's hidden, so this thread is the real
-        // enforcer.
-        if !rl_focused {
-            crate::overlay::enforce_hidden();
-        }
+        // can stall while the main window's hidden, so this thread also
+        // enforces the configured focus policy.
+        crate::overlay::enforce_hidden();
         crate::winutil::note_foreground();
         let on_screen = !crate::winutil::main_window_hidden();
         let should_be_topmost =

@@ -46,7 +46,6 @@ const FPS_PER_ROUND: usize = 3;
 const MAX_ROUNDS: usize = 3;
 const ROUND_WAIT: Duration = Duration::from_secs(20);
 
-// avatars are a few kb, this is only here so a bad url cant use too much memory
 const AVATAR_MAX_BYTES: u64 = 4 * 1024 * 1024;
 
 /// find the bundled curl-impersonate exe. HEBNIX_CURL_IMPERSONATE overrides,
