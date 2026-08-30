@@ -120,6 +120,17 @@ fn b(v: &Value, key: &str) -> bool {
     v.get(key).and_then(|x| x.as_bool()).unwrap_or(false)
 }
 
+fn strs(v: &Value, key: &str) -> Vec<String> {
+    v.get(key)
+        .and_then(|x| x.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(str::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 // Internal parsers
 
 fn parse_player_ref(d: &Value) -> PlayerRef {
@@ -168,6 +179,7 @@ fn parse_update_state(data: &Value) -> UpdateStateData {
                 touches: i(p, "Touches"),
                 car_touches: i(p, "CarTouches"),
                 demos: i(p, "Demos"),
+                loadout: strs(p, "Loadout"),
                 has_car: b(p, "bHasCar"),
                 speed: f(p, "Speed"),
                 boost: i(p, "Boost"),
@@ -178,6 +190,7 @@ fn parse_update_state(data: &Value) -> UpdateStateData {
                 demolished: b(p, "bDemolished"),
                 supersonic: b(p, "bSupersonic"),
                 attacker,
+                pickup_class: s(p, "PickupClass"),
             });
         }
     }
