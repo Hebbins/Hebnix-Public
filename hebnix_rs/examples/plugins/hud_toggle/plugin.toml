@@ -1,0 +1,4 @@
+name = "HUD Toggle"
+author = "Hebnix"
+version = "1.0.0"
+entry = "main.lua"
