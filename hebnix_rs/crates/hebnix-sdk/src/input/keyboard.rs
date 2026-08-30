@@ -4,10 +4,20 @@
 
 use std::time::{Duration, Instant};
 
-use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+    KEYEVENTF_KEYUP, SendInput, VIRTUAL_KEY, VK_SHIFT, VkKeyScanW,
+};
 
 // (name, vk code) for named keys
-const NAMED_KEYS: [(&str, i32); 58] = [
+const NAMED_KEYS: [(&str, i32); 65] = [
+    ("mouse_left", 0x01),
+    ("mouse_right", 0x02),
+    ("mouse_middle", 0x04),
+    ("mouse_x1", 0x05),
+    ("mouse_x2", 0x06),
+    ("left mouse button", 0x01),
+    ("right mouse button", 0x02),
     ("backspace", 0x08),
     ("tab", 0x09),
     ("enter", 0x0D),
@@ -127,6 +137,88 @@ pub fn scan_pressed_key() -> Option<String> {
         }
     }
     None
+}
+
+// --- synthetic input (SendInput) ---
+//
+// used for things like quick-chat automation: tapping the chat-open key and
+// typing the message. gated by callers (not here) to whatever policy applies,
+// e.g. hebnix's "not while a match is in progress" rule for raw input.
+
+fn send_one(input: INPUT) {
+    unsafe {
+        SendInput(&[input], std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+fn vk_input(vk: i32, key_up: bool) -> INPUT {
+    let mut flags = KEYBD_EVENT_FLAGS(0);
+    if key_up {
+        flags |= KEYEVENTF_KEYUP;
+    }
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(vk as u16),
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+const TAP_GAP: Duration = Duration::from_millis(1);
+
+/// press+release a vk code
+pub fn tap_vk(vk: i32) {
+    send_one(vk_input(vk, false));
+    std::thread::sleep(TAP_GAP);
+    send_one(vk_input(vk, true));
+    std::thread::sleep(TAP_GAP);
+}
+
+/// press+release a named key ("enter", "t", "f1", ...). false if the name
+/// isn't recognized.
+pub fn tap_key(name: &str) -> bool {
+    match name_to_vk(name) {
+        Some(vk) => {
+            tap_vk(vk);
+            true
+        }
+        None => false,
+    }
+}
+
+/// type text by tapping real vk codes (shift held for caps/punctuation as
+/// needed), mapped per the active keyboard layout via VkKeyScanW.
+///
+/// deliberately not KEYEVENTF_UNICODE: that path has no real vk/scan code
+/// attached, so games that read keyboard via raw input (most UE titles,
+/// including RL) never see it — the chat box opens (a real vk tap) and
+/// enter sends (also a real vk tap), but nothing typed in between shows up.
+/// tapping real keys goes through the same path a physical keypress would.
+pub fn type_text(text: &str) {
+    for unit in text.encode_utf16() {
+        let scan = unsafe { VkKeyScanW(unit) };
+        if scan == -1 {
+            continue; // unmappable on the current layout, skip
+        }
+        let vk = (scan & 0xFF) as i32;
+        let need_shift = (scan >> 8) & 0x1 != 0;
+
+        if need_shift {
+            send_one(vk_input(VK_SHIFT.0 as i32, false));
+            std::thread::sleep(TAP_GAP);
+        }
+        tap_vk(vk);
+        if need_shift {
+            send_one(vk_input(VK_SHIFT.0 as i32, true));
+            std::thread::sleep(TAP_GAP);
+        }
+    }
 }
 
 /// blocks until a key is pressed, returns its name.
