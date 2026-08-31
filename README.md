@@ -16,6 +16,8 @@ Build the optional bridge executable with `rlapi_bridge/build.bat`.
 
 Set `$env:HEBNIX_BASE_DIR` to use a different data directory while developing.
 
+There is also a more user friendly build.bat file.
+
 ## Packaging
 
     cd hebnix_rs

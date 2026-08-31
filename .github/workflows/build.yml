@@ -22,14 +22,30 @@ jobs:
         with:
           workspaces: hebnix_rs -> target
 
-      - name: build rlapi bridge
-        working-directory: rlapi_bridge
-        run: .\build.bat
-        shell: cmd
+      - name: cache third-party dependencies
+        uses: actions/cache@v4
+        with:
+          path: hebnix_rs/vendor/curl-impersonate
+          key: hebnix-vendor-${{ runner.os }}-curl-1.5.6-cacert-2026-05-14
 
-      - name: build + package hebnix
-        working-directory: hebnix_rs
-        run: .\package.ps1
+      - name: install third-party dependencies
+        run: .\build.bat package --skip-deps
+        shell: cmd
+        continue-on-error: false
+        env:
+          CI: true
+
+      - name: verify dependencies
+        run: |
+          if (!(Test-Path "hebnix_rs\vendor\curl-impersonate\curl-impersonate.exe")) {
+            Write-Error "curl-impersonate.exe not found"
+            exit 1
+          }
+          if (!(Test-Path "hebnix_rs\vendor\curl-impersonate\cacert.pem")) {
+            Write-Error "cacert.pem not found"
+            exit 1
+          }
+          Write-Host "Dependencies verified successfully"
         shell: pwsh
 
       - uses: actions/upload-artifact@v4
