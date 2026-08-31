@@ -17,28 +17,118 @@ use crate::tracker::models::{LifetimeStats, PlayerStats, PlaylistAverage, Playli
 use crate::utils::constants::RANK_TIERS;
 use crate::utils::platforms::{get_platform_slug, is_bot};
 
-// --impersonate targets we rotate through. all verified valid (tracker.gg
-// returns 200 or 429 for each, never a 403/block). throttling is per
-// fingerprint, so on a 429 we just try a different one. interleaved across
-// browser families so 3 consecutive tries span chrome/edge/firefox/safari.
-const IMPERSONATE_TARGETS: [&str; 16] = [
-    "chrome142",
-    "edge101",
-    "firefox147",
-    "safari260",
-    "chrome116",
-    "edge99",
-    "firefox135",
-    "safari184",
-    "chrome110",
-    "firefox133",
-    "safari180",
-    "chrome131",
-    "chrome124",
-    "chrome136",
-    "chrome120",
-    "chrome146",
+#[derive(Clone, Copy)]
+enum Family {
+    Chrome,
+    Firefox,
+    Safari,
+}
+
+#[derive(Clone, Copy)]
+struct Target {
+    name: &'static str,
+    family: Family,
+    version: u32,
+}
+
+const CHROME_PLATFORMS: [(&str, &str); 3] = [
+    ("Windows NT 10.0; Win64; x64", "Windows"),
+    ("Macintosh; Intel Mac OS X 10_15_7", "macOS"),
+    ("X11; Linux x86_64", "Linux"),
 ];
+
+const FIREFOX_PLATFORMS: [&str; 3] = [
+    "Windows NT 10.0; Win64; x64",
+    "Macintosh; Intel Mac OS X 10.15",
+    "X11; Linux x86_64",
+];
+
+// --impersonate targets we rotate through, each verified against tracker.gg
+// (200, never a 403). cloudflare blocks by fingerprint, so a dead target burns
+// a retry every time it comes up - re-check with the loop in the module tests
+// before adding one. interleaved across browser families so 3 consecutive
+// tries span chrome/firefox/safari.
+const IMPERSONATE_TARGETS: [Target; 11] = [
+    Target {
+        name: "chrome146",
+        family: Family::Chrome,
+        version: 146,
+    },
+    Target {
+        name: "firefox147",
+        family: Family::Firefox,
+        version: 147,
+    },
+    Target {
+        name: "safari184",
+        family: Family::Safari,
+        version: 184,
+    },
+    Target {
+        name: "chrome145",
+        family: Family::Chrome,
+        version: 145,
+    },
+    Target {
+        name: "firefox144",
+        family: Family::Firefox,
+        version: 144,
+    },
+    Target {
+        name: "safari180",
+        family: Family::Safari,
+        version: 180,
+    },
+    Target {
+        name: "chrome136",
+        family: Family::Chrome,
+        version: 136,
+    },
+    Target {
+        name: "firefox135",
+        family: Family::Firefox,
+        version: 135,
+    },
+    Target {
+        name: "chrome133a",
+        family: Family::Chrome,
+        version: 133,
+    },
+    Target {
+        name: "firefox133",
+        family: Family::Firefox,
+        version: 133,
+    },
+    Target {
+        name: "chrome131",
+        family: Family::Chrome,
+        version: 131,
+    },
+];
+
+
+fn identity_headers(target: &Target, pick: usize) -> Vec<String> {
+    match target.family {
+        Family::Chrome => {
+            let (platform, hint) = CHROME_PLATFORMS[pick % CHROME_PLATFORMS.len()];
+            let version = target.version;
+            vec![
+                format!(
+                    "User-Agent: Mozilla/5.0 ({platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version}.0.0.0 Safari/537.36"
+                ),
+                format!("sec-ch-ua-platform: \"{hint}\""),
+            ]
+        }
+        Family::Firefox => {
+            let platform = FIREFOX_PLATFORMS[pick % FIREFOX_PLATFORMS.len()];
+            let version = target.version;
+            vec![format!(
+                "User-Agent: Mozilla/5.0 ({platform}; rv:{version}.0) Gecko/20100101 Firefox/{version}.0"
+            )]
+        }
+        Family::Safari => Vec::new(),
+    }
+}
 
 // retry shape: try this many distinct fingerprints per round, then wait and go
 // again, up to this many rounds. matches the standalone's "rotate + back off".
@@ -121,11 +211,21 @@ fn write_runtime_file(path: &std::path::Path, bytes: &[u8]) -> Option<()> {
 // wall-clock derived start index. not crypto, just varies which profile we try
 // first so the fleet doesn't all lead with the same one.
 fn pick_impersonate_index() -> usize {
+    clock_entropy() % IMPERSONATE_TARGETS.len()
+}
+
+/// same idea for the OS an identity presents as. shifted so it doesn't move in
+/// lockstep with the fingerprint pick otherwise a given target would always
+/// come paired with the same platform.
+fn pick_platform_index() -> usize {
+    clock_entropy() >> 7
+}
+
+fn clock_entropy() -> usize {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.subsec_nanos() as usize)
         .unwrap_or(0)
-        % IMPERSONATE_TARGETS.len()
 }
 
 pub struct TrackerClient {
@@ -295,11 +395,11 @@ impl TrackerClient {
         let mut last = String::from("no fingerprint worked");
         for round in 0..MAX_ROUNDS {
             for _ in 0..FPS_PER_ROUND {
-                let target = IMPERSONATE_TARGETS[idx % n];
+                let target = &IMPERSONATE_TARGETS[idx % n];
                 idx += 1;
-                match self.run_curl(&bin, target, &url) {
+                match self.run_curl(&bin, target, pick_platform_index(), &url) {
                     Ok(data) => {
-                        tracing::debug!("tracker fetch ok ({target})");
+                        tracing::debug!("tracker fetch ok ({})", target.name);
                         return Ok(data);
                     }
                     Err(CurlError::NoCurl) => {
@@ -307,7 +407,7 @@ impl TrackerClient {
                     }
                     Err(CurlError::Http(msg)) if msg.contains("NOT_FOUND_404") => return Err(msg),
                     Err(CurlError::Http(msg)) => {
-                        tracing::debug!("tracker {target} failed ({msg}), next fingerprint");
+                        tracing::debug!("tracker {} failed ({msg}), next fingerprint", target.name);
                         last = msg;
                     }
                 }
@@ -322,7 +422,13 @@ impl TrackerClient {
 
     // run curl-impersonate with the picked fingerprint + our bundled cacert
     // (boringssl doesn't touch the windows cert store, so it needs the bundle).
-    fn run_curl(&self, bin: &std::path::Path, target: &str, url: &str) -> Result<Value, CurlError> {
+    fn run_curl(
+        &self,
+        bin: &std::path::Path,
+        target: &Target,
+        platform_pick: usize,
+        url: &str,
+    ) -> Result<Value, CurlError> {
         const MARKER: &str = "\n__HTTP_STATUS__:";
         let timeout_secs = self.timeout.as_secs().max(1).to_string();
         let write_out = format!("{MARKER}%{{http_code}}");
@@ -337,8 +443,14 @@ impl TrackerClient {
             "-w".into(),
             write_out,
             "--impersonate".into(),
-            target.into(),
+            target.name.into(),
         ];
+        // -H replaces the header curl-impersonate would have sent rather than
+        // adding a second one, so the browser's own header order survives.
+        for header in identity_headers(target, platform_pick) {
+            args.push("-H".into());
+            args.push(header);
+        }
         if let Some(cacert) = bin.parent().map(|d| d.join("cacert.pem")) {
             if cacert.is_file() {
                 args.push("--cacert".into());
@@ -717,4 +829,130 @@ fn parse_iso8601_to_unix(s: &str) -> Option<f64> {
     let days = era * 146097 + doe - 719468;
 
     Some((days * 86400 + hour * 3600 + min * 60 + sec - offset_secs) as f64)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn ua_of(headers: &[String]) -> String {
+        headers
+            .iter()
+            .find(|h| h.starts_with("User-Agent: "))
+            .expect("a chrome/firefox override always sets a UA")
+            .clone()
+    }
+
+    fn os_named_in(ua: &str) -> &'static str {
+        if ua.contains("Windows") {
+            "Windows"
+        } else if ua.contains("Macintosh") {
+            "macOS"
+        } else {
+            "Linux"
+        }
+    }
+    
+    #[test]
+    fn identities_agree_with_their_fingerprint() {
+        for target in &IMPERSONATE_TARGETS {
+            for pick in 0..CHROME_PLATFORMS.len() {
+                let headers = identity_headers(target, pick);
+                let version_marker = match target.family {
+                    Family::Chrome => format!("Chrome/{}.0.0.0", target.version),
+                    Family::Firefox => format!("Firefox/{}.0", target.version),
+                    // safari opts out of overriding, keeping its macOS default
+                    Family::Safari => {
+                        assert!(headers.is_empty(), "{} overrode its UA", target.name);
+                        continue;
+                    }
+                };
+                let ua = ua_of(&headers);
+                assert!(
+                    ua.contains(&version_marker),
+                    "{} sent a UA without {version_marker}: {ua}",
+                    target.name
+                );
+                if let Some(hint) = headers
+                    .iter()
+                    .find(|h| h.starts_with("sec-ch-ua-platform: "))
+                {
+                    assert!(
+                        hint.contains(os_named_in(&ua)),
+                        "{} sent {ua} alongside {hint}",
+                        target.name
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rotating_the_pick_reaches_every_os() {
+        for target in &IMPERSONATE_TARGETS {
+            let count = match target.family {
+                Family::Chrome => CHROME_PLATFORMS.len(),
+                Family::Firefox => FIREFOX_PLATFORMS.len(),
+                Family::Safari => continue,
+            };
+            let seen: HashSet<&str> = (0..count)
+                .map(|pick| os_named_in(&ua_of(&identity_headers(target, pick))))
+                .collect();
+            assert_eq!(seen.len(), count, "{} can't reach every OS", target.name);
+        }
+    }
+
+    #[test]
+    fn families_are_interleaved() {
+        // the retry loop takes FPS_PER_ROUND consecutive targets; they should not all be the same family, or one bad family destroys everything 
+        for window in IMPERSONATE_TARGETS.windows(FPS_PER_ROUND) {
+            let families: HashSet<&str> = window
+                .iter()
+                .map(|t| match t.family {
+                    Family::Chrome => "chrome",
+                    Family::Firefox => "firefox",
+                    Family::Safari => "safari",
+                })
+                .collect();
+            assert!(
+                families.len() > 1,
+                "{:?} is a single-family run",
+                window.iter().map(|t| t.name).collect::<Vec<_>>()
+            );
+        }
+    }
+
+
+    #[test]
+    #[ignore = "hits the live tracker.gg api"]
+    fn targets_are_not_blocked() {
+        let client = TrackerClient::default();
+        let bin = impersonate_binary().expect("bundled curl-impersonate");
+        let url = "https://api.tracker.gg/api/v2/rocket-league/standard/profile/xbl/FightnFoo";
+
+        let mut blocked = Vec::new();
+        for target in &IMPERSONATE_TARGETS {
+            for pick in 0..CHROME_PLATFORMS.len() {
+                let outcome = match client.run_curl(&bin, target, pick, url) {
+                    Ok(_) => "200".to_string(),
+                    Err(CurlError::NoCurl) => panic!("couldn't launch curl-impersonate"),
+                    Err(CurlError::Http(msg)) => msg,
+                };
+                let os = match target.family {
+                    Family::Safari => "macOS",
+                    _ => os_named_in(&ua_of(&identity_headers(target, pick))),
+                };
+                println!("{:<11} {:<8} {outcome}", target.name, os);
+                if outcome.contains("403") {
+                    blocked.push(format!("{} ({os})", target.name));
+                }
+                std::thread::sleep(Duration::from_secs(6));
+                if matches!(target.family, Family::Safari) {
+                    break; 
+                }
+            }
+        }
+        assert!(blocked.is_empty(), "cloudflare is blocking: {blocked:?}");
+    }
 }
