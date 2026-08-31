@@ -1,197 +1,34 @@
-<div align="center">
-
 # Hebnix
 
-### An open-source Rocket League toolkit built for the post-EAC era.
+Hebnix serves as an intelligent gateway to Rocket League's Stats API, Configuration Files, game files and plugins.\
+The purpose is to consolidate several Rocket League Quality of Life tools into 1 platform that is simple to work with, user friendly and feature rich.
 
-Access Rocket League data, build plugins, manage workshop maps, customise game files, and more — all from one platform.
+[Website](https://hebnix.com) | [Plugins](https://hebnix.com/plugins) | [Download](https://hebnix.com/download) | [Developer Documentation](https://docs.hebnix.com) | [Discord](https://discord.gg/yr6xXb5wQd)
 
-[Website](https://hebnix.com) · [Download](https://hebnix.com/download) · [Plugins](https://hebnix.com/plugins) · [Documentation](https://docs.hebnix.com) · [Discord](https://discord.gg/yr6xXb5wQd)
+## Build
 
-</div>
+Install Rust with the MSVC toolchain, then run:
 
----
+    cd hebnix_rs
+    cargo build --release
 
-## 🚀 What is Hebnix?
+Build the optional bridge executable with `rlapi_bridge/build.bat`.
 
-**Hebnix** is a free and open-source Rocket League toolkit designed to bring useful tools, customisation and community-developed plugins together in one application.
+Set `$env:HEBNIX_BASE_DIR` to use a different data directory while developing.
 
-Unlike traditional injected mods, Hebnix operates externally and provides plugins with controlled access to Rocket League data and local resources.
+## Packaging
 
-Hebnix acts as a gateway between Rocket League and community plugins, exposing functionality such as:
+    cd hebnix_rs
+    ./package.ps1
 
-- 📊 **Rocket League StatsAPI** — Access live game, player and event data
-- 🏆 **TRN Data** — Retrieve player ranks and competitive information
-- 🧩 **Plugin System** — Build and install community-created Lua plugins
-- 🗺️ **Workshop Maps** — Download, manage and launch custom maps
-- 🎨 **Game Customisation** — Manage supported local items, decals and game files
-- ⚙️ **Configuration Access** — Read and work with local Rocket League configuration
-- 🎭 **Themes** — Customise the Hebnix interface
-- 🔌 **Developer APIs** — HTTP, crypto, storage, UI and other utilities for plugin developers
+## Plugins and themes
 
-The goal is simple: provide a modern platform for Rocket League tools that is **open, extensible and easy to use**.
+See the [plugin examples](hebnix_rs/examples/plugins), [theme examples](hebnix_rs/examples/themes), and [documentation](https://hebnix.com/docs).
 
----
+## Logs
 
-## 🧩 Plugins
+`hebnix.log` and `crash.txt` are written beside the executable. Set `RUST_LOG=debug` for additional logging.
 
-Hebnix includes a Lua-based plugin system that allows developers to build tools without needing to modify or inject code into the Rocket League process.
+## License
 
-Plugins can interact with Hebnix APIs for functionality including:
-
-```text
-Rocket League StatsAPI
-TRN Player Data
-HTTP Requests
-Plugin Storage
-Configuration Files
-Assets
-Cryptography
-UI Windows
-Drawing & Overlays
-```
-
-Browse community plugins:
-
-👉 **[hebnix.com/plugins](https://hebnix.com/plugins)**
-
-Interested in creating your own?
-
-👉 **[Developer Documentation](https://docs.hebnix.com)**
-
-Example projects are also available in:
-
-- [`hebnix_rs/examples/plugins`](hebnix_rs/examples/plugins)
-- [`hebnix_rs/examples/themes`](hebnix_rs/examples/themes)
-
----
-
-## 🛡️ Open Source
-
-Hebnix is completely open source.
-
-This includes the application, plugin system and installer, allowing anyone to inspect how Hebnix works, build it themselves or contribute to the project.
-
-Portable releases are also available for users who prefer not to install Hebnix.
-
-We welcome bug reports, feature suggestions, plugins and contributions from the Rocket League community.
-
----
-
-## 💻 Building Hebnix
-
-### Requirements
-
-- Windows 10/11
-- [Rust](https://www.rust-lang.org/tools/install)
-- MSVC toolchain
-
-Clone the repository and build the release version:
-
-```powershell
-cd hebnix_rs
-cargo build --release
-```
-
-The compiled application will be available in:
-
-```text
-hebnix_rs/target/release/
-```
-
-### RLAPI Bridge
-
-The optional bridge executable can be built using:
-
-```powershell
-rlapi_bridge/build.bat
-```
-
-### Development Data Directory
-
-By default, Hebnix uses its normal application data directory.
-
-During development, you can override this by setting:
-
-```powershell
-$env:HEBNIX_BASE_DIR = "C:\Path\To\Hebnix"
-```
-
----
-
-## 📦 Packaging
-
-To create a distributable build:
-
-```powershell
-cd hebnix_rs
-./package.ps1
-```
-
----
-
-## 📝 Logs
-
-Hebnix writes diagnostic information beside the executable:
-
-```text
-hebnix.log
-crash.txt
-```
-
-For additional debugging information, enable debug logging:
-
-```powershell
-$env:RUST_LOG = "debug"
-```
-
-Then launch Hebnix from the same terminal.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome.
-
-You can help Hebnix by:
-
-- 🧩 Creating plugins
-- 🎭 Creating themes
-- 🐛 Reporting bugs
-- 💡 Suggesting features
-- 🧪 Testing new releases
-- 📖 Improving documentation
-- 💻 Contributing code
-
-If you're interested in developing plugins or contributing to Hebnix itself, join the community on **[Discord](https://discord.gg/yr6xXb5wQd)**.
-
----
-
-## 🌐 Community
-
-Have a plugin idea, found a bug, or just want to follow development?
-
-**[Join the Hebnix Discord](https://discord.gg/yr6xXb5wQd)**
-
-You can also:
-
-⭐ Star the repository to support the project  
-🧩 Share your plugins with the community  
-🐛 Open an issue if you find a problem  
-🔀 Submit a pull request if you'd like to contribute
-
----
-
-## 📜 License
-
-Hebnix is distributed under the terms of the [LICENSE](LICENSE.md).
-
----
-
-<div align="center">
-
-### Built for the Rocket League community.
-
-**[Download Hebnix](https://hebnix.com/download)** · **[Documentation](https://docs.hebnix.com)** · **[Discord](https://discord.gg/yr6xXb5wQd)**
-
-</div>
+[LICENSE](LICENSE.md)
