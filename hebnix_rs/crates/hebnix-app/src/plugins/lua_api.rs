@@ -894,21 +894,25 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     }
     hebnix.set("input", input)?;
 
+    // hebnix.chat.send(channel, message)
+    // channel is "global", "team" or "party".
+    // Opens that chat channel, types the message, hits enter.
+    // Uses whatever key the player actually has that channel bound to
+    // (read from their save file), not the T/Y/U defaults — so this still
+    // works if they've rebound chat. Keyboard binds only, controller chat
+    // binds aren't read.
     let chat = lua.create_table()?;
     chat.set(
         "send",
         lua.create_function(|_, (channel, message): (String, String)| {
-            let open_key = match channel.to_lowercase().as_str() {
-                "global" => "t",
-                "team" => "y",
-                "party" => "u",
-                other => {
-                    return Err(mlua::Error::runtime(format!(
-                        "hebnix.chat.send: unknown channel '{other}', expected global, team or party"
-                    )));
-                }
-            };
-            hebnix_sdk::input::tap_key(open_key);
+            let channel = channel.to_lowercase();
+            if !matches!(channel.as_str(), "global" | "team" | "party") {
+                return Err(mlua::Error::runtime(format!(
+                    "hebnix.chat.send: unknown channel '{channel}', expected global, team or party"
+                )));
+            }
+            let open_key = hebnix_sdk::input::chat_channel_bind(&channel);
+            hebnix_sdk::input::tap_key(&open_key);
             std::thread::sleep(Duration::from_millis(100));
             hebnix_sdk::input::type_text(&message);
             std::thread::sleep(Duration::from_millis(30));

@@ -12,6 +12,12 @@ struct ActionBindingCache {
     path: Option<PathBuf>,
     modified: Option<SystemTime>,
     bindings: HashMap<String, Vec<String>>,
+    // Keyboard-only chat channel binds ("global" | "team" | "party" -> key).
+    // Kept separate from `bindings` because the chat channel actions aren't
+    // in the known action set normalise_action() recognises, and because
+    // callers here specifically want the keyboard key (not a controller
+    // button) to feed into tap_key().
+    chat_binds: HashMap<&'static str, String>,
 }
 
 impl Default for ActionBindingCache {
@@ -21,7 +27,48 @@ impl Default for ActionBindingCache {
             path: None,
             modified: None,
             bindings: HashMap::new(),
+            chat_binds: HashMap::new(),
         }
+    }
+}
+
+// Classifies a raw (un-normalised) action name as a text chat channel.
+// Rocket League doesn't expose these under a fixed action id we can rely on
+// across versions, so match loosely on the action name instead of an exact
+// string. Excludes quick chat presets and voice chat, which also contain
+// "chat" but aren't the text-chat-to-channel binds.
+fn classify_chat_channel(action: &str) -> Option<&'static str> {
+    let lower = action.to_ascii_lowercase();
+    if !lower.contains("chat") || lower.contains("preset") || lower.contains("voice") {
+        return None;
+    }
+    if lower.contains("team") {
+        Some("team")
+    } else if lower.contains("party") {
+        Some("party")
+    } else {
+        Some("global")
+    }
+}
+
+fn collect_chat_binds(raw: &Value, output: &mut HashMap<&'static str, String>) {
+    let Some(bindings) = raw.as_array() else {
+        return;
+    };
+    for binding in bindings {
+        let Some(action) = binding.get("Action").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(channel) = classify_chat_channel(action) else {
+            continue;
+        };
+        let Some(key) = binding.get("Key").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(bind) = keyboard_key_to_bind(key) else {
+            continue;
+        };
+        output.entry(channel).or_insert(bind);
     }
 }
 
@@ -170,11 +217,13 @@ fn refresh_cache(cache: &mut ActionBindingCache) {
     }
 
     let mut bindings = HashMap::new();
+    let mut chat_binds = HashMap::new();
     if let Some(path) = path.as_ref()
         && let Ok(save) = crate::save_file::load(path, false)
     {
         if let Some(controls) = save.controls() {
             collect_bindings(&controls.raw_bindings, false, &mut bindings);
+            collect_chat_binds(&controls.raw_bindings, &mut chat_binds);
         }
         if let Some(gamepad) = save.gamepad_bindings() {
             collect_bindings(&gamepad.raw_bindings, true, &mut bindings);
@@ -184,6 +233,29 @@ fn refresh_cache(cache: &mut ActionBindingCache) {
     cache.path = path;
     cache.modified = modified;
     cache.bindings = bindings;
+    cache.chat_binds = chat_binds;
+}
+
+/// Keyboard key bound to a text chat channel ("global", "team" or "party"),
+/// read from the user's actual save file. Falls back to Rocket League's
+/// stock defaults (T / Y / U) if the save couldn't be read or doesn't have
+/// that channel bound. Controller bindings are never returned here — chat.send
+/// only ever taps a keyboard key.
+pub fn chat_channel_bind(channel: &str) -> String {
+    let default = match channel {
+        "team" => "y",
+        "party" => "u",
+        _ => "t",
+    };
+    let Ok(mut cache) = cache().lock() else {
+        return default.into();
+    };
+    refresh_cache(&mut cache);
+    cache
+        .chat_binds
+        .get(channel)
+        .cloned()
+        .unwrap_or_else(|| default.into())
 }
 
 pub fn action_binds(action: &str) -> Vec<String> {
