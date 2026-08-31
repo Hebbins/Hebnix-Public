@@ -629,7 +629,7 @@ impl PluginManager {
 
     /// enabled plugins that touch the overlay, with the dir they serve from.
     /// page is None for draw-only, which still needs it for draw.image.
-    pub fn overlay_page_plugins(&self) -> Vec<(String, Option<String>, PathBuf)> {
+    pub fn overlay_page_plugins(&self) -> Vec<(String, Option<String>, PathBuf, bool)> {
         self.plugins
             .iter()
             .filter(|p| p.enabled)
@@ -648,16 +648,17 @@ impl PluginManager {
                 if !draws && page.is_none() {
                     return None;
                 }
+                let clickable = page.is_some() && table.get::<bool>("clickable").unwrap_or(false);
                 let assets = self.plugin_dir.join(&p.slug).join("assets");
-                Some((p.slug.clone(), page, assets))
+                Some((p.slug.clone(), page, assets, clickable))
             })
             .collect()
     }
 
     /// stacking order, bottom first. unlisted slugs go on top.
-    pub fn overlay_layers(&self, order: &[String]) -> Vec<(String, Option<String>, PathBuf)> {
+    pub fn overlay_layers(&self, order: &[String]) -> Vec<(String, Option<String>, PathBuf, bool)> {
         let mut layers = self.overlay_page_plugins();
-        layers.sort_by_key(|(slug, _, _)| {
+        layers.sort_by_key(|(slug, _, _, _)| {
             order
                 .iter()
                 .position(|ordered| ordered == slug)

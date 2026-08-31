@@ -11,9 +11,9 @@ use windows::Win32::System::Threading::{CreateMutexW, GetCurrentProcessId};
 use windows::Win32::UI::Shell::{ITaskbarList, TaskbarList};
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowW, GWL_EXSTYLE, GetForegroundWindow, GetWindowLongW, GetWindowThreadProcessId,
-    HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, LWA_ALPHA, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongW, SetWindowPos, WS_EX_LAYERED,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, LWA_ALPHA, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE,
+    SWP_NOSIZE, SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongW, SetWindowPos,
+    ShowWindow, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
 };
 use windows::core::PCWSTR;
 
@@ -220,6 +220,15 @@ pub fn set_main_window_invisible(invisible: bool) {
                 );
                 set_taskbar_button(window, true);
             }
+        }
+    }
+}
+
+pub fn show_main_window_from_tray() {
+    set_main_window_invisible(false);
+    if let Some(window) = main_window() {
+        unsafe {
+            let _ = ShowWindow(window, SW_SHOW);
         }
     }
 }

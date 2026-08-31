@@ -18,7 +18,7 @@ pub enum AppMsg {
     // only sent when it changes
     WindowMode(WindowMode),
     ToggleVisibility,
-    TrayOpen,
+    TrayVisibility(bool),
     TrayQuit,
     HotkeyCaptured(Option<String>),
     // should the main window be topmost (RL or hebnix focused)

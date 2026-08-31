@@ -556,7 +556,13 @@ impl HebnixApp {
                     let receiver = tray_icon::menu::MenuEvent::receiver();
                     while let Ok(event) = receiver.recv() {
                         if event.id == open_id {
-                            let _ = tx.send(AppMsg::TrayOpen);
+                            let hidden = !winutil::main_window_hidden();
+                            if hidden {
+                                winutil::set_main_window_invisible(true);
+                            } else {
+                                winutil::show_main_window_from_tray();
+                            }
+                            let _ = tx.send(AppMsg::TrayVisibility(hidden));
                         } else if event.id == quit_id {
                             let _ = tx.send(AppMsg::TrayQuit);
                         }
@@ -1134,8 +1140,7 @@ impl HebnixApp {
 
     fn set_hidden(&mut self, ctx: &egui::Context, hidden: bool) {
         tracing::info!(hidden, "toggling main window visibility");
-        let rocket_league_had_focus =
-            !hidden && hebnix_sdk::process::is_rocket_league_focused();
+        let rocket_league_had_focus = !hidden && hebnix_sdk::process::is_rocket_league_focused();
         if !hidden {
             winutil::note_foreground();
         }
@@ -1442,8 +1447,8 @@ impl HebnixApp {
                 AppMsg::ToggleVisibility => {
                     self.handle_toggle_visibility(ctx);
                 }
-                AppMsg::TrayOpen => {
-                    self.set_hidden(ctx, !self.hidden);
+                AppMsg::TrayVisibility(hidden) => {
+                    self.set_hidden(ctx, hidden);
                 }
                 AppMsg::TrayQuit => {
                     if self.update_info.is_none() {
@@ -2927,7 +2932,7 @@ impl HebnixApp {
         let mut rows: Vec<(String, String, &'static str)> = layers
             .iter()
             .rev()
-            .map(|(slug, page, _)| {
+            .map(|(slug, page, _, _)| {
                 let name = self
                     .plugin_mgr
                     .plugins
@@ -3983,10 +3988,8 @@ impl HebnixApp {
                         .add_sized([160.0, 120.0], egui::Button::new("📁\n\nInstall from .ZIP"))
                         .clicked()
                     {
-                        let dialog = rfd::FileDialog::new()
-                            .add_filter("Plugin Archives", &["zip"]);
-                        if let Some(file) = winutil::parent_file_dialog(dialog).pick_file()
-                        {
+                        let dialog = rfd::FileDialog::new().add_filter("Plugin Archives", &["zip"]);
+                        if let Some(file) = winutil::parent_file_dialog(dialog).pick_file() {
                             match install_zip(&file, &self.plugin_dir) {
                                 Ok(()) => {
                                     self.console.write(format!(
@@ -4404,18 +4407,22 @@ impl HebnixApp {
         let layers = self.plugin_mgr.overlay_layers(&self.config.overlay_order);
         let html_layers = layers
             .iter()
-            .filter(|(_, page, _)| page.is_some())
+            .filter(|(_, page, _, _)| page.is_some())
             .cloned()
             .collect::<Vec<_>>();
         self.ensure_webview(!html_layers.is_empty());
         if let Some(webview) = &mut self.webview {
             webview.sync_pages(&html_layers);
         }
+        let webview_accepts_input = self
+            .webview
+            .as_ref()
+            .is_some_and(|webview| webview.wants_input());
 
         let draws = self.plugin_mgr.overlay_plugins();
         let slugs = layers
             .iter()
-            .map(|(slug, _, _)| slug.clone())
+            .map(|(slug, _, _, _)| slug.clone())
             .filter(|slug| draws.contains(slug))
             .collect::<Vec<_>>();
         let webview_wants = self
@@ -4426,6 +4433,7 @@ impl HebnixApp {
             self.config.settings.allow_draw_on_hebnix_focus,
         );
         let focused = crate::overlay::has_render_focus();
+        crate::overlay::set_webview_clickable(focused && webview_accepts_input);
         if (slugs.is_empty() && !webview_wants) || !focused {
             self.overlay.hide();
             self.native_overlay.hide();

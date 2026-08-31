@@ -7,7 +7,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use webview2_com::Microsoft::Web::WebView2::Win32::{
     COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS, COREWEBVIEW2_COLOR,
@@ -143,7 +143,7 @@ window.addEventListener('message', function (event) {
   var frames = Array.from(document.querySelectorAll('#layers > iframe[data-clickable="true"]'));
   var frame = frames.find(function (candidate) { return candidate.contentWindow === event.source; });
   if (!frame) return;
-  window.chrome.webview.postMessage({kind:'pointer-hit', hit:data.hit === true, region:data.region || null});
+  window.chrome.webview.postMessage({kind:'pointer-hit', hit:data.hit === true});
 });
 window.chrome.webview.addEventListener('message', function (event) {
   var msg = event.data;
@@ -188,22 +188,14 @@ const POINTER_HIT_SCRIPT: &str = r#"
   }
 
   function report(event) {
-    var painted = document.elementsFromPoint(event.clientX, event.clientY).filter(isPainted);
-    var region = null;
-    painted.forEach(function (element) {
-      var rect = element.getBoundingClientRect();
-      if (!region || rect.width * rect.height > region.width * region.height) {
-        region = {left:rect.left, top:rect.top, right:rect.right, bottom:rect.bottom, width:rect.width, height:rect.height};
-      }
-    });
-    window.parent.postMessage({
-      __hebnixPointerHit:true,
-      hit:painted.length > 0,
-      region:region ? {left:region.left, top:region.top, right:region.right, bottom:region.bottom} : null
-    }, '*');
+    var hit = document.elementsFromPoint(event.clientX, event.clientY).some(isPainted);
+    window.parent.postMessage({__hebnixPointerHit:true, hit:hit}, '*');
   }
 
   document.addEventListener('mousemove', report, true);
+  document.addEventListener('mouseleave', function () {
+    window.parent.postMessage({__hebnixPointerHit:true, hit:false}, '*');
+  }, true);
 })();
 "#;
 
@@ -253,35 +245,17 @@ enum Stage {
 }
 
 static POINTER_HIT: AtomicBool = AtomicBool::new(false);
-static POINTER_REGION_VALID: AtomicBool = AtomicBool::new(false);
-static POINTER_REGION_LEFT: AtomicI32 = AtomicI32::new(0);
-static POINTER_REGION_TOP: AtomicI32 = AtomicI32::new(0);
-static POINTER_REGION_RIGHT: AtomicI32 = AtomicI32::new(0);
-static POINTER_REGION_BOTTOM: AtomicI32 = AtomicI32::new(0);
 
 thread_local! {
     static INPUT_CONTROLLER: RefCell<Option<ICoreWebView2CompositionController>> = const { RefCell::new(None) };
 }
 
-pub fn pointer_hit_at(hwnd: HWND, mut point: POINT) -> bool {
-    if POINTER_HIT.load(Ordering::Relaxed) {
-        return true;
-    }
-    if !POINTER_REGION_VALID.load(Ordering::Relaxed) {
-        return false;
-    }
-    unsafe {
-        let _ = ScreenToClient(hwnd, &mut point);
-    }
-    point.x >= POINTER_REGION_LEFT.load(Ordering::Relaxed)
-        && point.x < POINTER_REGION_RIGHT.load(Ordering::Relaxed)
-        && point.y >= POINTER_REGION_TOP.load(Ordering::Relaxed)
-        && point.y < POINTER_REGION_BOTTOM.load(Ordering::Relaxed)
+pub fn pointer_hit() -> bool {
+    POINTER_HIT.load(Ordering::Relaxed)
 }
 
 pub fn clear_pointer_hit() {
     POINTER_HIT.store(false, Ordering::Relaxed);
-    POINTER_REGION_VALID.store(false, Ordering::Relaxed);
 }
 
 pub fn forward_mouse_screen_message(
@@ -724,30 +698,6 @@ fn install_pointer_hit_test(webview: &ICoreWebView2) -> Result<(), String> {
                             .unwrap_or(false),
                         Ordering::Relaxed,
                     );
-                    if let Some(region) = value.get("region").and_then(|region| region.as_object())
-                    {
-                        let coordinate = |name: &str| {
-                            region
-                                .get(name)
-                                .and_then(|value| value.as_f64())
-                                .map(|value| value.round() as i32)
-                        };
-                        if let (Some(left), Some(top), Some(right), Some(bottom)) = (
-                            coordinate("left"),
-                            coordinate("top"),
-                            coordinate("right"),
-                            coordinate("bottom"),
-                        ) {
-                            POINTER_REGION_LEFT.store(left, Ordering::Relaxed);
-                            POINTER_REGION_TOP.store(top, Ordering::Relaxed);
-                            POINTER_REGION_RIGHT.store(right, Ordering::Relaxed);
-                            POINTER_REGION_BOTTOM.store(bottom, Ordering::Relaxed);
-                            POINTER_REGION_VALID
-                                .store(right > left && bottom > top, Ordering::Relaxed);
-                        }
-                    } else if !POINTER_HIT.load(Ordering::Relaxed) {
-                        POINTER_REGION_VALID.store(false, Ordering::Relaxed);
-                    }
                 }
             }
         }
