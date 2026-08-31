@@ -622,3 +622,12 @@ pub fn set_main_window_invisible(invisible: bool) {
         }
     }
 }
+
+pub fn show_main_window_from_tray() {
+    set_main_window_invisible(false);
+    if let Some(hwnd) = find_hebnix_window(true) {
+        unsafe {
+            let _ = ShowWindow(hwnd, SW_SHOW);
+        }
+    }
+}

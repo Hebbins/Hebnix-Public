@@ -329,7 +329,7 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                 && info.pt.y < rect.bottom
             {
                 let msg = wparam.0 as u32;
-                let pointer_hit = crate::webview::host::pointer_hit_at(hwnd, info.pt);
+                let pointer_hit = crate::webview::host::pointer_hit();
                 let captured = WEBVIEW_MOUSE_CAPTURED.load(Ordering::Relaxed);
                 let is_move = msg == 0x0200;
                 let is_down = matches!(msg, 0x0201 | 0x0203 | 0x0204 | 0x0206 | 0x0207 | 0x0209);
