@@ -2703,6 +2703,10 @@ fn build_save_summary(
         t.set("player_title", profile.player_title)?;
     }
 
+    if let Some(display) = save.gameplay_display() {
+        t.set("ui_scale", display.ui_scale)?;
+    }
+
     t.set("inventory_count", save.inventory().len())?;
     t.set("recent_players_count", save.recent_players().len())?;
     t.set("observed_players_count", save.observed_players().len())?;
