@@ -15,5 +15,5 @@ pub use dualsense::{
     ps_model,
 };
 pub use game_actions::{action_binds, chat_channel_bind, clear_action_bind_cache, is_action_pressed};
-pub use keyboard::{detect_hotkey, is_key_pressed, tap_key, type_text};
+pub use keyboard::{detect_hotkey, is_key_pressed, tap_key, type_text, type_text_while};
 pub use xinput::{XINPUT_BUTTON_DISPLAY, XInputState, get_xinput_state};
