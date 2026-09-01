@@ -201,7 +201,18 @@ pub fn tap_key(name: &str) -> bool {
 /// enter sends (also a real vk tap), but nothing typed in between shows up.
 /// tapping real keys goes through the same path a physical keypress would.
 pub fn type_text(text: &str) {
+    let _ = type_text_while(text, || true);
+}
+
+/// type text while the supplied guard remains true.
+pub fn type_text_while<F>(text: &str, should_continue: F) -> bool
+where
+    F: Fn() -> bool,
+{
     for unit in text.encode_utf16() {
+        if !should_continue() {
+            return false;
+        }
         let scan = unsafe { VkKeyScanW(unit) };
         if scan == -1 {
             continue; // unmappable on the current layout, skip
@@ -219,6 +230,7 @@ pub fn type_text(text: &str) {
             std::thread::sleep(TAP_GAP);
         }
     }
+    true
 }
 
 /// blocks until a key is pressed, returns its name.

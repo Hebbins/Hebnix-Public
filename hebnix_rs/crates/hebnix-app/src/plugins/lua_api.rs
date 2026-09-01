@@ -881,7 +881,17 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                         "hebnix.input.send is disabled while a match is in progress",
                     ));
                 }
+                if !hebnix_sdk::process::is_rocket_league_focused() {
+                    return Err(mlua::Error::runtime(
+                        "hebnix.input.send requires Rocket League to be focused",
+                    ));
+                }
                 for key in keys.iter() {
+                    if !hebnix_sdk::process::is_rocket_league_focused() {
+                        return Err(mlua::Error::runtime(
+                            "hebnix.input.send stopped because Rocket League lost focus",
+                        ));
+                    }
                     if !hebnix_sdk::input::tap_key(key) {
                         return Err(mlua::Error::runtime(format!(
                             "hebnix.input.send: unknown key '{key}'"
@@ -905,6 +915,11 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     chat.set(
         "send",
         lua.create_function(|_, (channel, message): (String, String)| {
+            if !hebnix_sdk::process::is_rocket_league_focused() {
+                return Err(mlua::Error::runtime(
+                    "hebnix.chat.send requires Rocket League to be focused",
+                ));
+            }
             let channel = channel.to_lowercase();
             if !matches!(channel.as_str(), "global" | "team" | "party") {
                 return Err(mlua::Error::runtime(format!(
@@ -914,8 +929,24 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             let open_key = hebnix_sdk::input::chat_channel_bind(&channel);
             hebnix_sdk::input::tap_key(&open_key);
             std::thread::sleep(Duration::from_millis(100));
-            hebnix_sdk::input::type_text(&message);
+            if !hebnix_sdk::process::is_rocket_league_focused() {
+                return Err(mlua::Error::runtime(
+                    "hebnix.chat.send stopped because Rocket League lost focus",
+                ));
+            }
+            if !hebnix_sdk::input::type_text_while(&message, || {
+                hebnix_sdk::process::is_rocket_league_focused()
+            }) {
+                return Err(mlua::Error::runtime(
+                    "hebnix.chat.send stopped because Rocket League lost focus",
+                ));
+            }
             std::thread::sleep(Duration::from_millis(30));
+            if !hebnix_sdk::process::is_rocket_league_focused() {
+                return Err(mlua::Error::runtime(
+                    "hebnix.chat.send stopped because Rocket League lost focus",
+                ));
+            }
             hebnix_sdk::input::tap_key("enter");
             Ok(())
         })?,
