@@ -563,6 +563,14 @@ impl LiteApp {
                 } => self
                     .plugin_mgr
                     .on_http_redirect_response(&slug, &req_id, status, &location),
+                AppMsg::PluginHttpUploadRes {
+                    slug,
+                    req_id,
+                    status,
+                    body,
+                } => self
+                    .plugin_mgr
+                    .on_http_upload_response(&slug, &req_id, status, &body),
                 AppMsg::PluginFetch { result } => {
                     self.install_modal.fetching = false;
                     match result {

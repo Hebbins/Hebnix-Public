@@ -759,6 +759,42 @@ fn send_req_bytes(req: reqwest::blocking::RequestBuilder) -> (u16, Vec<u8>) {
     }
 }
 
+/// posts a multipart/form-data body. fields are plain text, files map a
+/// field name to a local path and get read off disk. status 0 if the
+/// request never landed or a file couldn't be read.
+fn send_multipart_req(
+    url: &str,
+    fields: Option<std::collections::HashMap<String, String>>,
+    files: Option<std::collections::HashMap<String, String>>,
+    headers: Option<std::collections::HashMap<String, String>>,
+) -> (u16, String) {
+    let mut form = reqwest::blocking::multipart::Form::new();
+
+    if let Some(fields) = fields {
+        for (k, v) in fields {
+            form = form.text(k, v);
+        }
+    }
+
+    if let Some(files) = files {
+        for (field_name, path) in files {
+            form = match form.file(field_name, &path) {
+                Ok(f) => f,
+                Err(e) => return (0, format!("failed to read file '{path}': {e}")),
+            };
+        }
+    }
+
+    let mut req = http_client().post(url).multipart(form);
+    if let Some(hdrs) = headers {
+        for (k, v) in hdrs {
+            req = req.header(k, v);
+        }
+    }
+
+    send_req(req)
+}
+
 const UI_TABLE_REGISTRY: &str = "hebnix_ui_table";
 const DRAW_TABLE_REGISTRY: &str = "hebnix_draw_table";
 
@@ -1965,6 +2001,38 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
 
                         let (status, body) = send_req(req);
                         let _ = thread_tx.send(AppMsg::PluginHttpRes {
+                            slug,
+                            req_id,
+                            status,
+                            body,
+                        });
+                    });
+                    Ok(())
+                },
+            )?,
+        )?;
+    }
+
+    // result lands in this plugin's on_http_upload_response(req_id, status, body)
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "http_multipart_post_async",
+            lua.create_function(
+                move |_,
+                      (req_id, url, fields, files, headers): (
+                    String,
+                    String,
+                    Option<std::collections::HashMap<String, String>>,
+                    Option<std::collections::HashMap<String, String>>,
+                    Option<std::collections::HashMap<String, String>>,
+                )| {
+                    let thread_tx = host.tx.clone();
+                    let slug = host.slug.clone();
+
+                    std::thread::spawn(move || {
+                        let (status, body) = send_multipart_req(&url, fields, files, headers);
+                        let _ = thread_tx.send(AppMsg::PluginHttpUploadRes {
                             slug,
                             req_id,
                             status,

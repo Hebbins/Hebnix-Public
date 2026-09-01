@@ -1605,6 +1605,16 @@ impl HebnixApp {
                         .on_http_redirect_response(&slug, &req_id, status, &location);
                     ctx.request_repaint();
                 }
+                AppMsg::PluginHttpUploadRes {
+                    slug,
+                    req_id,
+                    status,
+                    body,
+                } => {
+                    self.plugin_mgr
+                        .on_http_upload_response(&slug, &req_id, status, &body);
+                    ctx.request_repaint();
+                }
             }
         }
     }
