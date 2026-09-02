@@ -203,7 +203,56 @@ const POINTER_HIT_SCRIPT: &str = r#"
     }, '*');
   }
 
+  var layoutFrame = 0;
+  function reportLayout() {
+    if (layoutFrame) return;
+    layoutFrame = requestAnimationFrame(function () {
+      layoutFrame = 0;
+      var region = null;
+      var elements = document.body ? document.body.querySelectorAll('*') : [];
+      Array.prototype.forEach.call(elements, function (element) {
+        if (!isPainted(element)) return;
+        var rect = element.getBoundingClientRect();
+        var left = Math.max(0, rect.left);
+        var top = Math.max(0, rect.top);
+        var right = Math.min(window.innerWidth, rect.right);
+        var bottom = Math.min(window.innerHeight, rect.bottom);
+        var area = Math.max(0, right - left) * Math.max(0, bottom - top);
+        if (area > 0 && (!region || area > region.area)) {
+          region = {left:left, top:top, right:right, bottom:bottom, area:area};
+        }
+      });
+      window.parent.postMessage({
+        __hebnixPointerHit:true,
+        hit:false,
+        region:region ? {left:region.left, top:region.top, right:region.right, bottom:region.bottom} : null
+      }, '*');
+    });
+  }
+
   document.addEventListener('mousemove', report, true);
+  document.addEventListener('transitionend', reportLayout, true);
+  document.addEventListener('animationend', reportLayout, true);
+  window.addEventListener('load', reportLayout);
+  window.addEventListener('resize', reportLayout);
+  function startLayoutWatch() {
+    var root = document.documentElement;
+    if (!root) return;
+    new MutationObserver(reportLayout).observe(root, {
+      attributes:true,
+      childList:true,
+      subtree:true
+    });
+    if (window.ResizeObserver) new ResizeObserver(reportLayout).observe(root);
+    reportLayout();
+    setTimeout(reportLayout, 50);
+    setTimeout(reportLayout, 300);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startLayoutWatch, {once:true});
+  } else {
+    startLayoutWatch();
+  }
 })();
 "#;
 
