@@ -1,6 +1,6 @@
 //! thread-safe ttl cache for player stats.
 //!
-//! tracker.gg only updates every ~5min so we cache hard and never poll.
+//! Short-lived cache for Rocket League profile responses.
 //! fetches are event-driven (new player shows up in match -> fetch once).
 
 use std::collections::HashMap;

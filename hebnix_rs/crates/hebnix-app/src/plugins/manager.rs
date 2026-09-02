@@ -59,6 +59,7 @@ pub struct PluginManager {
     tx: Sender<AppMsg>,
     pub shared: Rc<RefCell<HostShared>>,
     last_pos_flush: std::time::Instant,
+    last_tick_dispatch: std::time::Instant,
 }
 
 impl PluginManager {
@@ -77,6 +78,7 @@ impl PluginManager {
                 suppress_plugin_logs: false,
             })),
             last_pos_flush: std::time::Instant::now(),
+            last_tick_dispatch: std::time::Instant::now() - std::time::Duration::from_secs(1),
         }
     }
 
@@ -382,7 +384,19 @@ impl PluginManager {
         }
     }
 
-    /// call on_tick on every enabled plugin, once per ui frame. keep em cheap.
+    /// Dispatch plugin ticks no faster than `minimum_interval`. UI input can
+    /// generate frames much faster than the requested repaint rate, so this
+    /// keeps mouse movement from multiplying plugin work.
+    pub fn dispatch_tick_if_due(&mut self, minimum_interval: std::time::Duration) {
+        let now = std::time::Instant::now();
+        if now.duration_since(self.last_tick_dispatch) < minimum_interval {
+            return;
+        }
+        self.last_tick_dispatch = now;
+        self.dispatch_tick();
+    }
+
+    /// Call on_tick on every enabled plugin.
     pub fn dispatch_tick(&mut self) {
         let mut crashed: Vec<(usize, String, String)> = Vec::new();
 

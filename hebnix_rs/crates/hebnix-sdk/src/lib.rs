@@ -1,6 +1,6 @@
 //! Hebnix SDK, rust port of the hebnix python package.
 //!
-//! stats events, RL process detection, tracker.gg client, save-file decrypt,
+//! stats events, RL process detection, Rocket League profile client, save-file decrypt,
 //! Launch.log parsing, controller/keyboard input.
 
 pub mod eos;

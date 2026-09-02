@@ -282,7 +282,7 @@ fn xinput_controllers(lua: &Lua) -> mlua::Result<Option<Table>> {
     Ok((output_index > 1).then_some(list))
 }
 
-// Async tracker fetches (shared across plugins; results poll-able from Lua)
+// Async player-profile fetches shared across plugins; results are pollable from Lua
 
 enum AsyncStats {
     Pending,
@@ -295,15 +295,15 @@ fn async_stats() -> &'static std::sync::Mutex<std::collections::HashMap<String, 
     MAP.get_or_init(Default::default)
 }
 
-/// what the tracker worker fetches (both resolve to a PlayerStats)
+/// Requests handled by the profile worker; both resolve to PlayerStats.
 enum FetchSpec {
     /// full StatsAPI PrimaryId, e.g. "Steam|76561198..|0"
     PrimaryId { pid: String, name: String },
-    /// tracker.gg platform slug + identifier (steam id64 or display name).
+    /// Supported platform slug + platform account ID.
     Profile { slug: String, identifier: String },
 }
 
-/// single worker thread, 1.5s throttle between tracker.gg requests. results
+/// Single worker thread for profile requests. Results
 /// land in async_stats under the request key.
 fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
     static QUEUE: OnceLock<crossbeam_channel::Sender<(String, FetchSpec)>> = OnceLock::new();
@@ -319,11 +319,9 @@ fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
                             tracker_client().fetch_profile(slug, identifier)
                         }
                     };
-                    // the tracker client rotates fingerprints + backs off on
-                    // 429 internally, so just take the result here.
                     let result = run(&spec);
                     let stats = result.unwrap_or_else(|e| {
-                        tracing::warn!("tracker fetch '{key}' refused: {e}");
+                        tracing::warn!("profile fetch '{key}' refused: {e}");
                         hebnix_sdk::tracker::PlayerStats {
                             primary_id: key.clone(),
                             error: Some(e),
@@ -331,13 +329,12 @@ fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
                         }
                     });
                     if let Some(err) = &stats.error {
-                        tracing::info!("tracker fetch '{key}' error: {err}");
+                        tracing::info!("profile fetch '{key}' error: {err}");
                     }
                     async_stats()
                         .lock()
                         .unwrap()
                         .insert(key, AsyncStats::Done(stats));
-                    std::thread::sleep(Duration::from_millis(1500));
                 }
             })
             .ok();
@@ -422,7 +419,7 @@ fn play_audio(
 //
 // Both run off the UI thread (token acquisition and PsyNet calls block on
 // network / the Steam DLL / the bridge subprocess). Plugins enqueue work and
-// poll for the result, mirroring the tracker pattern above.
+// Poll for the result using the same asynchronous result pattern.
 
 use hebnix_sdk::eos::{self, EOSToken, Platform as EosPlatform};
 use hebnix_sdk::rlapi::RlApi;
@@ -628,12 +625,12 @@ fn next_rpc_key() -> String {
     format!("rpc:{}", N.fetch_add(1, Ordering::Relaxed))
 }
 
-/// normalize platform names to tracker.gg slugs
+/// normalize platform names to profile service slugs
 fn normalize_slug(platform: &str) -> String {
     match platform.trim().to_lowercase().as_str() {
         "steam" => "steam",
         "epic" | "epicgames" => "epic",
-        "xbl" | "xbox" | "xboxone" => "xbl",
+        "xbl" | "xbox" | "xboxone" => "xboxone",
         "psn" | "ps4" | "ps5" | "playstation" => "psn",
         "switch" | "nintendo" => "switch",
         other => return other.to_string(),
@@ -1170,7 +1167,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
-    // tracker.gg (blocking network call, cached ~5 min per player)
+    // player ranks (blocking network call, cached per player)
     hebnix.set(
         "fetch_stats",
         lua.create_function(|lua, (primary_id, display_name): (String, String)| {
@@ -1216,7 +1213,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         )?;
     }
 
-    // non-blocking tracker fetch by StatsAPI PrimaryId ("Steam|..|0")
+    // non-blocking rank fetch by StatsAPI PrimaryId ("Steam|..|0")
     // Poll with hebnix.stats_result(primary_id).
     hebnix.set(
         "fetch_stats_async",
@@ -1241,9 +1238,9 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
-    // Non-blocking tracker fetch by platform + identifier:
+    // Non-blocking rank fetch by platform + platform id:
     //   hebnix.fetch_profile_async("steam", "76561198..")   -- id64
-    //   hebnix.fetch_profile_async("epic", "DisplayName")  -- any platform
+    //   hebnix.fetch_profile_async("epic", "account-id")
     // Returns the key to poll with hebnix.stats_result(key), or nil.
     hebnix.set(
         "fetch_profile_async",

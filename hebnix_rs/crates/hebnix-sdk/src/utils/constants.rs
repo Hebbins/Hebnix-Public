@@ -35,12 +35,17 @@ pub const DIVISIONS: [(&str, u32); 4] = [
     ("Division IV", 4),
 ];
 
-/// platform slugs for tracker.gg
-pub const PLATFORM_SLUGS: [(&str, &str); 5] = [
+/// platform slugs for the profile service
+pub const PLATFORM_SLUGS: [(&str, &str); 10] = [
     ("steam", "steam"),
     ("epic", "epic"),
-    ("xboxone", "xbl"),
+    ("epicgames", "epic"),
+    ("xboxone", "xboxone"),
+    ("xbl", "xboxone"),
+    ("xbox", "xboxone"),
     ("ps4", "psn"),
+    ("ps5", "psn"),
+    ("psn", "psn"),
     ("switch", "switch"),
 ];
 
