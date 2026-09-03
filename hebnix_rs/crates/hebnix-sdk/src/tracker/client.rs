@@ -48,6 +48,12 @@ impl TrackerClient {
         Ok(stats)
     }
 
+    /// Fetch a fresh PrimaryId profile, bypassing the SDK cache.
+    pub fn refresh(&self, primary_id: &str, display_name: &str) -> Result<PlayerStats, String> {
+        self.cache.invalidate(primary_id);
+        self.fetch(primary_id, display_name)
+    }
+
     pub fn fetch_profile(&self, platform: &str, identifier: &str) -> Result<PlayerStats, String> {
         let platform = normalize_platform(platform)?;
         let platform_user_id = strip_platform_id(identifier);
@@ -65,6 +71,18 @@ impl TrackerClient {
             self.cache.set(cache_key, stats.clone(), None);
         }
         Ok(stats)
+    }
+
+    /// Fetch a fresh platform profile, bypassing the SDK cache.
+    pub fn refresh_profile(&self, platform: &str, identifier: &str) -> Result<PlayerStats, String> {
+        let platform = normalize_platform(platform)?;
+        let platform_user_id = strip_platform_id(identifier);
+        if platform_user_id.is_empty() {
+            return Err("platform id must not be empty".to_string());
+        }
+        self.cache
+            .invalidate(&format!("{platform}:{platform_user_id}"));
+        self.fetch_profile(&platform, &platform_user_id)
     }
 
     pub fn get_cached(&self, primary_id: &str) -> Option<PlayerStats> {

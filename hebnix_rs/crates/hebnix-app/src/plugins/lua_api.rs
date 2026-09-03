@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use eframe::egui;
@@ -284,9 +284,24 @@ fn xinput_controllers(lua: &Lua) -> mlua::Result<Option<Table>> {
 
 // Async player-profile fetches shared across plugins; results are pollable from Lua
 
+const ASYNC_PROFILE_RESULT_TTL: Duration = Duration::from_secs(15);
+
 enum AsyncStats {
     Pending,
-    Done(hebnix_sdk::tracker::PlayerStats),
+    Done {
+        stats: hebnix_sdk::tracker::PlayerStats,
+        completed_at: Instant,
+    },
+}
+
+fn profile_result_needs_refresh(result: Option<&AsyncStats>) -> bool {
+    match result {
+        None => true,
+        Some(AsyncStats::Pending) => false,
+        Some(AsyncStats::Done { completed_at, .. }) => {
+            completed_at.elapsed() >= ASYNC_PROFILE_RESULT_TTL
+        }
+    }
 }
 
 fn async_stats() -> &'static std::sync::Mutex<std::collections::HashMap<String, AsyncStats>> {
@@ -314,9 +329,9 @@ fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
             .spawn(move || {
                 while let Ok((key, spec)) = rx.recv() {
                     let run = |spec: &FetchSpec| match spec {
-                        FetchSpec::PrimaryId { pid, name } => tracker_client().fetch(pid, name),
+                        FetchSpec::PrimaryId { pid, name } => tracker_client().refresh(pid, name),
                         FetchSpec::Profile { slug, identifier } => {
-                            tracker_client().fetch_profile(slug, identifier)
+                            tracker_client().refresh_profile(slug, identifier)
                         }
                     };
                     let result = run(&spec);
@@ -331,10 +346,13 @@ fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
                     if let Some(err) = &stats.error {
                         tracing::info!("profile fetch '{key}' error: {err}");
                     }
-                    async_stats()
-                        .lock()
-                        .unwrap()
-                        .insert(key, AsyncStats::Done(stats));
+                    async_stats().lock().unwrap().insert(
+                        key,
+                        AsyncStats::Done {
+                            stats,
+                            completed_at: Instant::now(),
+                        },
+                    );
                 }
             })
             .ok();
@@ -1222,8 +1240,8 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                 return Ok(false);
             }
             let mut map = async_stats().lock().unwrap();
-            if map.contains_key(&primary_id) {
-                return Ok(false); // already pending or done
+            if !profile_result_needs_refresh(map.get(&primary_id)) {
+                return Ok(false); // pending or still fresh
             }
             map.insert(primary_id.clone(), AsyncStats::Pending);
             drop(map);
@@ -1252,7 +1270,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             }
             let key = format!("{slug}:{identifier}");
             let mut map = async_stats().lock().unwrap();
-            if !map.contains_key(&key) {
+            if profile_result_needs_refresh(map.get(&key)) {
                 map.insert(key.clone(), AsyncStats::Pending);
                 drop(map);
                 let _ = stats_queue().send((key.clone(), FetchSpec::Profile { slug, identifier }));
@@ -1270,7 +1288,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             match map.get(&primary_id) {
                 None => Ok(LuaValue::Nil),
                 Some(AsyncStats::Pending) => Ok(LuaValue::String(lua.create_string("pending")?)),
-                Some(AsyncStats::Done(stats)) => Ok(to_lua(lua, stats)?),
+                Some(AsyncStats::Done { stats, .. }) => Ok(to_lua(lua, stats)?),
             }
         })?,
     )?;
