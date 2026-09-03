@@ -10,7 +10,7 @@ use crate::tracker::cache::{DEFAULT_TTL, TtlCache};
 use crate::tracker::models::{PlayerStats, PlaylistRank};
 use crate::utils::platforms::is_bot;
 
-const PROFILE_API: &str = "https://rlapi-serve.nixvio64.workers.dev/player";
+const PROFILE_API: &str = "https://req.hebnix.com/player";
 const RESPONSE_MAX_BYTES: u64 = 2 * 1024 * 1024;
 
 pub struct TrackerClient {
@@ -106,7 +106,7 @@ impl TrackerClient {
         );
         let response = match ureq::get(&url)
             .set("Accept", "application/json")
-            .set("User-Agent", "Hebnix/2.1.5")
+            .set("User-Agent", "Hebnix/2.1.6")
             .timeout(self.timeout)
             .call()
         {

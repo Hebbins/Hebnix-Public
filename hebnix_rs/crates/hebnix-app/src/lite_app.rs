@@ -18,7 +18,7 @@ use crate::plugins::PluginManager;
 use crate::tray::Tray;
 use crate::{dpi_fix, statsapi_ini, theme, winutil};
 
-pub const APP_VERSION: &str = "2.1.5";
+pub const APP_VERSION: &str = "2.1.6";
 pub const DEFAULT_WIDTH: f32 = 760.0;
 pub const DEFAULT_HEIGHT: f32 = 520.0;
 pub const MIN_WIDTH: f32 = 520.0;
