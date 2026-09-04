@@ -18,7 +18,7 @@ use crate::plugins::PluginManager;
 use crate::tray::Tray;
 use crate::{dpi_fix, statsapi_ini, theme, winutil};
 
-pub const APP_VERSION: &str = "2.1.3";
+pub const APP_VERSION: &str = "2.1.6";
 pub const DEFAULT_WIDTH: f32 = 760.0;
 pub const DEFAULT_HEIGHT: f32 = 520.0;
 pub const MIN_WIDTH: f32 = 520.0;
@@ -2097,6 +2097,19 @@ impl LiteApp {
     }
 
     fn render_game_overlay(&mut self) {
+        if !self.last_rl_open {
+            crate::overlay::set_webview_clickable(false);
+            self.overlay.hide();
+            self.native_overlay.hide();
+            self.overlay_rect = None;
+            if let Some(webview) = &mut self.webview {
+                if let Some((hwnd, _)) = self.overlay.webview_target() {
+                    webview.tick(hwnd, (1, 1), false);
+                }
+            }
+            return;
+        }
+
         let layers = self.plugin_mgr.overlay_layers(&self.config.overlay_order);
         let html_layers = layers
             .iter()
@@ -2449,7 +2462,13 @@ impl eframe::App for LiteApp {
                 }
             }
         });
-        self.plugin_mgr.dispatch_tick();
+        let plugin_tick_interval = if self.last_rl_open {
+            Duration::from_millis(50)
+        } else {
+            Duration::from_millis(500)
+        };
+        self.plugin_mgr
+            .dispatch_tick_if_due(plugin_tick_interval);
         // render first, it is what records new positions to flush
         self.render_plugin_windows(&ctx);
         self.plugin_mgr.flush_window_positions();
@@ -2459,7 +2478,10 @@ impl eframe::App for LiteApp {
         self.render_launch_path_notice(&ctx);
         self.render_changelog_popup(&ctx);
         ctx.request_repaint_after(
-            if self.plugin_mgr.has_tick_plugins() || !self.plugin_mgr.overlay_plugins().is_empty() {
+            if self.last_rl_open
+                && (self.plugin_mgr.has_tick_plugins()
+                    || !self.plugin_mgr.overlay_plugins().is_empty())
+            {
                 Duration::from_millis(50)
             } else {
                 Duration::from_millis(500)

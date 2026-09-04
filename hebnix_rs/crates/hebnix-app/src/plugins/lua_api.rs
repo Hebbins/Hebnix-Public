@@ -6,7 +6,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::OnceLock;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::Sender;
 use eframe::egui;
@@ -282,11 +282,26 @@ fn xinput_controllers(lua: &Lua) -> mlua::Result<Option<Table>> {
     Ok((output_index > 1).then_some(list))
 }
 
-// Async tracker fetches (shared across plugins; results poll-able from Lua)
+// Async player-profile fetches shared across plugins; results are pollable from Lua
+
+const ASYNC_PROFILE_RESULT_TTL: Duration = Duration::from_secs(15);
 
 enum AsyncStats {
     Pending,
-    Done(hebnix_sdk::tracker::PlayerStats),
+    Done {
+        stats: hebnix_sdk::tracker::PlayerStats,
+        completed_at: Instant,
+    },
+}
+
+fn profile_result_needs_refresh(result: Option<&AsyncStats>) -> bool {
+    match result {
+        None => true,
+        Some(AsyncStats::Pending) => false,
+        Some(AsyncStats::Done { completed_at, .. }) => {
+            completed_at.elapsed() >= ASYNC_PROFILE_RESULT_TTL
+        }
+    }
 }
 
 fn async_stats() -> &'static std::sync::Mutex<std::collections::HashMap<String, AsyncStats>> {
@@ -295,15 +310,15 @@ fn async_stats() -> &'static std::sync::Mutex<std::collections::HashMap<String, 
     MAP.get_or_init(Default::default)
 }
 
-/// what the tracker worker fetches (both resolve to a PlayerStats)
+/// Requests handled by the profile worker; both resolve to PlayerStats.
 enum FetchSpec {
     /// full StatsAPI PrimaryId, e.g. "Steam|76561198..|0"
     PrimaryId { pid: String, name: String },
-    /// tracker.gg platform slug + identifier (steam id64 or display name).
+    /// Supported platform slug + platform account ID.
     Profile { slug: String, identifier: String },
 }
 
-/// single worker thread, 1.5s throttle between tracker.gg requests. results
+/// Single worker thread for profile requests. Results
 /// land in async_stats under the request key.
 fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
     static QUEUE: OnceLock<crossbeam_channel::Sender<(String, FetchSpec)>> = OnceLock::new();
@@ -314,16 +329,14 @@ fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
             .spawn(move || {
                 while let Ok((key, spec)) = rx.recv() {
                     let run = |spec: &FetchSpec| match spec {
-                        FetchSpec::PrimaryId { pid, name } => tracker_client().fetch(pid, name),
+                        FetchSpec::PrimaryId { pid, name } => tracker_client().refresh(pid, name),
                         FetchSpec::Profile { slug, identifier } => {
-                            tracker_client().fetch_profile(slug, identifier)
+                            tracker_client().refresh_profile(slug, identifier)
                         }
                     };
-                    // the tracker client rotates fingerprints + backs off on
-                    // 429 internally, so just take the result here.
                     let result = run(&spec);
                     let stats = result.unwrap_or_else(|e| {
-                        tracing::warn!("tracker fetch '{key}' refused: {e}");
+                        tracing::warn!("profile fetch '{key}' refused: {e}");
                         hebnix_sdk::tracker::PlayerStats {
                             primary_id: key.clone(),
                             error: Some(e),
@@ -331,13 +344,15 @@ fn stats_queue() -> &'static crossbeam_channel::Sender<(String, FetchSpec)> {
                         }
                     });
                     if let Some(err) = &stats.error {
-                        tracing::info!("tracker fetch '{key}' error: {err}");
+                        tracing::info!("profile fetch '{key}' error: {err}");
                     }
-                    async_stats()
-                        .lock()
-                        .unwrap()
-                        .insert(key, AsyncStats::Done(stats));
-                    std::thread::sleep(Duration::from_millis(1500));
+                    async_stats().lock().unwrap().insert(
+                        key,
+                        AsyncStats::Done {
+                            stats,
+                            completed_at: Instant::now(),
+                        },
+                    );
                 }
             })
             .ok();
@@ -422,7 +437,7 @@ fn play_audio(
 //
 // Both run off the UI thread (token acquisition and PsyNet calls block on
 // network / the Steam DLL / the bridge subprocess). Plugins enqueue work and
-// poll for the result, mirroring the tracker pattern above.
+// Poll for the result using the same asynchronous result pattern.
 
 use hebnix_sdk::eos::{self, EOSToken, Platform as EosPlatform};
 use hebnix_sdk::rlapi::RlApi;
@@ -628,12 +643,12 @@ fn next_rpc_key() -> String {
     format!("rpc:{}", N.fetch_add(1, Ordering::Relaxed))
 }
 
-/// normalize platform names to tracker.gg slugs
+/// normalize platform names to profile service slugs
 fn normalize_slug(platform: &str) -> String {
     match platform.trim().to_lowercase().as_str() {
         "steam" => "steam",
         "epic" | "epicgames" => "epic",
-        "xbl" | "xbox" | "xboxone" => "xbl",
+        "xbl" | "xbox" | "xboxone" => "xboxone",
         "psn" | "ps4" | "ps5" | "playstation" => "psn",
         "switch" | "nintendo" => "switch",
         other => return other.to_string(),
@@ -1206,7 +1221,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
-    // tracker.gg (blocking network call, cached ~5 min per player)
+    // player ranks (blocking network call, cached per player)
     hebnix.set(
         "fetch_stats",
         lua.create_function(|lua, (primary_id, display_name): (String, String)| {
@@ -1252,7 +1267,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         )?;
     }
 
-    // non-blocking tracker fetch by StatsAPI PrimaryId ("Steam|..|0")
+    // non-blocking rank fetch by StatsAPI PrimaryId ("Steam|..|0")
     // Poll with hebnix.stats_result(primary_id).
     hebnix.set(
         "fetch_stats_async",
@@ -1261,8 +1276,8 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                 return Ok(false);
             }
             let mut map = async_stats().lock().unwrap();
-            if map.contains_key(&primary_id) {
-                return Ok(false); // already pending or done
+            if !profile_result_needs_refresh(map.get(&primary_id)) {
+                return Ok(false); // pending or still fresh
             }
             map.insert(primary_id.clone(), AsyncStats::Pending);
             drop(map);
@@ -1277,9 +1292,9 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
-    // Non-blocking tracker fetch by platform + identifier:
+    // Non-blocking rank fetch by platform + platform id:
     //   hebnix.fetch_profile_async("steam", "76561198..")   -- id64
-    //   hebnix.fetch_profile_async("epic", "DisplayName")  -- any platform
+    //   hebnix.fetch_profile_async("epic", "account-id")
     // Returns the key to poll with hebnix.stats_result(key), or nil.
     hebnix.set(
         "fetch_profile_async",
@@ -1291,7 +1306,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             }
             let key = format!("{slug}:{identifier}");
             let mut map = async_stats().lock().unwrap();
-            if !map.contains_key(&key) {
+            if profile_result_needs_refresh(map.get(&key)) {
                 map.insert(key.clone(), AsyncStats::Pending);
                 drop(map);
                 let _ = stats_queue().send((key.clone(), FetchSpec::Profile { slug, identifier }));
@@ -1309,7 +1324,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             match map.get(&primary_id) {
                 None => Ok(LuaValue::Nil),
                 Some(AsyncStats::Pending) => Ok(LuaValue::String(lua.create_string("pending")?)),
-                Some(AsyncStats::Done(stats)) => Ok(to_lua(lua, stats)?),
+                Some(AsyncStats::Done { stats, .. }) => Ok(to_lua(lua, stats)?),
             }
         })?,
     )?;

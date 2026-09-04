@@ -3,7 +3,7 @@
 //    dodges the ambiguous default-dpi mode behind the mixed-dpi drag bugs)
 //  - embed hebnix.ico as the exe icon
 //  - copy the runtime binaries (steam_api64.dll, rlapi-bridge.exe, the
-//    curl-impersonate/ set) next to the built exe so a plain build just runs
+//    required runtime assets next to the built exe so a plain build just runs
 
 use std::path::{Path, PathBuf};
 
@@ -61,12 +61,6 @@ fn copy_runtime_binaries() {
         &profile_dir.join("tap-driver"),
         "tap-driver/ missing - Workshop LAN is unavailable",
     );
-    // folder copy, the exe needs cacert.pem sitting next to it
-    copy_dir(
-        &vendor.join("curl-impersonate"),
-        &profile_dir.join("curl-impersonate"),
-        "curl-impersonate/ missing from hebnix_rs/vendor/ - tracker.gg lookups will fail",
-    );
 }
 
 fn copy_file(src: &Path, profile_dir: &Path, missing_hint: &str) {
@@ -78,24 +72,6 @@ fn copy_file(src: &Path, profile_dir: &Path, missing_hint: &str) {
     let dst = profile_dir.join(src.file_name().unwrap_or_default());
     if let Err(e) = std::fs::copy(src, &dst) {
         println!("cargo:warning=hebnix: copy {} failed: {e}", src.display());
-    }
-}
-
-fn copy_dir(src: &Path, dst: &Path, missing_hint: &str) {
-    if !src.is_dir() {
-        println!("cargo:warning=hebnix: {missing_hint}");
-        return;
-    }
-    let Ok(entries) = std::fs::read_dir(src) else {
-        return;
-    };
-    let _ = std::fs::create_dir_all(dst);
-    for entry in entries.flatten() {
-        let path = entry.path();
-        println!("cargo:rerun-if-changed={}", path.display());
-        if path.is_file() {
-            let _ = std::fs::copy(&path, dst.join(entry.file_name()));
-        }
     }
 }
 

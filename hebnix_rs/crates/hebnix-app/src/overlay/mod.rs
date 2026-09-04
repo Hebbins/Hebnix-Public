@@ -72,12 +72,29 @@ pub fn set_allow_draw_on_hebnix_focus(allow: bool) {
 
 pub fn set_webview_clickable(clickable: bool) {
     WEBVIEW_CLICKABLE.store(clickable, Ordering::Relaxed);
-    if !clickable {
+    if clickable {
+        if WEBVIEW_MOUSE_HOOK.load(Ordering::Relaxed) == 0 {
+            unsafe {
+                if let Ok(hook) = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), None, 0) {
+                    WEBVIEW_MOUSE_HOOK.store(hook.0 as isize, Ordering::Relaxed);
+                }
+            }
+        }
+    } else {
         WEBVIEW_MOUSE_CAPTURED.store(false, Ordering::Relaxed);
         crate::webview::host::clear_pointer_hit();
+        remove_webview_mouse_hook();
     }
 }
 
+fn remove_webview_mouse_hook() {
+    let raw = WEBVIEW_MOUSE_HOOK.swap(0, Ordering::Relaxed);
+    if raw != 0 {
+        unsafe {
+            let _ = UnhookWindowsHookEx(HHOOK(raw as *mut _));
+        }
+    }
+}
 pub fn webview_clickable() -> bool {
     WEBVIEW_CLICKABLE.load(Ordering::Relaxed)
 }
@@ -92,6 +109,7 @@ pub fn enforce_hidden() {
     if has_render_focus() {
         return;
     }
+    set_webview_clickable(false);
     for raw in [
         WEBVIEW_OVERLAY_HWND.load(Ordering::Relaxed),
         NATIVE_OVERLAY_HWND.load(Ordering::Relaxed),
@@ -283,13 +301,6 @@ impl Window {
             let webview_visual = dcomp_device.CreateVisual()?;
             dcomp_target.SetRoot(&dcomp_root)?;
             dcomp_root.AddVisual(&webview_visual, true, None)?;
-
-            if WEBVIEW_MOUSE_HOOK.load(Ordering::Relaxed) == 0 {
-                if let Ok(hook) = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), None, 0) {
-                    WEBVIEW_MOUSE_HOOK.store(hook.0 as isize, Ordering::Relaxed);
-                }
-            }
-
             Ok(Self {
                 hwnd,
                 last_rect: None,
@@ -306,10 +317,7 @@ impl Window {
 impl Drop for Window {
     fn drop(&mut self) {
         unsafe {
-            let raw = WEBVIEW_MOUSE_HOOK.swap(0, Ordering::Relaxed);
-            if raw != 0 {
-                let _ = UnhookWindowsHookEx(HHOOK(raw as *mut _));
-            }
+            remove_webview_mouse_hook();
             let _ = DestroyWindow(self.hwnd);
         }
     }

@@ -42,7 +42,7 @@ pub fn get_platform_tag(primary_id: &str) -> &'static str {
         .unwrap_or("[?]")
 }
 
-/// tracker.gg api slug for a PrimaryId's platform ("epic" fallback)
+/// profile service slug for a PrimaryId's platform ("epic" fallback)
 pub fn get_platform_slug(primary_id: &str) -> &'static str {
     if is_bot(primary_id) {
         return "epic";

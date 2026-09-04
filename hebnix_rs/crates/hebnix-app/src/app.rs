@@ -25,7 +25,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.3";
+pub const APP_VERSION: &str = "2.1.6";
 
 pub const DEFAULT_WIDTH: f32 = 1000.0;
 pub const DEFAULT_HEIGHT: f32 = 600.0;
@@ -4414,6 +4414,19 @@ impl HebnixApp {
     }
 
     fn render_game_overlay(&mut self) {
+        if !self.last_rl_open {
+            crate::overlay::set_webview_clickable(false);
+            self.overlay.hide();
+            self.native_overlay.hide();
+            self.overlay_rect = None;
+            if let Some(webview) = &mut self.webview {
+                if let Some((hwnd, _)) = self.overlay.webview_target() {
+                    webview.tick(hwnd, (1, 1), false);
+                }
+            }
+            return;
+        }
+
         let layers = self.plugin_mgr.overlay_layers(&self.config.overlay_order);
         let html_layers = layers
             .iter()
@@ -5116,13 +5129,20 @@ impl eframe::App for HebnixApp {
             self.render_update_modal(ctx);
             self.render_install_modal(ctx);
         }
-        self.plugin_mgr.dispatch_tick();
+        let plugin_tick_interval = if self.last_rl_open {
+            Duration::from_millis(50)
+        } else {
+            Duration::from_millis(500)
+        };
+        self.plugin_mgr
+            .dispatch_tick_if_due(plugin_tick_interval);
         self.render_plugin_windows(ctx);
         self.plugin_mgr.flush_window_positions();
         self.render_game_overlay();
 
-        let fast =
-            self.plugin_mgr.has_tick_plugins() || !self.plugin_mgr.overlay_plugins().is_empty();
+        let fast = self.last_rl_open
+            && (self.plugin_mgr.has_tick_plugins()
+                || !self.plugin_mgr.overlay_plugins().is_empty());
         let heartbeat = if fast {
             Duration::from_millis(50)
         } else {
