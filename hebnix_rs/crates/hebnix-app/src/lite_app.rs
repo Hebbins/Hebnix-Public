@@ -131,6 +131,7 @@ pub struct LiteApp {
 
 impl LiteApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        hebnix_sdk::input::init_controllers();
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let base_dir = crate::config::base_dir();
         let themes_dir = base_dir.join("themes");

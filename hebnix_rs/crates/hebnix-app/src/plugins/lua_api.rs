@@ -393,6 +393,54 @@ fn log_queue() -> &'static crossbeam_channel::Sender<(String, bool)> {
     })
 }
 
+enum AsyncSaveSummary {
+    Pending,
+    Done {
+        path: std::path::PathBuf,
+        result: Result<hebnix_sdk::save_file::SaveData, String>,
+    },
+}
+
+fn async_save_summary()
+-> &'static std::sync::Mutex<std::collections::HashMap<String, AsyncSaveSummary>> {
+    static MAP: OnceLock<std::sync::Mutex<std::collections::HashMap<String, AsyncSaveSummary>>> =
+        OnceLock::new();
+    MAP.get_or_init(Default::default)
+}
+
+/// single worker: find_save_file (can scan platform profile dirs) + decrypt
+/// + parse is real work, too slow for the ui thread lua runs on (same
+/// reasoning as log_queue above).
+fn save_summary_queue() -> &'static crossbeam_channel::Sender<(String, Option<std::path::PathBuf>)>
+{
+    static QUEUE: OnceLock<crossbeam_channel::Sender<(String, Option<std::path::PathBuf>)>> =
+        OnceLock::new();
+    QUEUE.get_or_init(|| {
+        let (tx, rx) = crossbeam_channel::unbounded::<(String, Option<std::path::PathBuf>)>();
+        std::thread::Builder::new()
+            .name("save-summary-worker".into())
+            .spawn(move || {
+                while let Ok((key, path)) = rx.recv() {
+                    let resolved = path.or_else(|| hebnix_sdk::save_file::find_save_file(None));
+                    let done = match resolved {
+                        Some(path) => {
+                            let result = hebnix_sdk::save_file::load(&path, false)
+                                .map_err(|e| e.to_string());
+                            AsyncSaveSummary::Done { path, result }
+                        }
+                        None => AsyncSaveSummary::Done {
+                            path: std::path::PathBuf::new(),
+                            result: Err("no .save file found".to_string()),
+                        },
+                    };
+                    async_save_summary().lock().unwrap().insert(key, done);
+                }
+            })
+            .ok();
+        tx
+    })
+}
+
 use std::io::Cursor;
 fn play_audio(
     bytes: std::sync::Arc<[u8]>,
@@ -1060,6 +1108,17 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         "is_bind_pressed",
         lua.create_function(|_, bind: String| Ok(hebnix_sdk::input::is_bind_pressed(&bind)))?,
     )?;
+    // "(Xinput)" / "(Playstation)" / "(Dinput)" / "" (keyboard) - pair with
+    // ui.bind_icon to show the user which input method a bind came from.
+    hebnix.set(
+        "bind_type_label",
+        lua.create_function(|_, bind: String| {
+            let label = hebnix_sdk::input::resolve_bind_string(&bind)
+                .map(|b| crate::plugins::gamepad_icons::bind_type_label(&b))
+                .unwrap_or("");
+            Ok(label)
+        })?,
+    )?;
     hebnix.set(
         "get_action_binds",
         lua.create_function(|lua, action: String| {
@@ -1657,6 +1716,61 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                     Ok(LuaValue::Table(t))
                 }
             }
+        })?,
+    )?;
+
+    // non-blocking load_save_summary: call from on_tick without stalling the
+    // ui thread. Returns a key to poll with hebnix.save_summary_result(key).
+    // Like parse_launch_log_async, a key that's already pending/done is left
+    // alone - call hebnix.clear_save_summary_cache() first to force a fresh
+    // read (e.g. on your own refresh timer).
+    hebnix.set(
+        "load_save_summary_async",
+        lua.create_function(|_, path: Option<String>| {
+            let path = path.map(std::path::PathBuf::from);
+            let key = format!(
+                "savesummary:{}",
+                path.as_deref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default()
+            );
+            let mut map = async_save_summary().lock().unwrap();
+            if !map.contains_key(&key) {
+                map.insert(key.clone(), AsyncSaveSummary::Pending);
+                drop(map);
+                let _ = save_summary_queue().send((key.clone(), path));
+            }
+            Ok(key)
+        })?,
+    )?;
+
+    // Returns nil (never requested), "pending", or the summary table (same
+    // shape as load_save_summary, including an "error" field on failure).
+    hebnix.set(
+        "save_summary_result",
+        lua.create_function(|lua, key: String| {
+            let map = async_save_summary().lock().unwrap();
+            match map.get(&key) {
+                None => Ok(LuaValue::Nil),
+                Some(AsyncSaveSummary::Pending) => {
+                    Ok(LuaValue::String(lua.create_string("pending")?))
+                }
+                Some(AsyncSaveSummary::Done { path, result }) => match result {
+                    Ok(save) => Ok(LuaValue::Table(build_save_summary(lua, save, path)?)),
+                    Err(e) => {
+                        let t = lua.create_table()?;
+                        t.set("error", e.clone())?;
+                        Ok(LuaValue::Table(t))
+                    }
+                },
+            }
+        })?,
+    )?;
+
+    // clears the cache so the next _async call re-reads the save file
+    hebnix.set(
+        "clear_save_summary_cache",
+        lua.create_function(|_, ()| {
+            async_save_summary().lock().unwrap().clear();
+            Ok(())
         })?,
     )?;
 
@@ -3041,6 +3155,62 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
             })?,
         )?;
     }
+
+    // ui.bind_icon("controller_a", {width=, height=, x=, y=, tint="#rrggbb[aa]"})
+    // draws the button-prompt icon for a bind string (xbox/playstation/dinput,
+    // whichever is currently connected for dinput binds). false for keyboard
+    // binds or buttons with no icon in the pack (e.g. the guide/PS button) -
+    // pair with hebnix.bind_type_label to also show "(Xinput)" etc as text.
+    ui.set(
+        "bind_icon",
+        lua.create_function(move |_, (bind, opts): (String, Option<Table>)| {
+            let Some(resolved) = hebnix_sdk::input::resolve_bind_string(&bind) else {
+                return Ok(false);
+            };
+            let Some((bytes, cache_key)) = crate::plugins::gamepad_icons::bind_icon(&resolved)
+            else {
+                return Ok(false);
+            };
+
+            let w = opt_num(&opts, "width");
+            let h = opt_num(&opts, "height");
+            let at = match (opt_num(&opts, "x"), opt_num(&opts, "y")) {
+                (Some(x), Some(y)) => Some(egui::vec2(x, y)),
+                _ => None,
+            };
+            let tint = opts
+                .as_ref()
+                .and_then(|t| t.get::<String>("tint").ok())
+                .and_then(|s| parse_hex_color(&s));
+
+            let drawn = with_current_ui(|ui| {
+                let uri = format!("bytes://gamepad-icon/{cache_key}.svg");
+                let mut img = egui::Image::from_bytes(uri, bytes);
+                if let Some(c) = tint {
+                    img = img.tint(c);
+                }
+                match (w, h) {
+                    (Some(w), Some(h)) => {
+                        img = img.fit_to_exact_size(egui::vec2(w, h));
+                    }
+                    (Some(w), None) => img = img.max_width(w),
+                    _ => {}
+                }
+                match (at, w, h) {
+                    (Some(offset), Some(w), Some(h)) => {
+                        let min = ui.cursor().min + offset;
+                        img.paint_at(ui, egui::Rect::from_min_size(min, egui::vec2(w, h)));
+                    }
+                    _ => {
+                        ui.add(img);
+                    }
+                }
+                true
+            })
+            .unwrap_or(false);
+            Ok(drawn)
+        })?,
+    )?;
 
     // ui.horizontal(function() ... end)
     ui.set(

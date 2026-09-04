@@ -447,6 +447,7 @@ fn clear_rl_cache(tx: &Sender<AppMsg>) {
 
 impl HebnixApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        hebnix_sdk::input::init_controllers();
         egui_extras::install_image_loaders(&cc.egui_ctx);
 
         let base_dir = crate::config::base_dir();
