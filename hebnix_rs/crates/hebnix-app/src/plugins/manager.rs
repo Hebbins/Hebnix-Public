@@ -969,6 +969,21 @@ mod tests {
             }),
         );
         mgr.dispatch_tick();
+
+        // Wii is not a tracker platform so no fetch goes out. on_overlay stops at
+        // the scoreboard bind here, nothing holds it during a test run.
+        mgr.dispatch_simple(
+            "UpdateState",
+            serde_json::json!({
+                "Players": [
+                    { "Name": "A", "PrimaryId": "Wii|1|0", "TeamNum": 0, "Score": 100, "Shortcut": 7 },
+                    { "Name": "B", "PrimaryId": "Wii|2|0", "TeamNum": 1, "Score": 0, "Shortcut": 9 }
+                ]
+            }),
+        );
+        mgr.render_overlay_gdi("ingame_rank", 1920.0, 1080.0)
+            .expect("on_overlay must not error");
+
         mgr.dispatch_simple("GameLeft", serde_json::json!({}));
         mgr.dispatch_tick();
 

@@ -25,6 +25,8 @@ pub struct LogGameInfo {
     pub game_class: Option<String>,
     pub map_name: Option<String>,
     pub game_tags: Option<String>,
+    pub mutators: Vec<String>,
+    pub bot_skill: Option<String>,
     pub server_name: Option<String>,
     pub region: Option<String>,
     pub server_ip: Option<String>,
