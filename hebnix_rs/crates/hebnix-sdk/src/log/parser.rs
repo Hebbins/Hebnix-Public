@@ -338,6 +338,10 @@ fn parse_game_info(
         game.game_class = Some(game_class);
     }
 
+    if let Some(tags) = game.game_tags.as_deref() {
+        (game.mutators, game.bot_skill) = split_game_tags(tags);
+    }
+
     if let Some(c) = find_last(re_server_name(), text) {
         game.server_name = Some(c[1].to_string());
     }
@@ -346,6 +350,24 @@ fn parse_game_info(
     }
 
     game
+}
+
+/// GameTags into (mutators, bot skill)
+fn split_game_tags(tags: &str) -> (Vec<String>, Option<String>) {
+    let mut mutators = Vec::new();
+    let mut bot_skill = None;
+    for tag in tags.split(',') {
+        let tag = tag.trim();
+        if tag.is_empty() {
+            continue;
+        }
+        if let Some(skill) = tag.strip_prefix("Bots") {
+            bot_skill = Some(skill.to_string());
+        } else {
+            mutators.push(tag.to_string());
+        }
+    }
+    (mutators, bot_skill)
 }
 
 /// map name from a browse url path
@@ -363,4 +385,39 @@ fn extract_map_from_browse_path(path: &str) -> Option<String> {
 
 fn extract_from_browse_query(path: &str, re: &Regex) -> Option<String> {
     re.captures(path).map(|c| c[1].to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_game_tags;
+
+    #[test]
+    fn tag_counts_match_the_package_loads() {
+        for (tags, count) in [
+            ("BotsIntro", 0),
+            ("BotsIntro,10Minutes", 1),
+            ("BotsIntro,20Minutes,Max3", 2),
+            ("BotsNone,UnlimitedBooster,UnlimitedTime,MatchCreatorAdminEnabled", 3),
+            (
+                "MatchCreatorAdminEnabled,BotsNone,UnlimitedJumps,UnlimitedBooster,UnlimitedTime",
+                4,
+            ),
+            ("Freeplay", 1),
+        ] {
+            assert_eq!(split_game_tags(tags).0.len(), count, "tags: {tags}");
+        }
+    }
+
+    #[test]
+    fn the_bots_tag_is_the_skill_not_a_mutator() {
+        let (mutators, skill) = split_game_tags("BotsIntro,20Minutes,Max3");
+        assert_eq!(mutators, ["20Minutes", "Max3"]);
+        assert_eq!(skill.as_deref(), Some("Intro"));
+    }
+
+    #[test]
+    fn empty_tags_give_nothing() {
+        assert_eq!(split_game_tags(""), (Vec::new(), None));
+        assert_eq!(split_game_tags(" , ,"), (Vec::new(), None));
+    }
 }

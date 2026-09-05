@@ -11,6 +11,7 @@ struct ActionBindingCache {
     checked_at: Option<Instant>,
     path: Option<PathBuf>,
     modified: Option<SystemTime>,
+    ini_modified: Option<SystemTime>,
     bindings: HashMap<String, Vec<String>>,
     // Keyboard-only chat channel binds ("global" | "team" | "party" -> key).
     // Kept separate from `bindings` because the chat channel actions aren't
@@ -26,6 +27,7 @@ impl Default for ActionBindingCache {
             checked_at: None,
             path: None,
             modified: None,
+            ini_modified: None,
             bindings: HashMap::new(),
             chat_binds: HashMap::new(),
         }
@@ -182,6 +184,88 @@ fn collect_bindings(raw: &Value, controller: bool, output: &mut HashMap<String, 
     }
 }
 
+pub fn find_input_ini() -> PathBuf {
+    crate::utils::system_settings::find_system_settings().with_file_name("TAInput.ini")
+}
+
+fn ini_field<'a>(line: &'a str, name: &str) -> Option<&'a str> {
+    let rest = line.split_once(name)?.1.trim_start();
+    let rest = rest.strip_prefix('=')?.trim_start();
+    let rest = rest.strip_prefix('"')?;
+    rest.split_once('"').map(|(value, _)| value)
+}
+
+/// stock binds frin TAInput.ini since .save contains only changed binds
+fn ini_default_bindings() -> (HashMap<String, Vec<String>>, HashMap<String, Vec<String>>) {
+    let mut keyboard = HashMap::new();
+    let mut gamepad = HashMap::new();
+    let Ok(text) = std::fs::read_to_string(find_input_ini()) else {
+        return (keyboard, gamepad);
+    };
+
+    let mut in_preset = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            // Standard and Legacy are the alternate presets, same scoreboard keys
+            in_preset = line.eq_ignore_ascii_case("[ProjectX.ControlPreset_X]");
+            continue;
+        }
+        if !in_preset {
+            continue;
+        }
+        let (target, controller) = if line.starts_with("PCBindings") {
+            (&mut keyboard, false)
+        } else if line.starts_with("GamepadBindings") {
+            (&mut gamepad, true)
+        } else {
+            continue;
+        };
+        let (Some(action), Some(key)) = (ini_field(line, "Action"), ini_field(line, "Key")) else {
+            continue;
+        };
+        let bind = if controller {
+            controller_key_to_bind(key)
+        } else {
+            keyboard_key_to_bind(key)
+        };
+        let Some(bind) = bind else {
+            continue;
+        };
+        let entry: &mut Vec<String> = target.entry(normalise_action(action)).or_default();
+        if !entry.contains(&bind) {
+            entry.push(bind);
+        }
+    }
+    (keyboard, gamepad)
+}
+
+fn merge_bindings(
+    saved: HashMap<String, Vec<String>>,
+    defaults: HashMap<String, Vec<String>>,
+    output: &mut HashMap<String, Vec<String>>,
+) {
+    for (action, binds) in defaults {
+        if saved.contains_key(&action) {
+            continue;
+        }
+        let entry = output.entry(action).or_default();
+        for bind in binds {
+            if !entry.contains(&bind) {
+                entry.push(bind);
+            }
+        }
+    }
+    for (action, binds) in saved {
+        let entry = output.entry(action).or_default();
+        for bind in binds {
+            if !entry.contains(&bind) {
+                entry.push(bind);
+            }
+        }
+    }
+}
+
 fn current_save_path() -> Option<PathBuf> {
     let accounts = crate::save_file::find_save_accounts(None);
     accounts
@@ -211,27 +295,37 @@ fn refresh_cache(cache: &mut ActionBindingCache) {
         .as_ref()
         .and_then(|path| std::fs::metadata(path).ok())
         .and_then(|metadata| metadata.modified().ok());
+    let ini_modified = std::fs::metadata(find_input_ini())
+        .and_then(|metadata| metadata.modified())
+        .ok();
 
-    if path == cache.path && modified == cache.modified {
+    if path == cache.path && modified == cache.modified && ini_modified == cache.ini_modified {
         return;
     }
 
-    let mut bindings = HashMap::new();
+    let mut keyboard = HashMap::new();
+    let mut gamepad = HashMap::new();
     let mut chat_binds = HashMap::new();
     if let Some(path) = path.as_ref()
         && let Ok(save) = crate::save_file::load(path, false)
     {
         if let Some(controls) = save.controls() {
-            collect_bindings(&controls.raw_bindings, false, &mut bindings);
+            collect_bindings(&controls.raw_bindings, false, &mut keyboard);
             collect_chat_binds(&controls.raw_bindings, &mut chat_binds);
         }
-        if let Some(gamepad) = save.gamepad_bindings() {
-            collect_bindings(&gamepad.raw_bindings, true, &mut bindings);
+        if let Some(pad) = save.gamepad_bindings() {
+            collect_bindings(&pad.raw_bindings, true, &mut gamepad);
         }
     }
 
+    let (ini_keyboard, ini_gamepad) = ini_default_bindings();
+    let mut bindings = HashMap::new();
+    merge_bindings(keyboard, ini_keyboard, &mut bindings);
+    merge_bindings(gamepad, ini_gamepad, &mut bindings);
+
     cache.path = path;
     cache.modified = modified;
+    cache.ini_modified = ini_modified;
     cache.bindings = bindings;
     cache.chat_binds = chat_binds;
 }
@@ -279,5 +373,71 @@ pub fn is_action_pressed(action: &str) -> bool {
 pub fn clear_action_bind_cache() {
     if let Ok(mut cache) = cache().lock() {
         *cache = ActionBindingCache::default();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn map(pairs: &[(&str, &[&str])]) -> HashMap<String, Vec<String>> {
+        pairs
+            .iter()
+            .map(|(action, binds)| {
+                (
+                    (*action).to_string(),
+                    binds.iter().map(|b| (*b).to_string()).collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn ini_fields_come_out_of_a_bindings_line() {
+        let line = "PCBindings=( Action=\"ToggleScoreboard\",\tKey=\"Tab\" )";
+        assert_eq!(ini_field(line, "Action"), Some("ToggleScoreboard"));
+        assert_eq!(ini_field(line, "Key"), Some("Tab"));
+        assert_eq!(ini_field(line, "Nope"), None);
+    }
+
+    #[test]
+    fn the_ini_default_fills_an_action_the_save_never_wrote() {
+        let mut merged = HashMap::new();
+        merge_bindings(
+            map(&[("handbrake", &["left shift"])]),
+            map(&[("handbrake", &["LeftShift"]), ("togglescoreboard", &["Tab"])]),
+            &mut merged,
+        );
+        assert_eq!(merged.get("togglescoreboard").unwrap(), &["Tab"]);
+        assert_eq!(merged.get("handbrake").unwrap(), &["left shift"]);
+    }
+
+    #[test]
+    fn a_rebound_action_drops_the_stock_key() {
+        let mut merged = HashMap::new();
+        merge_bindings(
+            map(&[("togglescoreboard", &["controller_dpad_down"])]),
+            map(&[("togglescoreboard", &["controller_lb"])]),
+            &mut merged,
+        );
+        assert_eq!(
+            merged.get("togglescoreboard").unwrap(),
+            &["controller_dpad_down"]
+        );
+    }
+
+    #[test]
+    fn keyboard_and_pad_land_on_the_same_action() {
+        let mut merged = HashMap::new();
+        merge_bindings(HashMap::new(), map(&[("togglescoreboard", &["Tab"])]), &mut merged);
+        merge_bindings(
+            map(&[("togglescoreboard", &["controller_dpad_down"])]),
+            map(&[("togglescoreboard", &["controller_lb"])]),
+            &mut merged,
+        );
+        assert_eq!(
+            merged.get("togglescoreboard").unwrap(),
+            &["Tab", "controller_dpad_down"]
+        );
     }
 }

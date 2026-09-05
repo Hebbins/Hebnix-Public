@@ -292,8 +292,8 @@ impl Drop for HostSession {
 #[cfg(test)]
 mod tests {
     use super::{
-        find_unreal_lan_endpoint, replace_binary_lan_endpoint, replace_equal_length_ascii_endpoint,
-        unreal_ansi_string,
+        HOST_ADDRESS_BYTES, find_unreal_lan_endpoint, replace_binary_lan_endpoint,
+        replace_equal_length_ascii_endpoint, unreal_ansi_string,
     };
     #[test]
     fn rewrites_the_physical_lan_endpoint_to_the_tap_host() {

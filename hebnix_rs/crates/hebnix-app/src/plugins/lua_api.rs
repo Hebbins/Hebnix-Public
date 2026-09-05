@@ -2988,6 +2988,26 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         })?,
     )?;
 
+    // ui.collapsing("Label", function(ui) ... end) -- starts folded
+    ui.set(
+        "collapsing",
+        lua.create_function(|lua, (label, f): (String, mlua::Function)| {
+            let ui_tbl: Table = ui_table(lua)?;
+            with_current_ui(|outer| {
+                egui::CollapsingHeader::new(&label)
+                    .id_salt(&label)
+                    .show(outer, |inner| {
+                        with_ui_scope(inner, || {
+                            if let Err(e) = f.call::<()>(ui_tbl.clone()) {
+                                tracing::warn!("plugin ui.collapsing callback error: {e}");
+                            }
+                        });
+                    });
+            });
+            Ok(())
+        })?,
+    )?;
+
     Ok(ui)
 }
 
@@ -3144,5 +3164,26 @@ mod tests {
         t.set("PlayerID", "Steam|1|0").unwrap();
         let json = lua_body_to_json(&lua, Some(LuaValue::Table(t)));
         assert_eq!(json["PlayerID"], serde_json::json!("Steam|1|0"));
+    }
+
+    #[test]
+    fn launch_log_mutators_reach_lua_as_a_table() {
+        let lua = Lua::new();
+        let mut info = hebnix_sdk::log::LogInfo::default();
+        info.game = Some(hebnix_sdk::log::LogGameInfo {
+            game_tags: Some("BotsIntro,20Minutes,Max3".into()),
+            mutators: vec!["20Minutes".into(), "Max3".into()],
+            bot_skill: Some("Intro".into()),
+            ..Default::default()
+        });
+
+        let LuaValue::Table(table) = to_lua(&lua, &info).unwrap() else {
+            panic!("LogInfo should convert to a table");
+        };
+        let game: Table = table.get("game").unwrap();
+        let mutators: Table = game.get("mutators").unwrap();
+        assert_eq!(mutators.len().unwrap(), 2);
+        assert_eq!(mutators.get::<String>(1).unwrap(), "20Minutes");
+        assert_eq!(game.get::<String>("bot_skill").unwrap(), "Intro");
     }
 }
