@@ -433,6 +433,8 @@ pub struct GameplayDisplaySettings {
     pub force_default_colors: bool,
     pub freeplay_default_team_colors: bool,
     pub quick_drop_opening: bool,
+    /// options > video > interface scale, e.g. 0.75
+    pub ui_scale: f64,
     pub raw: Value,
 }
 

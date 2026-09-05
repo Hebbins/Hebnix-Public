@@ -579,6 +579,39 @@ impl PluginManager {
         }
     }
 
+    /// goes to the requesting plugin only. Result of http_multipart_post_async.
+    pub fn on_http_upload_response(&mut self, slug: &str, req_id: &str, status: u16, body: &str) {
+        let Some(idx) = self.plugins.iter().position(|p| p.slug == slug) else {
+            return;
+        };
+        let plugin = &self.plugins[idx];
+        if !plugin.enabled {
+            return;
+        }
+        let Some(rt) = &plugin.runtime else {
+            return;
+        };
+        let name = plugin.display_name().to_string();
+
+        let call = (|| -> mlua::Result<()> {
+            let table: Table = rt.lua.registry_value(&rt.plugin_table)?;
+            let func: LuaValue = table.get("on_http_upload_response")?;
+            if let LuaValue::Function(f) = func {
+                f.call::<()>((req_id, status, body))?;
+            }
+            Ok(())
+        })();
+
+        if let Err(e) = call {
+            self.log(format!(
+                "[Core] Critical Error in '{name}' on_http_upload_response: {e}. Force disabling."
+            ));
+            self.plugins[idx].enabled = false;
+            Self::call_on_unload(&mut self.plugins[idx]);
+            self.plugins[idx].runtime = None;
+        }
+    }
+
     /// render a plugin's settings ui. Err(msg) if the callback raised, so the
     /// caller can log + disable.
     pub fn render_settings(&mut self, slug: &str, ui: &mut egui::Ui) -> Result<(), String> {

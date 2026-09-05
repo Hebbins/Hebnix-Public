@@ -131,6 +131,7 @@ pub struct LiteApp {
 
 impl LiteApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        hebnix_sdk::input::init_controllers();
         egui_extras::install_image_loaders(&cc.egui_ctx);
         let base_dir = crate::config::base_dir();
         let themes_dir = base_dir.join("themes");
@@ -563,6 +564,14 @@ impl LiteApp {
                 } => self
                     .plugin_mgr
                     .on_http_redirect_response(&slug, &req_id, status, &location),
+                AppMsg::PluginHttpUploadRes {
+                    slug,
+                    req_id,
+                    status,
+                    body,
+                } => self
+                    .plugin_mgr
+                    .on_http_upload_response(&slug, &req_id, status, &body),
                 AppMsg::PluginFetch { result } => {
                     self.install_modal.fetching = false;
                     match result {

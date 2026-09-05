@@ -2383,7 +2383,7 @@ dependencies = [
  "aes",
  "crossbeam-channel",
  "dirs",
- "hidapi",
+ "gilrs",
  "regex",
  "serde",
  "serde_json",
@@ -2425,19 +2425,6 @@ name = "hexf-parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
-
-[[package]]
-name = "hidapi"
-version = "2.6.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c78dadfc12f865bc3fcac3897e64533b930737ceb9ef245c8277de98d0b010e9"
-dependencies = [
- "cc",
- "cfg-if",
- "libc",
- "pkg-config",
- "windows-sys 0.61.2",
-]
 
 [[package]]
 name = "hmac"
@@ -3143,6 +3130,16 @@ name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
+
+[[package]]
+name = "mime_guess"
+version = "2.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f7c44f8e672c00fe5308fa235f821cb4198414e1c77935c1ab6948d3fd78550e"
+dependencies = [
+ "mime",
+ "unicase",
+]
 
 [[package]]
 name = "mime_guess2"
@@ -4603,6 +4600,7 @@ dependencies = [
  "js-sys",
  "log",
  "mime",
+ "mime_guess",
  "native-tls",
  "once_cell",
  "percent-encoding",
