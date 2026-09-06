@@ -393,6 +393,54 @@ fn log_queue() -> &'static crossbeam_channel::Sender<(String, bool)> {
     })
 }
 
+enum AsyncSaveSummary {
+    Pending,
+    Done {
+        path: std::path::PathBuf,
+        result: Result<hebnix_sdk::save_file::SaveData, String>,
+    },
+}
+
+fn async_save_summary()
+-> &'static std::sync::Mutex<std::collections::HashMap<String, AsyncSaveSummary>> {
+    static MAP: OnceLock<std::sync::Mutex<std::collections::HashMap<String, AsyncSaveSummary>>> =
+        OnceLock::new();
+    MAP.get_or_init(Default::default)
+}
+
+/// single worker: find_save_file (can scan platform profile dirs) + decrypt
+/// + parse is real work, too slow for the ui thread lua runs on (same
+/// reasoning as log_queue above).
+fn save_summary_queue() -> &'static crossbeam_channel::Sender<(String, Option<std::path::PathBuf>)>
+{
+    static QUEUE: OnceLock<crossbeam_channel::Sender<(String, Option<std::path::PathBuf>)>> =
+        OnceLock::new();
+    QUEUE.get_or_init(|| {
+        let (tx, rx) = crossbeam_channel::unbounded::<(String, Option<std::path::PathBuf>)>();
+        std::thread::Builder::new()
+            .name("save-summary-worker".into())
+            .spawn(move || {
+                while let Ok((key, path)) = rx.recv() {
+                    let resolved = path.or_else(|| hebnix_sdk::save_file::find_save_file(None));
+                    let done = match resolved {
+                        Some(path) => {
+                            let result = hebnix_sdk::save_file::load(&path, false)
+                                .map_err(|e| e.to_string());
+                            AsyncSaveSummary::Done { path, result }
+                        }
+                        None => AsyncSaveSummary::Done {
+                            path: std::path::PathBuf::new(),
+                            result: Err("no .save file found".to_string()),
+                        },
+                    };
+                    async_save_summary().lock().unwrap().insert(key, done);
+                }
+            })
+            .ok();
+        tx
+    })
+}
+
 use std::io::Cursor;
 fn play_audio(
     bytes: std::sync::Arc<[u8]>,
@@ -774,6 +822,42 @@ fn send_req_bytes(req: reqwest::blocking::RequestBuilder) -> (u16, Vec<u8>) {
     }
 }
 
+/// posts a multipart/form-data body. fields are plain text, files map a
+/// field name to a local path and get read off disk. status 0 if the
+/// request never landed or a file couldn't be read.
+fn send_multipart_req(
+    url: &str,
+    fields: Option<std::collections::HashMap<String, String>>,
+    files: Option<std::collections::HashMap<String, String>>,
+    headers: Option<std::collections::HashMap<String, String>>,
+) -> (u16, String) {
+    let mut form = reqwest::blocking::multipart::Form::new();
+
+    if let Some(fields) = fields {
+        for (k, v) in fields {
+            form = form.text(k, v);
+        }
+    }
+
+    if let Some(files) = files {
+        for (field_name, path) in files {
+            form = match form.file(field_name, &path) {
+                Ok(f) => f,
+                Err(e) => return (0, format!("failed to read file '{path}': {e}")),
+            };
+        }
+    }
+
+    let mut req = http_client().post(url).multipart(form);
+    if let Some(hdrs) = headers {
+        for (k, v) in hdrs {
+            req = req.header(k, v);
+        }
+    }
+
+    send_req(req)
+}
+
 const UI_TABLE_REGISTRY: &str = "hebnix_ui_table";
 const DRAW_TABLE_REGISTRY: &str = "hebnix_draw_table";
 
@@ -1023,6 +1107,17 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     hebnix.set(
         "is_bind_pressed",
         lua.create_function(|_, bind: String| Ok(hebnix_sdk::input::is_bind_pressed(&bind)))?,
+    )?;
+    // "(Xinput)" / "(Playstation)" / "(Dinput)" / "" (keyboard) - pair with
+    // ui.bind_icon to show the user which input method a bind came from.
+    hebnix.set(
+        "bind_type_label",
+        lua.create_function(|_, bind: String| {
+            let label = hebnix_sdk::input::resolve_bind_string(&bind)
+                .map(|b| crate::plugins::gamepad_icons::bind_type_label(&b))
+                .unwrap_or("");
+            Ok(label)
+        })?,
     )?;
     hebnix.set(
         "get_action_binds",
@@ -1624,6 +1719,61 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
+    // non-blocking load_save_summary: call from on_tick without stalling the
+    // ui thread. Returns a key to poll with hebnix.save_summary_result(key).
+    // Like parse_launch_log_async, a key that's already pending/done is left
+    // alone - call hebnix.clear_save_summary_cache() first to force a fresh
+    // read (e.g. on your own refresh timer).
+    hebnix.set(
+        "load_save_summary_async",
+        lua.create_function(|_, path: Option<String>| {
+            let path = path.map(std::path::PathBuf::from);
+            let key = format!(
+                "savesummary:{}",
+                path.as_deref().map(|p| p.to_string_lossy().to_string()).unwrap_or_default()
+            );
+            let mut map = async_save_summary().lock().unwrap();
+            if !map.contains_key(&key) {
+                map.insert(key.clone(), AsyncSaveSummary::Pending);
+                drop(map);
+                let _ = save_summary_queue().send((key.clone(), path));
+            }
+            Ok(key)
+        })?,
+    )?;
+
+    // Returns nil (never requested), "pending", or the summary table (same
+    // shape as load_save_summary, including an "error" field on failure).
+    hebnix.set(
+        "save_summary_result",
+        lua.create_function(|lua, key: String| {
+            let map = async_save_summary().lock().unwrap();
+            match map.get(&key) {
+                None => Ok(LuaValue::Nil),
+                Some(AsyncSaveSummary::Pending) => {
+                    Ok(LuaValue::String(lua.create_string("pending")?))
+                }
+                Some(AsyncSaveSummary::Done { path, result }) => match result {
+                    Ok(save) => Ok(LuaValue::Table(build_save_summary(lua, save, path)?)),
+                    Err(e) => {
+                        let t = lua.create_table()?;
+                        t.set("error", e.clone())?;
+                        Ok(LuaValue::Table(t))
+                    }
+                },
+            }
+        })?,
+    )?;
+
+    // clears the cache so the next _async call re-reads the save file
+    hebnix.set(
+        "clear_save_summary_cache",
+        lua.create_function(|_, ()| {
+            async_save_summary().lock().unwrap().clear();
+            Ok(())
+        })?,
+    )?;
+
     hebnix.set(
         "find_save_accounts",
         lua.create_function(|lua, ()| {
@@ -1980,6 +2130,38 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
 
                         let (status, body) = send_req(req);
                         let _ = thread_tx.send(AppMsg::PluginHttpRes {
+                            slug,
+                            req_id,
+                            status,
+                            body,
+                        });
+                    });
+                    Ok(())
+                },
+            )?,
+        )?;
+    }
+
+    // result lands in this plugin's on_http_upload_response(req_id, status, body)
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "http_multipart_post_async",
+            lua.create_function(
+                move |_,
+                      (req_id, url, fields, files, headers): (
+                    String,
+                    String,
+                    Option<std::collections::HashMap<String, String>>,
+                    Option<std::collections::HashMap<String, String>>,
+                    Option<std::collections::HashMap<String, String>>,
+                )| {
+                    let thread_tx = host.tx.clone();
+                    let slug = host.slug.clone();
+
+                    std::thread::spawn(move || {
+                        let (status, body) = send_multipart_req(&url, fields, files, headers);
+                        let _ = thread_tx.send(AppMsg::PluginHttpUploadRes {
                             slug,
                             req_id,
                             status,
@@ -2650,6 +2832,10 @@ fn build_save_summary(
         t.set("player_title", profile.player_title)?;
     }
 
+    if let Some(display) = save.gameplay_display() {
+        t.set("ui_scale", display.ui_scale)?;
+    }
+
     t.set("inventory_count", save.inventory().len())?;
     t.set("recent_players_count", save.recent_players().len())?;
     t.set("observed_players_count", save.observed_players().len())?;
@@ -2969,6 +3155,62 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
             })?,
         )?;
     }
+
+    // ui.bind_icon("controller_a", {width=, height=, x=, y=, tint="#rrggbb[aa]"})
+    // draws the button-prompt icon for a bind string (xbox/playstation/dinput,
+    // whichever is currently connected for dinput binds). false for keyboard
+    // binds or buttons with no icon in the pack (e.g. the guide/PS button) -
+    // pair with hebnix.bind_type_label to also show "(Xinput)" etc as text.
+    ui.set(
+        "bind_icon",
+        lua.create_function(move |_, (bind, opts): (String, Option<Table>)| {
+            let Some(resolved) = hebnix_sdk::input::resolve_bind_string(&bind) else {
+                return Ok(false);
+            };
+            let Some((bytes, cache_key)) = crate::plugins::gamepad_icons::bind_icon(&resolved)
+            else {
+                return Ok(false);
+            };
+
+            let w = opt_num(&opts, "width");
+            let h = opt_num(&opts, "height");
+            let at = match (opt_num(&opts, "x"), opt_num(&opts, "y")) {
+                (Some(x), Some(y)) => Some(egui::vec2(x, y)),
+                _ => None,
+            };
+            let tint = opts
+                .as_ref()
+                .and_then(|t| t.get::<String>("tint").ok())
+                .and_then(|s| parse_hex_color(&s));
+
+            let drawn = with_current_ui(|ui| {
+                let uri = format!("bytes://gamepad-icon/{cache_key}.svg");
+                let mut img = egui::Image::from_bytes(uri, bytes);
+                if let Some(c) = tint {
+                    img = img.tint(c);
+                }
+                match (w, h) {
+                    (Some(w), Some(h)) => {
+                        img = img.fit_to_exact_size(egui::vec2(w, h));
+                    }
+                    (Some(w), None) => img = img.max_width(w),
+                    _ => {}
+                }
+                match (at, w, h) {
+                    (Some(offset), Some(w), Some(h)) => {
+                        let min = ui.cursor().min + offset;
+                        img.paint_at(ui, egui::Rect::from_min_size(min, egui::vec2(w, h)));
+                    }
+                    _ => {
+                        ui.add(img);
+                    }
+                }
+                true
+            })
+            .unwrap_or(false);
+            Ok(drawn)
+        })?,
+    )?;
 
     // ui.horizontal(function() ... end)
     ui.set(

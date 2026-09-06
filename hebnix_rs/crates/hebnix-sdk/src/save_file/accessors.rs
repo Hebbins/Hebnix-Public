@@ -468,6 +468,7 @@ pub fn parse_gameplay_display(raw: &Value) -> GameplayDisplaySettings {
         force_default_colors: safe_bool(raw, "bForceDefaultColors", false),
         freeplay_default_team_colors: safe_bool(raw, "bFreeplayDefaultTeamColors", false),
         quick_drop_opening: safe_bool(raw, "bQuickDropOpening", false),
+        ui_scale: safe_f64(raw, "UIScale", 0.0),
         raw: raw.clone(),
     }
 }

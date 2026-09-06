@@ -101,6 +101,13 @@ pub enum AppMsg {
         status: u16,
         location: String,
     },
+    // result of http_multipart_post_async, lands in on_http_upload_response
+    PluginHttpUploadRes {
+        slug: String,
+        req_id: String,
+        status: u16,
+        body: String,
+    },
     AppUpdateFetched {
         result: Result<Option<crate::update::UpdateInfo>, String>,
     },

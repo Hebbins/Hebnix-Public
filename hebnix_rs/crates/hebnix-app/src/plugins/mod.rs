@@ -5,6 +5,7 @@
 //! on_game_event, on_settings(ui), on_window(ui), on_overlay(draw,w,h)).
 //! see examples/plugins/.
 
+pub mod gamepad_icons;
 pub mod lua_api;
 pub mod manager;
 pub mod manifest;
