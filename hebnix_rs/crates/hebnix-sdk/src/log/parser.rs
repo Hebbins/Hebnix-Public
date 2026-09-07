@@ -46,8 +46,9 @@ re!(
     re_welcomed,
     r"DevNet: Welcomed by server \(Level: ([^,]+), Game: ([^,]+), GameTags: ([^)]+)\)"
 );
-re!(re_playlist_id, r"PlaylistId=(\d+)");
-re!(re_playlist, r"Playlist=(\d+)");
+// JoinSettings writes PlaylistId=6, the anti cheat line writes PlaylistId=(6)
+re!(re_playlist_id, r"PlaylistId=\(?(\d+)");
+re!(re_playlist, r"Playlist=\(?(\d+)");
 re!(re_server_name, r#"ServerName="([^"]+)""#);
 re!(re_region, r#"Region="([^"]+)""#);
 re!(re_browse_remote, r"DevNet: Browse: ([\d.]+):(\d+)/(\S+)");
@@ -55,6 +56,8 @@ re!(re_browse_local, r"DevNet: Browse: (\S+)");
 re!(re_build_id, r"Log: BuildID: (\d+) from GPsyonixBuildID");
 re!(re_browse_game, r"[?&]Game=([^?&]+)");
 re!(re_browse_tags, r"[?&]GameTags=([^?&]+)");
+re!(re_loadmap_tags, r"LoadMap: \S*[?&]GameTags=([^?&\s]+)");
+re!(re_loadmap_offline, r"LoadMap: \S*[?&]Offline(?:[?&]|\s|$)");
 
 fn find_last<'t>(re: &Regex, text: &'t str) -> Option<regex::Captures<'t>> {
     re.captures_iter(text).last()
@@ -258,11 +261,16 @@ fn parse_game_info(
         ..Default::default()
     };
 
-    // playlist id
-    if let Some(c) = find_last(re_playlist_id(), text) {
-        game.playlist_id = c[1].parse().ok();
-    } else if let Some(c) = find_last(re_playlist(), text) {
-        game.playlist_id = c[1].parse().ok();
+    // playlist id. an offline match queues nothing, so a stale id from the last
+    // online one is still sitting in the log
+    game.offline = last_map_load_is_offline(text);
+    if !game.offline {
+        let queued = since_last_menu_load(text);
+        if let Some(c) = find_last(re_playlist_id(), queued) {
+            game.playlist_id = c[1].parse().ok();
+        } else if let Some(c) = find_last(re_playlist(), queued) {
+            game.playlist_id = c[1].parse().ok();
+        }
     }
     if let Some(pid) = game.playlist_id {
         game.playlist_name = online_playlists.get(&pid).cloned();
@@ -338,9 +346,14 @@ fn parse_game_info(
         game.game_class = Some(game_class);
     }
 
-    if let Some(tags) = game.game_tags.as_deref() {
-        (game.mutators, game.bot_skill) = split_game_tags(tags);
+    // the last LoadMap is the current map. matching the last LoadMap that happens to carry GameTags instead inherits them from an older load, a menu clears them
+    if text.contains("LoadMap:") {
+        game.game_tags = tags_of_last_map_load(text);
     }
+    if let Some(tags) = game.game_tags.as_deref() {
+        (game.mutators, game.bot_skill, game.player_count) = split_game_tags(tags);
+    }
+    game.mutator_count = count_mutator_packages(text).max(game.mutators.len() as i64);
 
     if let Some(c) = find_last(re_server_name(), text) {
         game.server_name = Some(c[1].to_string());
@@ -352,10 +365,53 @@ fn parse_game_info(
     game
 }
 
-/// GameTags into (mutators, bot skill)
-fn split_game_tags(tags: &str) -> (Vec<String>, Option<String>) {
+/// the menu load between two matches, so a queue cannot outlive its own match
+fn since_last_menu_load(text: &str) -> &str {
+    match text.rfind("LoadMap: MENU_Main_p") {
+        Some(pos) => &text[pos..],
+        None => text,
+    }
+}
+
+/// exhibition and season write ?Offline? on the load, private matches do not
+fn last_map_load_is_offline(text: &str) -> bool {
+    let Some(pos) = text.rfind("LoadMap:") else {
+        return false;
+    };
+    text[pos..]
+        .lines()
+        .next()
+        .is_some_and(|line| re_loadmap_offline().is_match(line))
+}
+
+/// GameTags off the last LoadMap, None when that load carries none
+fn tags_of_last_map_load(text: &str) -> Option<String> {
+    let pos = text.rfind("LoadMap:")?;
+    let line = text[pos..].lines().next()?;
+    re_loadmap_tags().captures(line).map(|c| c[1].to_string())
+}
+
+#[cfg(test)]
+fn parse_playlist_for_test(text: &str) -> (Option<i64>, bool) {
+    let game = parse_game_info(text, false, &std::collections::HashMap::new());
+    (game.playlist_id, game.offline)
+}
+
+#[cfg(test)]
+fn parse_game_tags_for_test(text: &str) -> Option<String> {
+    tags_of_last_map_load(text)
+}
+
+/// the game loads Mutators_SF.upk once per mutator
+fn count_mutator_packages(text: &str) -> i64 {
+    let from = text.rfind("LoadMap:").map(|i| i + 1).unwrap_or(0);
+    text[from..].matches("Mutators_SF").count() as i64
+}
+
+fn split_game_tags(tags: &str) -> (Vec<String>, Option<String>, Option<i64>) {
     let mut mutators = Vec::new();
     let mut bot_skill = None;
+    let mut player_count = None;
     for tag in tags.split(',') {
         let tag = tag.trim();
         if tag.is_empty() {
@@ -363,11 +419,13 @@ fn split_game_tags(tags: &str) -> (Vec<String>, Option<String>) {
         }
         if let Some(skill) = tag.strip_prefix("Bots") {
             bot_skill = Some(skill.to_string());
+        } else if let Some(count) = tag.strip_prefix("PlayerCount") {
+            player_count = count.parse().ok();
         } else {
             mutators.push(tag.to_string());
         }
     }
-    (mutators, bot_skill)
+    (mutators, bot_skill, player_count)
 }
 
 /// map name from a browse url path
@@ -403,6 +461,8 @@ mod tests {
                 4,
             ),
             ("Freeplay", 1),
+            ("BotsMedium,PlayerCount4", 0),
+            ("BotsMedium,Max1,PlayerCount4", 1),
         ] {
             assert_eq!(split_game_tags(tags).0.len(), count, "tags: {tags}");
         }
@@ -410,14 +470,77 @@ mod tests {
 
     #[test]
     fn the_bots_tag_is_the_skill_not_a_mutator() {
-        let (mutators, skill) = split_game_tags("BotsIntro,20Minutes,Max3");
+        let (mutators, skill, _) = split_game_tags("BotsIntro,20Minutes,Max3");
         assert_eq!(mutators, ["20Minutes", "Max3"]);
         assert_eq!(skill.as_deref(), Some("Intro"));
     }
 
     #[test]
+    fn a_map_load_without_tags_does_not_inherit_them() {
+        let text = "\
+Log: LoadMap: mall_day_p?Game=TAGame.GameInfo_Soccar_TA?GameTags=Freeplay?Name=nix\n\
+Log: Fully load package: Mutators_SF.upk\n\
+Log: LoadMap: 1.2.3.4:9047/stadium_day_p?Name=nix?game=TAGame.GameInfo_GodBall_TA\n";
+        let info = super::parse_game_tags_for_test(text);
+        assert_eq!(info, None, "the current load carries no tags");
+        assert_eq!(super::count_mutator_packages(text), 0);
+    }
+
+    // lines trimmed from a real Launch.log, an offline exhibition after a private
+    const OFFLINE_AFTER_PRIVATE: &str = "\
+Log: LoadMap: MENU_Main_p?closed?Name=nix\n\
+Online: TryToPlayOnlineWithAntiCheat ControllerID=(-1) PlaylistId=(6)\n\
+Log: LoadMap: 18.88.28.33:9006/Paname_Dusk_P?Name=nix?GameTags=BotsNone,UnlimitedTime\n\
+Log: LoadMap: MENU_Main_p?closed?Name=nix\n\
+Log: LoadMap: EuroStadium_Night_P?Name=nix?Offline?GameTags=BotsEasy,PlayerCount4\n";
+
+    #[test]
+    fn an_offline_match_does_not_inherit_the_last_queued_playlist() {
+        let (playlist, offline) = super::parse_playlist_for_test(OFFLINE_AFTER_PRIVATE);
+        assert_eq!(playlist, None, "offline queues nothing");
+        assert!(offline);
+    }
+
+    #[test]
+    fn a_queued_playlist_does_not_outlive_its_own_match() {
+        let text = format!("{OFFLINE_AFTER_PRIVATE}\
+Log: LoadMap: MENU_Main_p?closed?Name=nix\n\
+JoinGame: StartJoin Reservation=((Playlist=1)) JoinSettings=((PlaylistId=1))\n\
+Online: TryToPlayOnlineWithAntiCheat ControllerID=(-1) PlaylistId=(1)\n\
+Log: LoadMap: 15.224.164.149:9042/Park_Night_P?Name=nix\n");
+        let (playlist, offline) = super::parse_playlist_for_test(&text);
+        assert_eq!(playlist, Some(1), "casual duel, not the 6 two matches back");
+        assert!(!offline);
+
+        let text = format!("{text}Log: LoadMap: MENU_Main_p?closed?Name=nix\n\
+Log: LoadMap: EuroStadium_Night_P?Name=nix?Offline?GameTags=BotsEasy\n");
+        assert_eq!(super::parse_playlist_for_test(&text), (None, true));
+    }
+
+    #[test]
+    fn mutator_packages_are_counted_from_the_last_map_load() {
+        let text = "\
+Log: LoadMap: Park_Night_P?GameTags=BotsMedium,PlayerCount4\n\
+Log: Fully load package: Mutators_SF.upk\n\
+Log: LoadMap: MENU_Main_p?closed\n";
+        assert_eq!(super::count_mutator_packages(text), 0);
+
+        let text = format!("{text}Log: LoadMap: Park_Night_P?GameTags=BotsMedium,Max40,20Minutes\n\
+Log: Fully load package: Mutators_SF.upk\n\
+Log: Fully load package: Mutators_SF.upk\n");
+        assert_eq!(super::count_mutator_packages(&text), 2);
+    }
+
+    #[test]
+    fn player_count_is_the_lobby_size_not_a_mutator() {
+        let (mutators, _, count) = split_game_tags("BotsMedium,Max1,PlayerCount4");
+        assert_eq!(mutators, ["Max1"]);
+        assert_eq!(count, Some(4));
+    }
+
+    #[test]
     fn empty_tags_give_nothing() {
-        assert_eq!(split_game_tags(""), (Vec::new(), None));
-        assert_eq!(split_game_tags(" , ,"), (Vec::new(), None));
+        assert_eq!(split_game_tags(""), (Vec::new(), None, None));
+        assert_eq!(split_game_tags(" , ,"), (Vec::new(), None, None));
     }
 }
