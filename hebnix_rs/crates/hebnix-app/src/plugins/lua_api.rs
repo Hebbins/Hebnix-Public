@@ -1134,6 +1134,10 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         lua.create_function(|_, action: String| Ok(hebnix_sdk::input::is_action_pressed(&action)))?,
     )?;
     hebnix.set(
+        "ui_scale",
+        lua.create_function(|_, ()| Ok(hebnix_sdk::input::ui_scale()))?,
+    )?;
+    hebnix.set(
         "refresh_action_binds",
         lua.create_function(|_, ()| {
             hebnix_sdk::input::clear_action_bind_cache();

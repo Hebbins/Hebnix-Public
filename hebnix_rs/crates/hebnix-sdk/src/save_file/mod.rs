@@ -27,7 +27,15 @@ pub fn load(filepath: &Path, check_crc: bool) -> Result<SaveData, crypto::SaveEr
     Ok(SaveData::from_raw(raw, filepath.to_path_buf()))
 }
 
-/// newest *.save in the DBE_Production dir
+/// stem of an account save, with or without the rotation suffix
+fn is_account_save_stem(stem: &str) -> bool {
+    let base = stem.split_once('_').map(|(head, _)| head).unwrap_or(stem);
+    let hex32 = base.len() == 32 && base.chars().all(|c| c.is_ascii_hexdigit());
+    let numeric = (10..=20).contains(&base.len()) && base.chars().all(|c| c.is_ascii_digit());
+    hex32 || numeric
+}
+
+/// newest account *.save in the DBE_Production dir
 pub fn find_save_file(save_data_path: Option<&Path>) -> Option<PathBuf> {
     let dir = match save_data_path {
         Some(p) => p.to_path_buf(),
@@ -44,6 +52,12 @@ pub fn find_save_file(save_data_path: Option<&Path>) -> Option<PathBuf> {
                 .extension()
                 .map(|ext| ext.eq_ignore_ascii_case("save"))
                 .unwrap_or(false)
+        })
+        .filter(|e| {
+            e.path()
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .is_some_and(is_account_save_stem)
         })
         .filter_map(|e| {
             let mtime = e.metadata().ok()?.modified().ok()?;

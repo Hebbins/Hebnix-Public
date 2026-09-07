@@ -12,6 +12,7 @@ struct ActionBindingCache {
     path: Option<PathBuf>,
     modified: Option<SystemTime>,
     ini_modified: Option<SystemTime>,
+    ui_scale: f64,
     bindings: HashMap<String, Vec<String>>,
     // Keyboard-only chat channel binds ("global" | "team" | "party" -> key).
     // Kept separate from `bindings` because the chat channel actions aren't
@@ -28,6 +29,7 @@ impl Default for ActionBindingCache {
             path: None,
             modified: None,
             ini_modified: None,
+            ui_scale: 1.0,
             bindings: HashMap::new(),
             chat_binds: HashMap::new(),
         }
@@ -267,18 +269,12 @@ fn merge_bindings(
 }
 
 fn current_save_path() -> Option<PathBuf> {
-    let accounts = crate::save_file::find_save_accounts(None);
-    accounts
-        .into_iter()
-        .filter_map(|account| {
-            let modified = std::fs::metadata(&account.path)
-                .and_then(|metadata| metadata.modified())
-                .ok()?;
-            Some((modified, account.path))
-        })
-        .max_by_key(|(modified, _)| *modified)
-        .map(|(_, path)| path)
-        .or_else(|| crate::save_file::find_save_file(None))
+    crate::save_file::find_save_file(None).or_else(|| {
+        crate::save_file::find_save_accounts(None)
+            .into_iter()
+            .next()
+            .map(|account| account.path)
+    })
 }
 
 fn refresh_cache(cache: &mut ActionBindingCache) {
@@ -306,6 +302,7 @@ fn refresh_cache(cache: &mut ActionBindingCache) {
     let mut keyboard = HashMap::new();
     let mut gamepad = HashMap::new();
     let mut chat_binds = HashMap::new();
+    let mut ui_scale = 1.0;
     if let Some(path) = path.as_ref()
         && let Ok(save) = crate::save_file::load(path, false)
     {
@@ -315,6 +312,12 @@ fn refresh_cache(cache: &mut ActionBindingCache) {
         }
         if let Some(pad) = save.gamepad_bindings() {
             collect_bindings(&pad.raw_bindings, true, &mut gamepad);
+        }
+        // UIScale is only written once it leaves 1.0, parse_gameplay_display defaults it to 0.0
+        if let Some(display) = save.gameplay_display()
+            && display.ui_scale > 0.0
+        {
+            ui_scale = display.ui_scale;
         }
     }
 
@@ -326,8 +329,19 @@ fn refresh_cache(cache: &mut ActionBindingCache) {
     cache.path = path;
     cache.modified = modified;
     cache.ini_modified = ini_modified;
+    cache.ui_scale = ui_scale;
     cache.bindings = bindings;
     cache.chat_binds = chat_binds;
+}
+
+/// options > interface > UIScale, 1.0 when the save never wrote it. rides the
+/// bind cache, the save is already loaded there and rl rewrites it as it plays
+pub fn ui_scale() -> f64 {
+    let Ok(mut cache) = cache().lock() else {
+        return 1.0;
+    };
+    refresh_cache(&mut cache);
+    cache.ui_scale
 }
 
 /// Keyboard key bound to a text chat channel ("global", "team" or "party"),

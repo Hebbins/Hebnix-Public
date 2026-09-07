@@ -1,9 +1,5 @@
--- InGameRank: rank icons pinned to the rows of the in game scoreboard.
--- layout ported from the bakkesmod plugin, ScoreboardPosition.cpp.
-
 local plugin = {}
 
--- offsets in 1080p pixels, everything gets multiplied by scale
 local SB = {
     left = 537,
     blue_bottom = 67,
@@ -12,14 +8,28 @@ local SB = {
     board_w = 1033,
     board_h = 548,
     imbalance = 32,
-    skip_tick = 67,
     y_offcenter = 32,
 }
 
--- measured at 16:9. bakkesmod pins the center 1005 from the right edge, which
--- works out to 45 here and to no shift at all past 21:9.
-local MUTATOR_SHIFT = 110
+local MUTATOR_EDGE = 1030
 
+local REPLAY_SHIFT = 0
+
+local X_OFFSET = -40
+local X_OFFSET_FIRST = -40
+
+local MMR_COL = -150.5
+local MMR_HEADER_DY = -44.6
+local HEADER_CAP = 12.0
+local VALUE_CAP = 17.2
+
+local SEGOE_CAP = 0.7002
+local SEGOE_MID = 0.7290
+
+local CASUAL_MMR = 0
+local PRIVATE_PLAYLIST = 6
+
+local FADE_SECONDS = 0.3
 local IMAGE_SCALE = 0.48
 local TIER_W, TIER_H = 150, 100
 local DIV_W, DIV_H = 100, 25
@@ -48,12 +58,25 @@ local BUTTONS = {
 }
 
 local players = {}
+local roster = {}
+local roster_seq = 0
 local request_keys = {}
 local in_match = false
 local in_replay = false
 local match_ended = false
+local match_guid = nil
+local my_id = nil
+local freeplay = false
 local current_playlist = nil
+local offline = false
 local mutators = {}
+local mutator_count = 0
+local first_tab_pending = true
+local in_first_open = false
+local scoreboard_was_held = false
+local was_drawing = false
+local fade_from = nil
+local shown_first_open = false
 local log_key = nil
 local mode = "Current"
 local cycle_was_pressed = false
@@ -145,14 +168,30 @@ local function request_profile(primary_id)
     return key
 end
 
+local function matchmade()
+    if offline then return false end
+    return current_playlist ~= nil and current_playlist ~= PRIVATE_PLAYLIST
+end
+
 local function clear_players(clear_cache)
     players = {}
+    roster = {}
+    roster_seq = 0
+    match_guid = nil
     request_keys = {}
     in_match = false
     in_replay = false
     current_playlist = nil
+    offline = false
     mutators = {}
+    mutator_count = 0
+    freeplay = false
     log_key = nil
+    first_tab_pending = true
+    in_first_open = false
+    scoreboard_was_held = false
+    was_drawing = false
+    fade_from = nil
     if clear_cache then hebnix.clear_stats_cache() end
 end
 
@@ -166,28 +205,102 @@ local function update_players(event)
         in_replay = game.bReplay == true or game.replay == true
     end
 
-    local updated = {}
-    for index, player in ipairs(source) do
+    local overlap, had = 0, next(roster) ~= nil
+    for _, player in ipairs(source) do
+        local id = tostring(player.PrimaryId or player.primary_id or "")
+        local name = tostring(player.Name or player.name or "Unknown")
+        local key = (id == "" or hebnix.is_bot(id)) and ("bot:" .. name) or id
+        if roster[key] then overlap = overlap + 1 end
+    end
+    if had and overlap == 0 then
+        roster = {}
+        roster_seq = 0
+    end
+
+    local seen, arrived = {}, {}
+    for _, player in ipairs(source) do
         local primary_id = tostring(player.PrimaryId or player.primary_id or "")
         local is_bot = primary_id == "" or hebnix.is_bot(primary_id)
-        local request_key = nil
-        if not is_bot then request_key = request_profile(primary_id) end
-        table.insert(updated, {
-            id = primary_id,
-            name = tostring(player.Name or player.name or "Unknown"),
-            team = tonumber(player.TeamNum or player.team_num) or -1,
-            score = tonumber(player.Score or player.score) or 0,
-            shortcut = tonumber(player.Shortcut or player.shortcut),
-            order = index,
-            bot = is_bot,
-            request_key = request_key,
-        })
+        local name = tostring(player.Name or player.name or "Unknown")
+        local key = is_bot and ("bot:" .. name) or primary_id
+        seen[key] = true
+
+        local entry = roster[key]
+        if not entry then
+            roster_seq = roster_seq + 1
+            entry = { order = roster_seq }
+            if not is_bot then entry.request_key = request_profile(primary_id) end
+            roster[key] = entry
+            table.insert(arrived, key)
+        end
+        entry.id = primary_id
+        entry.name = name
+        entry.score = tonumber(player.Score or player.score) or 0
+        entry.shortcut = tonumber(player.Shortcut or player.shortcut)
+        entry.bot = is_bot
+
+        local reported = tonumber(player.TeamNum or player.team_num) or -1
+        if reported == 0 or reported == 1 then
+            entry.team = reported
+            entry.ghost = entry.left or false
+        else
+            entry.ghost = true
+            entry.team = entry.team or -1
+        end
     end
-    players = updated
+
+    for key, entry in pairs(roster) do
+        if not seen[key] then entry.ghost = true end
+    end
+
+    if not matchmade() then
+        for key, entry in pairs(roster) do
+            if entry.ghost then roster[key] = nil end
+        end
+    end
+
+    for _, key in ipairs(arrived) do
+        local arrival = roster[key]
+        if arrival then
+            local oldest, oldest_key = nil, nil
+            for k, e in pairs(roster) do
+                if e.ghost and e.team == arrival.team
+                    and (not oldest or e.order < oldest.order) then
+                    oldest, oldest_key = e, k
+                end
+            end
+            if oldest_key then roster[oldest_key] = nil end
+        end
+    end
+
+    players = {}
+    for _, entry in pairs(roster) do table.insert(players, entry) end
     in_match = #players > 0
 end
 
--- rl orders by team, then score desc, then player id desc
+local function mark_left(event)
+    local data = event and (event.data or event.Data)
+    if type(data) ~= "table" then return end
+    local id = tostring(data.PrimaryId or data.primary_id or "")
+    local name = tostring(data.PlayerName or data.player_name or "")
+    local key = (id == "" or hebnix.is_bot(id)) and ("bot:" .. name) or id
+    local entry = roster[key]
+    if entry then
+        entry.left = true
+        entry.ghost = true
+    end
+end
+
+local function spectating()
+    if not my_id or my_id == "" or #players == 0 then return false end
+    for _, player in ipairs(players) do
+        if player.id == my_id and (player.team == 0 or player.team == 1) then
+            return false
+        end
+    end
+    return true
+end
+
 local function sorted_players()
     local sorted = {}
     for _, player in ipairs(players) do table.insert(sorted, player) end
@@ -207,7 +320,6 @@ local function sorted_players()
     return sorted
 end
 
--- casual and private carry no ranked playlist id, the team sizes do
 local TEAM_SIZE_PLAYLIST = { [1] = 10, [2] = 11, [3] = 13, [4] = 61 }
 
 local function auto_playlist()
@@ -224,31 +336,30 @@ end
 
 local function refresh_playlist()
     if not log_key then
-        hebnix.clear_launch_log() -- the parse is cached, the last match's id would stick
+        hebnix.clear_launch_log()
         log_key = hebnix.parse_launch_log_async(false)
         return
     end
     local info = hebnix.launch_log_result(log_key)
-    if type(info) ~= "table" or type(info.game) ~= "table" then return end
+    if type(info) ~= "table" then return end
+    if type(info.session) == "table" then my_id = info.session.primary_id end
+    if type(info.game) ~= "table" then return end
     current_playlist = tonumber(info.game.playlist_id)
+    offline = info.game.offline == true
     mutators = info.game.mutators or {}
+    freeplay = false
+    for _, tag in ipairs(mutators) do
+        if tag == "Freeplay" then freeplay = true end
+    end
+    mutator_count = math.max(tonumber(info.game.mutator_count) or 0, #mutators)
 end
 
--- these load a mutator package like the rest but never reach the strip
-local OFF_STRIP = { Freeplay = true, MatchCreatorAdminEnabled = true }
-
--- the strip sits right of the board and pushes it left, tournaments always
--- carry one whether or not GameTags names anything
 local function shows_mutator_strip()
     if current_playlist == 34 then return true end
-    for _, tag in ipairs(mutators) do
-        if not OFF_STRIP[tag] then return true end
-    end
-    return false
+    return mutator_count > 0
 end
 
--- black magic, do not touch without a screenshot to compare against
-local function sb_layout(w, h, ui_scale, mutator_shift, blues, oranges, replaying)
+local function sb_layout(w, h, ui_scale, x_offset, mutator_edge, blues, oranges, replay_shift)
     local scale
     if w / h > 1.5 then
         scale = 0.507 * h / SB.board_h
@@ -258,9 +369,14 @@ local function sb_layout(w, h, ui_scale, mutator_shift, blues, oranges, replayin
     local s = scale * ui_scale
 
     local cx = w / 2
+    if mutator_edge > 0 then
+        local strip_cx = w - mutator_edge * s
+        if strip_cx < cx then cx = strip_cx end
+    end
+    cx = cx + x_offset * s
+    cx = cx - replay_shift * s
+
     local cy = h / 2 + SB.y_offcenter * s
-    cx = cx - mutator_shift * s
-    if replaying then cx = cx - SB.skip_tick * s end
 
     local difference = blues - oranges
     local lopsided = (blues == 0) ~= (oranges == 0)
@@ -269,6 +385,9 @@ local function sb_layout(w, h, ui_scale, mutator_shift, blues, oranges, replayin
 
     return {
         scale = s,
+        icon = s,
+        centre = cx,
+        row_half = TIER_H * IMAGE_SCALE * 0.5 * s,
         x = cx + (-SB.left - TIER_W * IMAGE_SCALE) * s,
         div_x = cx + (-SB.left - DIV_W * IMAGE_SCALE) * s,
         blue_y = cy + (-SB.blue_bottom + 6 * (4 - blues) - SB.banner_distance * blues + 9) * s,
@@ -293,7 +412,6 @@ local function division_of(rank)
     return roman and levels[roman] or 0
 end
 
--- rl's own mmr to rank curve, the api returns tier 0 for placements
 local function rank_from_mmr(mmr, playlist_id)
     if playlist_id ~= 10 and playlist_id ~= 11 and playlist_id ~= 13 then return nil end
     local solo = playlist_id == 10
@@ -324,7 +442,6 @@ local function entry_of(stats, playlist_id, calculate_unranked)
     local division = division_of(rank)
     local mmr = math.floor(tonumber(rank.mmr) or 0)
     local unranked = tier == 0
-    -- 600 with no games played is the placeholder the api hands back
     if unranked and calculate_unranked and (mmr ~= 600 or (tonumber(rank.matches_played) or 0) > 0) then
         local guess_tier, guess_div = rank_from_mmr(mmr, playlist_id)
         if guess_tier then
@@ -369,15 +486,15 @@ local function display_rank(stats, wanted, fallback, extras, tournaments, calcul
     return best
 end
 
-local function draw_row(draw, rank, layout, y, show_division, show_playlist, calculate_unranked)
-    local s = layout.scale * IMAGE_SCALE
+local function draw_row(draw, rank, layout, y, show_division, show_playlist, calculate_unranked, paint)
+    local s = layout.icon * IMAGE_SCALE
     local with_division = show_division and rank.division > -1 and rank.tier < 22
     local x = layout.x - (with_division and DIV_W * s or 0)
 
     local tier = math.max(0, math.min(TIER_UNSYNCED, rank.tier))
-    draw.image("assets/tiers/" .. tier .. ".png", x, y, TIER_W * s, TIER_H * s)
+    draw.image("assets/tiers/" .. tier .. ".png", x, y, TIER_W * s, TIER_H * s, paint)
     if rank.unranked and calculate_unranked then
-        draw.image("assets/tiers/0.png", x, y, TIER_W * s * 0.5, TIER_H * s * 0.5)
+        draw.image("assets/tiers/0.png", x, y, TIER_W * s * 0.5, TIER_H * s * 0.5, paint)
     end
 
     if with_division then
@@ -385,7 +502,7 @@ local function draw_row(draw, rank, layout, y, show_division, show_playlist, cal
         for slot = 0, 3 do
             local image = slot <= rank.division and colour or 0
             draw.image("assets/divisions/" .. image .. ".png",
-                layout.div_x, y + (3 - slot) * DIV_STEP * s, DIV_W * s, DIV_H * s)
+                layout.div_x, y + (3 - slot) * DIV_STEP * s, DIV_W * s, DIV_H * s, paint)
         end
     end
 
@@ -393,9 +510,52 @@ local function draw_row(draw, rank, layout, y, show_division, show_playlist, cal
         local entry = playlist_by_id(rank.playlist_id)
         if entry then
             draw.image("assets/playlists/" .. entry.image,
-                x - PLAYLIST_PX * s, y, PLAYLIST_PX * s, PLAYLIST_PX * s)
+                x - PLAYLIST_PX * s, y, PLAYLIST_PX * s, PLAYLIST_PX * s, paint)
         end
     end
+end
+
+local last_layout = nil
+
+local function last_layout_readout()
+    if not last_layout then return "No frame drawn yet, hold the scoreboard once." end
+    return string.format(
+        "%dv%d, %d ghost, %d listed, 1 unit = %.2f px, edge %.0f, blue row1 %.0f%s%s",
+        last_layout.blues or 0, last_layout.oranges or 0,
+        last_layout.ghosts or 0, #players,
+        last_layout.scale, last_layout.x, last_layout.blue_y,
+        last_layout.first_open and " (first open)" or "",
+        last_layout.replay and " (replay)" or "")
+        .. (last_layout.watching and " (spectating)" or "")
+end
+
+local function draw_column_text(draw, x, centre_y, text, cap, s, opacity)
+    local em = cap / SEGOE_CAP * s
+    draw.text(x, centre_y - SEGOE_MID * em, text, {
+        color = string.format("#ffffff%02x", math.floor(opacity * 255 + 0.5)),
+        size = em,
+        halign = "center",
+    })
+end
+
+local function mmr_source_options()
+    local options = { "Match", "Same as icons", "Best", "Casual" }
+    for _, entry in ipairs(PLAYLISTS) do table.insert(options, entry.name) end
+    return options
+end
+
+local function mmr_playlist_for(source, wanted, rank)
+    if source == "Same as icons" then return wanted or rank.playlist_id end
+    if source == "Best" then return rank.playlist_id end
+    if source == "Casual" then return CASUAL_MMR end
+    for _, entry in ipairs(PLAYLISTS) do
+        if entry.name == source then return entry.id end
+    end
+    if current_playlist then
+        if playlist_by_id(current_playlist) then return current_playlist end
+        if current_playlist ~= PRIVATE_PLAYLIST then return CASUAL_MMR end
+    end
+    return auto_playlist() or wanted or rank.playlist_id
 end
 
 local function cycle_mode()
@@ -443,14 +603,29 @@ function plugin.on_unload()
 end
 
 function plugin.on_game_event(event_type, event)
+    local guid = event and (event.match_guid or event.MatchGuid)
+    if guid and guid ~= "" and guid ~= match_guid then
+        match_guid = guid
+        roster = {}
+        roster_seq = 0
+        players = {}
+    end
+
     if event_type == "UpdateState" then
         update_players(event)
+    elseif event_type == "PlayerLeft" then
+        mark_left(event)
     elseif event_type == "MatchCreated" or event_type == "MatchInitialized" then
         in_match = true
         match_ended = false
         current_playlist = nil
+        offline = false
         mutators = {}
+        mutator_count = 0
         log_key = nil
+        roster = {}
+        roster_seq = 0
+        first_tab_pending = true
     elseif event_type == "RoundStarted" or event_type == "CountdownBegin" then
         in_match = true
         match_ended = false
@@ -468,6 +643,17 @@ end
 
 function plugin.on_tick()
     if in_match and not current_playlist then refresh_playlist() end
+
+    if in_match then
+        local held = hebnix.is_action_pressed("scoreboard")
+        if held and not scoreboard_was_held then
+            in_first_open = first_tab_pending
+            first_tab_pending = false
+        elseif not held then
+            in_first_open = false
+        end
+        scoreboard_was_held = held
+    end
 
     local cycle_bind = hebnix.get_string("ingame_rank_cycle_bind", "")
     if cycle_bind ~= "" and not capture_target then
@@ -500,15 +686,35 @@ function plugin.on_tick()
 end
 
 function plugin.on_overlay(draw, w, h)
-    if not in_match or match_ended or #players == 0 then return end
-    if not hebnix.is_action_pressed("scoreboard") then return end
+    if not in_match or match_ended or #players == 0 or freeplay then return end
+
+    local held = hebnix.is_action_pressed("scoreboard")
+    local opacity = 1.0
+    if held then
+        was_drawing = true
+        fade_from = nil
+        shown_first_open = in_first_open
+    else
+        if was_drawing then
+            was_drawing = false
+            fade_from = hebnix.monotonic_seconds()
+        end
+        if not fade_from then return end
+        local elapsed = hebnix.monotonic_seconds() - fade_from
+        if elapsed >= FADE_SECONDS then
+            fade_from = nil
+            return
+        end
+        opacity = 1.0 - elapsed / FADE_SECONDS
+    end
+    local paint = { opacity = opacity }
 
     local extras = hebnix.get_bool("ingame_rank_extras", false)
     local tournaments = hebnix.get_bool("ingame_rank_tournaments", false)
     local show_division = hebnix.get_bool("ingame_rank_show_division", false)
     local show_playlist = hebnix.get_bool("ingame_rank_show_playlist", true)
     local calculate_unranked = hebnix.get_bool("ingame_rank_calculate_unranked", true)
-    local ui_scale = hebnix.get_number("ingame_rank_interface_scale", 100) / 100
+    local ui_scale = (hebnix.ui_scale and hebnix.ui_scale() or 1.0)
         * hebnix.get_number("ingame_rank_display_scale", 100) / 100
 
     local wanted, fallback = nil, false
@@ -522,23 +728,60 @@ function plugin.on_overlay(draw, w, h)
     end
 
     local list = sorted_players()
-    local blues, oranges = 0, 0
+    local blues, oranges, ghosts = 0, 0, 0
     for _, player in ipairs(list) do
-        if player.team == 0 then blues = blues + 1 else oranges = oranges + 1 end
+        if player.team == 0 then
+            blues = blues + 1
+        elseif player.team == 1 then
+            oranges = oranges + 1
+        end
+        if player.ghost then ghosts = ghosts + 1 end
     end
 
-    local mutator_shift = shows_mutator_strip()
-        and hebnix.get_number("ingame_rank_mutator_shift", MUTATOR_SHIFT) or 0
-    local layout = sb_layout(w, h, ui_scale, mutator_shift, blues, oranges, in_replay)
-    local x_nudge = hebnix.get_number("ingame_rank_x_nudge", 0) * layout.scale
+    local watching = spectating()
+    local mutator_edge = shows_mutator_strip()
+        and hebnix.get_number("ingame_rank_mutator_edge", MUTATOR_EDGE) or 0
+    local x_offset = shown_first_open
+        and hebnix.get_number("ingame_rank_x_offset_first", X_OFFSET_FIRST)
+        or hebnix.get_number("ingame_rank_x_offset", X_OFFSET)
+    local replay_shift = in_replay
+        and hebnix.get_number("ingame_rank_replay_shift", REPLAY_SHIFT) or 0
+    local layout = sb_layout(w, h, ui_scale, x_offset, mutator_edge, blues, oranges, replay_shift)
     local y_nudge = hebnix.get_number("ingame_rank_y_nudge", 0) * layout.scale
-    layout.x = layout.x + x_nudge
-    layout.div_x = layout.div_x + x_nudge
+    layout.first_open = shown_first_open
+    layout.replay = in_replay
+    layout.blues = blues
+    layout.oranges = oranges
+    layout.ghosts = ghosts
+    layout.watching = watching
+    last_layout = layout
+
+    local show_mmr = hebnix.get_bool("ingame_rank_show_mmr", true)
+    local mmr_source = hebnix.get_string("ingame_rank_mmr_source", "Match")
+    local mmr_x = layout.centre
+        + hebnix.get_number("ingame_rank_mmr_x", MMR_COL) * layout.scale
+    if show_mmr then
+        local head_y = MMR_HEADER_DY * layout.scale + layout.row_half
+        if blues > 0 then
+            draw_column_text(draw, mmr_x, layout.blue_y + head_y, "MMR",
+                HEADER_CAP, layout.scale, opacity)
+        end
+        if oranges > 0 then
+            draw_column_text(draw, mmr_x, layout.orange_y + head_y, "MMR",
+                HEADER_CAP, layout.scale, opacity)
+        end
+    end
 
     local blue_row, orange_row = -1, -1
     for _, player in ipairs(list) do
-        if player.team == 0 then blue_row = blue_row + 1 else orange_row = orange_row + 1 end
-        if not player.bot and player.team <= 1 then
+        if player.team == 0 then
+            blue_row = blue_row + 1
+        elseif player.team == 1 then
+            orange_row = orange_row + 1
+        else
+            goto continue
+        end
+        if not player.bot and not player.ghost then
             local y = y_nudge + (player.team == 0
                 and layout.blue_y + layout.separation * blue_row
                 or layout.orange_y + layout.separation * orange_row)
@@ -548,10 +791,24 @@ function plugin.on_overlay(draw, w, h)
             if type(stats) == "table" and not stats.error then
                 rank = display_rank(stats, wanted, fallback, extras, tournaments, calculate_unranked)
             end
-            -- the icon only earns its place when the row is not the asked playlist
             draw_row(draw, rank, layout, y, show_division,
-                show_playlist and rank.playlist_id ~= wanted, calculate_unranked)
+                show_playlist and rank.playlist_id ~= wanted, calculate_unranked, paint)
+
+            if show_mmr and type(stats) == "table" and not stats.error then
+                local mmr_rank = rank
+                if mmr_source == "Best" and wanted then
+                    mmr_rank = display_rank(stats, nil, true, extras, tournaments,
+                        calculate_unranked)
+                end
+                local entry = rank_for(stats, mmr_playlist_for(mmr_source, wanted, mmr_rank))
+                local mmr = entry and math.floor(tonumber(entry.mmr) or 0)
+                if mmr and mmr > 0 then
+                    draw_column_text(draw, mmr_x, y + layout.row_half, tostring(mmr),
+                        VALUE_CAP, layout.scale, opacity)
+                end
+            end
         end
+        ::continue::
     end
 end
 
@@ -570,16 +827,30 @@ function plugin.on_settings(ui)
     ui.checkbox("ingame_rank_show_playlist", "Show playlist icon on Best", true)
     ui.space(8)
 
+    ui.heading("MMR column")
+    ui.checkbox("ingame_rank_show_mmr", "Show the MMR column", true)
+    ui.combo_box("ingame_rank_mmr_source", "MMR shown", mmr_source_options())
+    ui.label("Match reads casual in casual and the mode's own MMR in competitive.")
+    ui.label("Same as icons follows the rank shown above, Best its highest playlist.")
+    ui.space(8)
+
     ui.collapsing("Advanced alignment", function(ui)
-        ui.label("Mutators: " .. (#mutators > 0 and table.concat(mutators, ", ") or "none")
-            .. (shows_mutator_strip() and " (board shifted)" or ""))
-        ui.label("Match these to Rocket League's Interface and Display Scale sliders.")
-        ui.slider("ingame_rank_interface_scale", "Interface scale", 50, 100, 100)
+        ui.label("Mutators: " .. mutator_count
+            .. (#mutators > 0 and " (" .. table.concat(mutators, ", ") .. ")" or "")
+            .. (shows_mutator_strip() and ", board shifted" or ""))
+        ui.label("Display scale has no home in the save, match it to the game.")
+        ui.label(string.format("Interface scale: %.2f, read from the save",
+            hebnix.ui_scale and hebnix.ui_scale() or 1.0))
         ui.slider("ingame_rank_display_scale", "Display scale", 90, 100, 100)
         ui.label("Below are 1080p pixels, they scale with the resolution.")
-        ui.slider("ingame_rank_mutator_shift", "Mutator board shift", 0, 250, MUTATOR_SHIFT)
-        ui.slider("ingame_rank_x_nudge", "X nudge", -100, 100, 0)
+        ui.label("Set X offset in a plain match first, the strip edge only bites when it overlaps.")
+        ui.slider("ingame_rank_x_offset", "X offset", -250, 250, X_OFFSET)
+        ui.slider("ingame_rank_x_offset_first", "X offset, first tab", -250, 250, X_OFFSET_FIRST)
+        ui.slider("ingame_rank_mutator_edge", "Mutator strip edge", 800, 1300, MUTATOR_EDGE)
+        ui.slider("ingame_rank_replay_shift", "Replay board shift", -250, 250, REPLAY_SHIFT)
         ui.slider("ingame_rank_y_nudge", "Y nudge", -100, 100, 0)
+        ui.slider("ingame_rank_mmr_x", "MMR column", -400, 100, MMR_COL)
+        ui.label(last_layout_readout())
     end)
     ui.space(8)
 

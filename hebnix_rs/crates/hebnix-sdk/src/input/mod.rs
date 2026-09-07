@@ -15,6 +15,8 @@ pub use dinput::{
     DINPUT_BUTTONS, Layout as DInputLayout, PsGen, current_dinput_layout, current_ps_gen,
     get_dinput_inputs, get_dinput_raw_inputs, is_dinput_connected, is_dinput_raw_pressed,
 };
-pub use game_actions::{action_binds, chat_channel_bind, clear_action_bind_cache, is_action_pressed};
+pub use game_actions::{
+    action_binds, chat_channel_bind, clear_action_bind_cache, is_action_pressed, ui_scale,
+};
 pub use keyboard::{detect_hotkey, is_key_pressed, tap_key, type_text, type_text_while};
 pub use xinput::{XINPUT_BUTTON_DISPLAY, XInputState, get_xinput_state};

@@ -1005,17 +1005,70 @@ mod tests {
 
         // Wii is not a tracker platform so no fetch goes out. on_overlay stops at
         // the scoreboard bind here, nothing holds it during a test run.
+        // every bot shares the id "unknown", they have to stay separate rows.
         mgr.dispatch_simple(
             "UpdateState",
             serde_json::json!({
                 "Players": [
                     { "Name": "A", "PrimaryId": "Wii|1|0", "TeamNum": 0, "Score": 100, "Shortcut": 7 },
+                    { "Name": "Bot1", "PrimaryId": "unknown", "TeamNum": 0, "Score": 50, "Shortcut": 1 },
+                    { "Name": "Bot2", "PrimaryId": "unknown", "TeamNum": 1, "Score": 20, "Shortcut": 2 },
                     { "Name": "B", "PrimaryId": "Wii|2|0", "TeamNum": 1, "Score": 0, "Shortcut": 9 }
                 ]
             }),
         );
         mgr.render_overlay_gdi("ingame_rank", 1920.0, 1080.0)
             .expect("on_overlay must not error");
+
+        // PlayerLeft is the signal, his row stays with the score he had
+        mgr.dispatch_simple(
+            "PlayerLeft",
+            serde_json::json!({
+                "PlayerName": "B",
+                "PrimaryId": "Wii|2|0"
+            }),
+        );
+        mgr.render_overlay_gdi("ingame_rank", 1920.0, 1080.0)
+            .expect("on_overlay must not error after PlayerLeft");
+
+        // he can still be listed afterwards, with TeamNum above 1
+        mgr.dispatch_simple(
+            "UpdateState",
+            serde_json::json!({
+                "Players": [
+                    { "Name": "A", "PrimaryId": "Wii|1|0", "TeamNum": 0, "Score": 100, "Shortcut": 7 },
+                    { "Name": "B", "PrimaryId": "Wii|2|0", "TeamNum": 255, "Score": 0, "Shortcut": 9 }
+                ]
+            }),
+        );
+        mgr.render_overlay_gdi("ingame_rank", 1920.0, 1080.0)
+            .expect("on_overlay must not error with a ghost");
+
+        // and the same when he drops off the list entirely
+        mgr.dispatch_simple(
+            "UpdateState",
+            serde_json::json!({
+                "Players": [
+                    { "Name": "A", "PrimaryId": "Wii|1|0", "TeamNum": 0, "Score": 100, "Shortcut": 7 }
+                ]
+            }),
+        );
+        mgr.render_overlay_gdi("ingame_rank", 1920.0, 1080.0)
+            .expect("on_overlay must not error with a dropped player");
+
+        // a fresh set of players is a new board, last match's ghosts must not
+        // survive it and inflate the team counts
+        mgr.dispatch_simple(
+            "UpdateState",
+            serde_json::json!({
+                "Players": [
+                    { "Name": "C", "PrimaryId": "Wii|3|0", "TeamNum": 0, "Score": 0, "Shortcut": 3 },
+                    { "Name": "D", "PrimaryId": "Wii|4|0", "TeamNum": 1, "Score": 0, "Shortcut": 4 }
+                ]
+            }),
+        );
+        mgr.render_overlay_gdi("ingame_rank", 1920.0, 1080.0)
+            .expect("on_overlay must not error after a full turnover");
 
         mgr.dispatch_simple("GameLeft", serde_json::json!({}));
         mgr.dispatch_tick();
