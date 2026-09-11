@@ -1,5 +1,5 @@
 name = "InGameRank"
 author = "nixvio64"
-version = "4.0.0"
+version = "4.0.1"
 entry = "main.lua"
 plugin_id = "0a4a31d91686afc7a5fc1a564f5abc60"
