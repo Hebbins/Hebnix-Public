@@ -1,6 +1,16 @@
+use crossbeam_channel::Sender;
 use hebnix_sdk::save_file::WindowMode;
 use hebnix_sdk::stats::StatsEvent;
 use serde_json::Value;
+
+pub fn block_item_action_if_game_running(tx: &Sender<AppMsg>) -> bool {
+    if hebnix_sdk::process::is_rocket_league_running() {
+        let _ = tx.send(AppMsg::ItemActionBlocked);
+        true
+    } else {
+        false
+    }
+}
 
 #[derive(Debug)]
 pub enum AppMsg {
@@ -23,6 +33,11 @@ pub enum AppMsg {
     HotkeyCaptured(Option<String>),
     // should the main window be topmost (RL or hebnix focused)
     Topmost(bool),
+    ItemActionBlocked,
+    ReloadCatalogs,
+    CatalogsFetched {
+        result: Result<std::collections::HashMap<String, Value>, String>,
+    },
     WorkshopCatalog(Result<Vec<Value>, String>),
     WorkshopImage {
         key: String,

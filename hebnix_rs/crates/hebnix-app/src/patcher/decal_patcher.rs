@@ -12,8 +12,6 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::messages::AppMsg;
-
-const SKINS_CATALOG: &str = include_str!("../../assets/catalogs/skins.json");
 use crate::patch_core::upk;
 
 // UPK magic constant
@@ -1791,6 +1789,8 @@ pub struct DecalPatcherState {
     pub selected_skin_id: Option<String>,
     pub selected_decal_name: Option<String>,
     pub catalog_error: Option<String>,
+    bodies_catalog: Option<Value>,
+    skins_catalog: Option<Value>,
     local_tx: crossbeam_channel::Sender<DecalOp>,
     local_rx: crossbeam_channel::Receiver<DecalOp>,
 }
@@ -2394,7 +2394,7 @@ impl DecalPatcherState {
 
         let (local_tx, local_rx) = crossbeam_channel::unbounded();
 
-        let mut state = Self {
+        let state = Self {
             base_dir: base_dir.to_path_buf(),
             decals_dir,
             decals: Vec::new(),
@@ -2413,13 +2413,13 @@ impl DecalPatcherState {
             selected_skin_id: None,
             selected_decal_name: None,
             catalog_error: None,
+            bodies_catalog: None,
+            skins_catalog: None,
             skin_dropdown_filter: String::new(),
             local_tx,
             local_rx,
         };
 
-        state.load_car_skins();
-        state.refresh_decals();
         state
     }
 
@@ -2455,33 +2455,43 @@ impl DecalPatcherState {
             .unwrap_or_else(|| active_key.to_string())
     }
 
-    pub fn load_car_skins(&mut self) {
-        self.car_skins.clear();
+    pub fn set_catalogs(&mut self, skins: Value, bodies: Value) -> Result<(), String> {
+        self.skins_catalog = Some(skins);
+        self.bodies_catalog = Some(bodies);
+        self.load_car_skins();
+        if let Some(error) = self.catalog_error.clone() {
+            return Err(error);
+        }
+        self.refresh_decals();
+        Ok(())
+    }
+
+    fn load_car_skins(&mut self) {
         self.catalog_error = None;
 
-        let json: Value = match serde_json::from_str(SKINS_CATALOG) {
-            Ok(j) => j,
-            Err(e) => {
-                self.catalog_error = Some(format!("Failed to parse skins.json: {}", e));
-                return;
-            }
+        let Some(json) = self.skins_catalog.as_ref() else {
+            self.car_skins.clear();
+            self.catalog_error = Some("The skins catalog has not been downloaded".to_string());
+            return;
         };
 
         let cars = match json.get("cars").and_then(|v| v.as_object()) {
             Some(c) => c,
             None => {
+                self.car_skins.clear();
                 self.catalog_error = Some("No 'cars' object found in skins.json".to_string());
                 return;
             }
         };
 
+        let mut car_skins = Vec::new();
         for (car_key, car_data) in cars {
             let skins = match car_data.get("skins").and_then(|v| v.as_array()) {
                 Some(s) => s,
                 None => continue,
             };
 
-            let car_name = self.format_car_name(car_key);
+            let car_name = Self::format_car_name(car_key);
             let mut skin_list = Vec::new();
 
             for skin in skins {
@@ -2501,7 +2511,7 @@ impl DecalPatcherState {
             }
 
             if !skin_list.is_empty() {
-                self.car_skins.push(CarSkinInfo {
+                car_skins.push(CarSkinInfo {
                     car_key: car_key.to_string(),
                     car_name,
                     skins: skin_list,
@@ -2509,13 +2519,14 @@ impl DecalPatcherState {
             }
         }
 
-        self.car_skins.sort_by(|a, b| a.car_name.cmp(&b.car_name));
+        car_skins.sort_by(|a, b| a.car_name.cmp(&b.car_name));
+        self.car_skins = car_skins;
         if !self.car_skins.is_empty() {
             self.catalog_error = None;
         }
     }
 
-    fn format_car_name(&self, raw: &str) -> String {
+    fn format_car_name(raw: &str) -> String {
         raw.split('_')
             .map(|w| {
                 let mut c = w.chars();
@@ -2682,32 +2693,25 @@ impl DecalPatcherState {
     }
 
     fn load_bodies_catalog(&self) -> Option<Value> {
-        for path in [
-            self.base_dir.join("bodies.json"),
-            self.base_dir.join("assets/catalogs/bodies.json"),
-        ] {
-            if let Ok(data) = fs::read_to_string(path) {
-                if let Ok(json) = serde_json::from_str(&data) {
-                    return Some(json);
-                }
-            }
-        }
-        serde_json::from_str(include_str!("../../assets/catalogs/bodies.json")).ok()
+        self.bodies_catalog.clone()
     }
 
     fn lookup_skin_name(&self, skin_id: i32) -> Option<String> {
-        if let Ok(json) = serde_json::from_str::<Value>(SKINS_CATALOG) {
-            if let Some(cars) = json.get("cars").and_then(|v| v.as_object()) {
-                for car_data in cars.values() {
-                    if let Some(skins) = car_data.get("skins").and_then(|v| v.as_array()) {
-                        for skin in skins {
-                            if let Some(id) = skin.get("id").and_then(|v| v.as_str()) {
-                                if id == skin_id.to_string() {
-                                    return skin
-                                        .get("name")
-                                        .and_then(|v| v.as_str())
-                                        .map(|s| s.to_string());
-                                }
+        if let Some(cars) = self
+            .skins_catalog
+            .as_ref()
+            .and_then(|json| json.get("cars"))
+            .and_then(Value::as_object)
+        {
+            for car_data in cars.values() {
+                if let Some(skins) = car_data.get("skins").and_then(|v| v.as_array()) {
+                    for skin in skins {
+                        if let Some(id) = skin.get("id").and_then(|v| v.as_str()) {
+                            if id == skin_id.to_string() {
+                                return skin
+                                    .get("name")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string());
                             }
                         }
                     }
@@ -2754,6 +2758,9 @@ impl DecalPatcherState {
         tx: &Sender<AppMsg>,
         ctx: &egui::Context,
     ) -> Result<(), String> {
+        if crate::messages::block_item_action_if_game_running(tx) {
+            return Ok(());
+        }
         self.validate_key_file()?;
 
         let decal_name_owned = decal_name.to_string();
@@ -2948,9 +2955,12 @@ impl DecalPatcherState {
         skin_id: &str,
         cooked_pc: &Path,
         backups_dir: &Path,
-        _tx: &Sender<AppMsg>,
+        tx: &Sender<AppMsg>,
         ctx: &egui::Context,
     ) -> Result<(), String> {
+        if crate::messages::block_item_action_if_game_running(tx) {
+            return Ok(());
+        }
         let active_key = format!("{}|{}", car_key, skin_id);
         let decal_name = self
             .active_decals
@@ -3006,9 +3016,12 @@ impl DecalPatcherState {
         &mut self,
         cooked_pc: &Path,
         backups_dir: &Path,
-        _tx: &Sender<AppMsg>,
+        tx: &Sender<AppMsg>,
         ctx: &egui::Context,
     ) -> Result<(), String> {
+        if crate::messages::block_item_action_if_game_running(tx) {
+            return Ok(());
+        }
         let mut target_candidates = HashSet::new();
         for active_key in self.active_decals.keys() {
             let Some((car_key, skin_id)) = active_key.split_once('|') else {
@@ -3208,7 +3221,7 @@ impl DecalPatcherState {
             );
             ui.add_space(8.0);
             if ui.button("Retry Loading Catalog").clicked() {
-                self.load_car_skins();
+                let _ = tx.send(AppMsg::ReloadCatalogs);
             }
             ui.add_space(8.0);
         }
@@ -3223,7 +3236,6 @@ impl DecalPatcherState {
                     .clicked()
                 {
                     self.refresh_decals();
-                    self.load_car_skins();
                     let _ = tx.send(AppMsg::Log("[Decals] Decal list refreshed.".to_string()));
                 }
                 let has_active = !self.active_decals.is_empty();
