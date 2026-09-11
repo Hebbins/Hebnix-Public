@@ -124,7 +124,7 @@ impl TrackerClient {
         );
         let response = match ureq::get(&url)
             .set("Accept", "application/json")
-            .set("User-Agent", "Hebnix/2.1.6")
+            .set("User-Agent", "Hebnix/2.1.7")
             .timeout(self.timeout)
             .call()
         {

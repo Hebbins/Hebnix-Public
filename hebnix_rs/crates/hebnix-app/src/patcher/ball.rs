@@ -167,6 +167,9 @@ impl PatcherState {
         tx: &Sender<AppMsg>,
         ctx: &egui::Context,
     ) {
+        if crate::messages::block_item_action_if_game_running(tx) {
+            return;
+        }
         self.processing_target = Some("Global_Restore".to_string());
 
         let cooked_pc_clone = cooked_pc.to_path_buf();
@@ -357,6 +360,9 @@ impl PatcherState {
         tx: &Sender<AppMsg>,
         ctx: &egui::Context,
     ) {
+        if crate::messages::block_item_action_if_game_running(tx) {
+            return;
+        }
         self.processing_target = Some(ball.name.clone());
         let ball_name = ball.name.clone();
         let upk_clone = upk_path.to_path_buf();
@@ -646,7 +652,7 @@ impl PatcherState {
                     return;
                 }
 
-                const PAGE_SIZE: usize = 20;
+                const PAGE_SIZE: usize = 16;
                 let pages = filtered.len().div_ceil(PAGE_SIZE).max(1);
                 self.page = self.page.min(pages - 1);
                 ui.horizontal(|ui| {
@@ -666,8 +672,8 @@ impl PatcherState {
                 });
                 let start = self.page * PAGE_SIZE;
                 let visible: Vec<_> = filtered.into_iter().skip(start).take(PAGE_SIZE).collect();
-                for row in visible.chunks(5) {
-                    ui.columns(5, |columns| {
+                for row in visible.chunks(4) {
+                    ui.columns(4, |columns| {
                         for (column, ball) in row.iter().enumerate() {
                             egui::Frame::group(columns[column].style()).show(
                                 &mut columns[column],

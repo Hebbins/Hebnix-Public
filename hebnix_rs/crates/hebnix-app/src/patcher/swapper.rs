@@ -185,16 +185,8 @@ fn shorten_for_card(text: &str) -> String {
     }
 }
 
-/// A decal name on its own is ambiguous: multiple cars can have the same
-/// skin label. Keep the car in every selection label and retain the UPK as a
-/// final disambiguator when the catalogue has duplicate display names.
-fn item_label(category: SwapCategory, item: &SwapItem) -> String {
-    if category == SwapCategory::Skins {
-        let car = item.car_name.as_deref().unwrap_or("Unknown car");
-        format!("{car} · {}", item.name)
-    } else {
-        item.name.clone()
-    }
+fn item_label(_category: SwapCategory, item: &SwapItem) -> String {
+    item.name.clone()
 }
 
 pub struct SwapperState {
@@ -215,7 +207,7 @@ pub struct SwapperState {
 
 impl SwapperState {
     pub fn new(base_dir: &Path) -> Self {
-        let mut state = Self {
+        Self {
             base_dir: base_dir.to_path_buf(),
             catalogs: HashMap::new(),
             errors: HashMap::new(),
@@ -229,9 +221,7 @@ impl SwapperState {
             view_patched: false,
             owned_only: false,
             thumbnails: HashMap::new(),
-        };
-        state.refresh_catalogs();
-        state
+        }
     }
 
     pub fn owned_only(&self) -> bool {
@@ -242,64 +232,30 @@ impl SwapperState {
         self.owned_only = enabled;
     }
 
-    fn catalog_path(&self, category: SwapCategory) -> Option<PathBuf> {
-        let regular = self.base_dir.join(format!("{}.json", category.slug()));
-        regular.is_file().then_some(regular)
-    }
-
-    fn embedded_catalog(category: SwapCategory) -> &'static str {
-        match category {
-            SwapCategory::Antennas => include_str!("../../assets/catalogs/antennas.json"),
-            SwapCategory::Anthems => include_str!("../../assets/catalogs/anthems.json"),
-            SwapCategory::Borders => include_str!("../../assets/catalogs/borders.json"),
-            SwapCategory::Bodies => include_str!("../../assets/catalogs/bodies.json"),
-            SwapCategory::Boosts => include_str!("../../assets/catalogs/boosts.json"),
-            SwapCategory::Engines => include_str!("../../assets/catalogs/engines.json"),
-            SwapCategory::Goals => include_str!("../../assets/catalogs/goals.json"),
-            SwapCategory::Finishes => include_str!("../../assets/catalogs/finishes.json"),
-            SwapCategory::Banners => include_str!("../../assets/catalogs/banners.json"),
-            SwapCategory::Skins => include_str!("../../assets/catalogs/skins.json"),
-            SwapCategory::Toppers => include_str!("../../assets/catalogs/toppers.json"),
-            SwapCategory::Trails => include_str!("../../assets/catalogs/trails.json"),
-            SwapCategory::Wheels => include_str!("../../assets/catalogs/wheels.json"),
+    pub fn set_catalogs(&mut self, catalogs: &HashMap<String, Value>) -> Result<(), String> {
+        let bodies = catalogs
+            .get(SwapCategory::Bodies.slug())
+            .ok_or_else(|| "The bodies catalog was not downloaded".to_string())?;
+        let mut parsed = HashMap::new();
+        for category in SwapCategory::ALL {
+            let root = catalogs
+                .get(category.slug())
+                .ok_or_else(|| format!("The {} catalog was not downloaded", category.slug()))?;
+            parsed.insert(category, Self::parse_catalog(category, root, bodies)?);
         }
-    }
-
-    pub fn refresh_catalogs(&mut self) {
-        self.catalogs.clear();
+        self.catalogs = parsed;
         self.errors.clear();
         self.thumbnails.clear();
-        for category in SwapCategory::ALL {
-            match self.load_catalog(category) {
-                Ok(items) => {
-                    self.catalogs.insert(category, items);
-                }
-                Err(error) => {
-                    self.errors.insert(category, error);
-                }
-            }
-        }
+        Ok(())
     }
 
-    fn load_catalog(&self, category: SwapCategory) -> Result<Vec<SwapItem>, String> {
-        let external = self.catalog_path(category);
-        let (bytes, source) = if let Some(path) = external {
-            (
-                fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?,
-                path.display().to_string(),
-            )
-        } else {
-            (
-                Self::embedded_catalog(category).as_bytes().to_vec(),
-                format!("embedded {} catalog", category.label()),
-            )
-        };
-        let root: Value = serde_json::from_slice(&bytes)
-            .map_err(|error| format!("Failed to parse {source}: {error}"))?;
+    fn parse_catalog(
+        category: SwapCategory,
+        root: &Value,
+        bodies: &Value,
+    ) -> Result<Vec<SwapItem>, String> {
         let mut items = Vec::new();
         if category == SwapCategory::Skins {
-            let bodies: Value = serde_json::from_str(Self::embedded_catalog(SwapCategory::Bodies))
-                .unwrap_or_default();
             let body_ids = bodies
                 .get("bodies")
                 .and_then(Value::as_array)
@@ -348,7 +304,10 @@ impl SwapperState {
                 .cmp(&b.name.to_ascii_lowercase())
         });
         if items.is_empty() {
-            Err(format!("No swappable UPKs found in {source}"))
+            Err(format!(
+                "No swappable UPKs found in the {} API catalog",
+                category.slug()
+            ))
         } else {
             Ok(items)
         }
@@ -694,7 +653,11 @@ impl SwapperState {
         &mut self,
         cooked_pc: &Path,
         backups_dir: &Path,
+        tx: &Sender<AppMsg>,
     ) -> Result<usize, String> {
+        if crate::messages::block_item_action_if_game_running(tx) {
+            return Ok(0);
+        }
         self.load_active(backups_dir);
         let targets = self
             .active
@@ -727,8 +690,8 @@ impl SwapperState {
             .into();
         let active = self.active.clone();
         let mut restore = None;
-        for row in active.chunks(5) {
-            ui.columns(5, |columns| {
+        for row in active.chunks(4) {
+            ui.columns(4, |columns| {
                 for (column, swap) in row.iter().enumerate() {
                     let category = SwapCategory::ALL
                         .into_iter()
@@ -825,6 +788,9 @@ impl SwapperState {
             ui.add_space(6.0);
         }
         if let Some(target) = restore {
+            if crate::messages::block_item_action_if_game_running(tx) {
+                return;
+            }
             match self.restore_swap(&target, cooked_pc, backups_dir) {
                 Ok(()) => {
                     let _ = tx.send(AppMsg::Log(format!("[Swapper] Restored {target}")));
@@ -850,11 +816,14 @@ impl SwapperState {
         ui.horizontal(|ui| {
             ui.heading(category.label());
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Refresh").clicked() {
-                    self.refresh_catalogs();
+                if ui.button("Reload Catalogs").clicked() {
+                    let _ = tx.send(AppMsg::ReloadCatalogs);
                     self.load_active(backups_dir);
                 }
                 if ui.button("Restore All").clicked() {
+                    if crate::messages::block_item_action_if_game_running(tx) {
+                        return;
+                    }
                     match self.restore_all(category, cooked_pc, backups_dir) {
                         Ok(count) => {
                             let _ = tx.send(AppMsg::Log(format!(
@@ -948,19 +917,28 @@ impl SwapperState {
             }) {
                 self.selected_car = None;
             }
+            if self.selected_car.is_none() {
+                self.selected_car = cars
+                    .iter()
+                    .find(|car| car_allowed(car))
+                    .map(|car| car.0.clone());
+            }
             let selected_text = self
                 .selected_car
                 .as_ref()
                 .and_then(|selected| cars.iter().find(|car| &car.0 == selected))
                 .map(|car| car.1.as_str())
-                .unwrap_or("All cars");
+                .unwrap_or("Select car...");
+            let previous_car = self.selected_car.clone();
             ui.horizontal(|ui| {
                 ui.strong("Car:");
                 egui::ComboBox::from_id_salt("swapper_decal_car")
                     .width(280.0)
                     .height(320.0)
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
                     .selected_text(selected_text)
                     .show_ui(ui, |ui| {
+                        ui.set_min_height(300.0);
                         ui.horizontal(|ui| {
                             ui.label("Filter:");
                             ui.add(
@@ -973,7 +951,6 @@ impl SwapperState {
                             }
                         });
                         ui.separator();
-                        ui.selectable_value(&mut self.selected_car, None, "All cars");
                         let query = self.car_search.trim().to_ascii_lowercase();
                         for (key, name, id) in &cars {
                             if (!self.owned_only || id.is_some_and(|id| owned_ids.contains(&id)))
@@ -988,6 +965,9 @@ impl SwapperState {
                         }
                     });
             });
+            if self.selected_car != previous_car {
+                self.page.insert(category, 0);
+            }
             ui.add_space(6.0);
         }
         let query = self
@@ -1009,7 +989,7 @@ impl SwapperState {
                     || self
                         .selected_car
                         .as_ref()
-                        .is_none_or(|car| item.car_key.as_ref() == Some(car));
+                        .is_some_and(|car| item.car_key.as_ref() == Some(car));
                 let is_applied = self.active.iter().any(|swap| {
                     swap.category == category.slug()
                         && swap.source_upk.eq_ignore_ascii_case(&item.upk)
@@ -1029,7 +1009,7 @@ impl SwapperState {
             return owned_filter_requested;
         }
 
-        const PAGE_SIZE: usize = 20;
+        const PAGE_SIZE: usize = 16;
         let total_pages = filtered.len().div_ceil(PAGE_SIZE).max(1);
         let page = self.page.entry(category).or_insert(0);
         *page = (*page).min(total_pages - 1);
@@ -1081,8 +1061,8 @@ impl SwapperState {
             .id_salt(("swapper_grid", category))
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                for row in visible.chunks(5) {
-                    ui.columns(5, |columns| {
+                for row in visible.chunks(4) {
+                    ui.columns(4, |columns| {
                         for (column, &source_index) in row.iter().enumerate() {
                             let source = &items[source_index];
                             let key =
@@ -1097,8 +1077,13 @@ impl SwapperState {
                                     .and_then(Clone::clone)
                             });
                             let target_index = self.target_index.entry(key.clone()).or_insert(0);
+                            let selected_car = self.selected_car.clone();
                             let target_allowed = |target: &SwapItem| {
                                 swap_compatible(category, source, target)
+                                    && (category != SwapCategory::Skins
+                                        || selected_car.as_ref().is_some_and(|car| {
+                                            target.car_key.as_ref() == Some(car)
+                                        }))
                                     && (!self.owned_only
                                         || target
                                             .product_id
@@ -1160,6 +1145,7 @@ impl SwapperState {
                                             .show_ui(
                                                 ui,
                                                 |ui| {
+                                                    ui.set_min_height(280.0);
                                                     let target_filter = self
                                                         .target_search
                                                         .entry(key.clone())
@@ -1184,13 +1170,7 @@ impl SwapperState {
                                                         .iter()
                                                         .enumerate()
                                                         .filter(|(_, item)| {
-                                                            swap_compatible(category, source, item)
-                                                                && (!self.owned_only
-                                                                    || item.product_id.is_some_and(
-                                                                        |id| {
-                                                                            owned_ids.contains(&id)
-                                                                        },
-                                                                    ))
+                                                            target_allowed(item)
                                                                 && (target_query.is_empty()
                                                                     || item_label(category, item)
                                                                         .to_ascii_lowercase()
@@ -1255,6 +1235,9 @@ impl SwapperState {
                 }
             });
         if let Some((source_index, target_index, restoring)) = action {
+            if crate::messages::block_item_action_if_game_running(tx) {
+                return owned_filter_requested;
+            }
             let source = items[source_index].clone();
             let target = items[target_index].clone();
             let result = if restoring {

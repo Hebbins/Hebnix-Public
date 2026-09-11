@@ -34,6 +34,7 @@ pub struct SettingsCfg {
     /// main window bg opacity (0.5-1.0)
     pub window_opacity: f32,
     pub start_in_tray: bool,
+    pub close_to_tray: bool,
     pub rl_path: String,
     pub rl_path_confirmed: bool,
     pub statsapi_path: String,
@@ -53,6 +54,7 @@ impl Default for SettingsCfg {
             theme: "Dark".to_string(),
             window_opacity: 0.96,
             start_in_tray: false,
+            close_to_tray: false,
             rl_path: DEFAULT_RL_PATH.to_string(),
             rl_path_confirmed: false,
             statsapi_path: DEFAULT_STATSAPI_PATH.to_string(),

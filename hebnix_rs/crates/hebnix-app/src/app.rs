@@ -25,7 +25,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.6";
+pub const APP_VERSION: &str = "2.1.7";
 
 pub const DEFAULT_WIDTH: f32 = 1000.0;
 pub const DEFAULT_HEIGHT: f32 = 600.0;
@@ -164,11 +164,54 @@ impl TitleCatalogEntry {
     }
 }
 
-fn embedded_titles() -> Vec<TitleCatalogEntry> {
-    serde_json::from_str::<serde_json::Value>(include_str!("../assets/catalogs/titles.json"))
-        .ok()
-        .and_then(|root| serde_json::from_value(root.get("titles")?.clone()).ok())
-        .unwrap_or_default()
+const CATALOG_NAMES: [&str; 14] = [
+    "antennas", "anthems", "banners", "bodies", "boosts", "borders", "engines", "finishes",
+    "goals", "skins", "titles", "toppers", "trails", "wheels",
+];
+
+fn titles_from_catalog(root: &Value) -> Result<Vec<TitleCatalogEntry>, String> {
+    let titles = root
+        .get("titles")
+        .cloned()
+        .ok_or_else(|| "The titles catalog has no 'titles' array".to_string())?;
+    let titles: Vec<TitleCatalogEntry> = serde_json::from_value(titles)
+        .map_err(|error| format!("Failed to parse the titles catalog: {error}"))?;
+    if titles.is_empty() {
+        Err("The titles catalog is empty".to_string())
+    } else {
+        Ok(titles)
+    }
+}
+
+fn fetch_catalogs(tx: Sender<AppMsg>, ctx: egui::Context) {
+    std::thread::Builder::new()
+        .name("catalog-fetcher".into())
+        .spawn(move || {
+            let result = (|| {
+                let mut catalogs = HashMap::new();
+                for name in CATALOG_NAMES {
+                    let url = format!("https://api.hebnix.com/catalogs/{name}.json");
+                    let response = get_retry(&url, Duration::from_secs(20))
+                        .map_err(|error| format!("Failed to fetch {name}.json: {error}"))?;
+                    let root: Value = response
+                        .into_json()
+                        .map_err(|error| format!("Failed to parse {name}.json: {error}"))?;
+                    let valid = if name == "skins" {
+                        root.get("cars").is_some_and(Value::is_object)
+                    } else {
+                        root.get(name).is_some_and(Value::is_array)
+                    };
+                    if !valid {
+                        return Err(format!("{name}.json has an invalid catalog structure"));
+                    }
+                    catalogs.insert(name.to_string(), root);
+                }
+                Ok(catalogs)
+            })();
+            let _ = tx.send(AppMsg::CatalogsFetched { result });
+            ctx.request_repaint();
+        })
+        .ok();
 }
 
 const TITLE_RANK_TOKENS: [(&str, &str); 8] = [
@@ -230,6 +273,7 @@ enum Tab {
     Workshop,
     Spoofer,
     Patcher,
+    Colours,
     Settings,
     Plugins,
     About,
@@ -411,6 +455,9 @@ pub struct HebnixApp {
     spoofer_title_copy: Option<String>,
     spoofer_title_copy_filter: String,
     title_catalog: Vec<TitleCatalogEntry>,
+    catalogs_loading: bool,
+    catalogs_loaded: bool,
+    catalogs_error: Option<String>,
     spoofer_rank_enabled: bool,
     spoofer_ranks: HashMap<i32, RankSpoofState>,
     spoofer_cert_installed: bool,
@@ -422,7 +469,10 @@ pub struct HebnixApp {
     patcher_boost: crate::boost_patcher::BoostPatcherState,
     patcher_decal: crate::decal_patcher::DecalPatcherState,
     swapper: crate::swapper::SwapperState,
+    colours: crate::patcher::colours::ColoursState,
+    colour_admin_prompt_open: bool,
     admin_prompt_open: bool,
+    item_action_prompt_open: bool,
     owned_admin_requested: bool,
     owned_proxy_prompt_open: bool,
     presets: crate::presets::PresetStore,
@@ -837,7 +887,10 @@ impl HebnixApp {
             spoofer_title_filter: String::new(),
             spoofer_title_copy,
             spoofer_title_copy_filter: String::new(),
-            title_catalog: embedded_titles(),
+            title_catalog: Vec::new(),
+            catalogs_loading: true,
+            catalogs_loaded: false,
+            catalogs_error: None,
             spoofer_rank_enabled,
             spoofer_ranks,
             spoofer_cert_installed: cert_installed,
@@ -848,7 +901,10 @@ impl HebnixApp {
             patcher_boost,
             patcher_decal,
             swapper,
+            colours: crate::patcher::colours::ColoursState::new(),
+            colour_admin_prompt_open: false,
             admin_prompt_open: false,
+            item_action_prompt_open: false,
             owned_admin_requested: false,
             owned_proxy_prompt_open: false,
             presets: crate::presets::PresetStore::new(&base_dir.clone()),
@@ -864,6 +920,7 @@ impl HebnixApp {
         app.save_friends_internal();
         app.save_ranks_internal();
         app.evaluate_proxies();
+        fetch_catalogs(app.tx.clone(), cc.egui_ctx.clone());
 
         app
     }
@@ -915,6 +972,38 @@ impl HebnixApp {
         self.spoofer_username_history.retain(|saved| saved != name);
         self.spoofer_username_history.insert(0, name.to_owned());
         self.spoofer_username_history.truncate(3);
+    }
+
+    fn apply_downloaded_catalogs(
+        &mut self,
+        catalogs: HashMap<String, Value>,
+    ) -> Result<(), String> {
+        let titles = titles_from_catalog(
+            catalogs
+                .get("titles")
+                .ok_or_else(|| "The titles catalog was not downloaded".to_string())?,
+        )?;
+        let skins = catalogs
+            .get("skins")
+            .cloned()
+            .ok_or_else(|| "The skins catalog was not downloaded".to_string())?;
+        let bodies = catalogs
+            .get("bodies")
+            .cloned()
+            .ok_or_else(|| "The bodies catalog was not downloaded".to_string())?;
+        self.swapper.set_catalogs(&catalogs)?;
+        self.patcher_decal.set_catalogs(skins, bodies)?;
+        self.title_catalog = titles;
+        Ok(())
+    }
+
+    fn reload_catalogs(&mut self, ctx: &egui::Context) {
+        if self.catalogs_loading {
+            return;
+        }
+        self.catalogs_loading = true;
+        self.catalogs_error = None;
+        fetch_catalogs(self.tx.clone(), ctx.clone());
     }
 
     fn render_presets_tab(&mut self, ui: &mut egui::Ui, backups_dir: &std::path::Path) {
@@ -1468,6 +1557,27 @@ impl HebnixApp {
                         winutil::set_main_window_topmost(topmost);
                     }
                 }
+                AppMsg::ItemActionBlocked => {
+                    self.item_action_prompt_open = true;
+                }
+                AppMsg::ReloadCatalogs => {
+                    self.reload_catalogs(ctx);
+                }
+                AppMsg::CatalogsFetched { result } => {
+                    self.catalogs_loading = false;
+                    let result =
+                        result.and_then(|catalogs| self.apply_downloaded_catalogs(catalogs));
+                    match result {
+                        Ok(()) => {
+                            self.catalogs_loaded = true;
+                            self.catalogs_error = None;
+                        }
+                        Err(error) => {
+                            self.catalogs_error = Some(error.clone());
+                            self.console.write(format!("[Catalogs] {error}"));
+                        }
+                    }
+                }
                 AppMsg::WorkshopCatalog(result) => match result {
                     Ok(items) => {
                         self.workshop.catalog = items;
@@ -1832,8 +1942,6 @@ impl HebnixApp {
         self.patcher_ball.refresh_balls();
         self.patcher_boost.refresh_boosts();
         self.patcher_decal.refresh_decals();
-        self.patcher_decal.load_car_skins();
-        self.swapper.refresh_catalogs();
         self.save_config();
     }
 
@@ -3431,6 +3539,12 @@ impl HebnixApp {
                                 }
                             });
                             ui.horizontal(|ui| {
+                                ui.add_sized([130.0, 20.0], egui::Label::new("Close to Tray:"));
+                                if ui.checkbox(&mut self.config.settings.close_to_tray, "").changed() {
+                                    self.save_config();
+                                }
+                            });
+                            ui.horizontal(|ui| {
                                 ui.add_sized([130.0, 20.0], egui::Label::new("Suppress Left Alerts:"));
                                 if ui.checkbox(&mut self.config.settings.suppress_left_alerts, "").changed() {
                                     self.save_config();
@@ -3776,6 +3890,86 @@ impl HebnixApp {
         } else if cancel {
             self.admin_prompt_open = false;
             self.owned_admin_requested = false;
+        }
+    }
+
+    fn render_colour_admin_prompt(&mut self, ctx: &egui::Context) {
+        if !self.colour_admin_prompt_open {
+            return;
+        }
+        let mut relaunch = false;
+        let mut cancel = false;
+        egui::Window::new("Administrator required")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.label(
+                    "Windows denied write access to TAGame.upk. Restart Hebnix as Administrator, then return to Colours and apply again.",
+                );
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Restart as Administrator").clicked() {
+                        relaunch = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
+                });
+            });
+        if relaunch {
+            self.colour_admin_prompt_open = false;
+            if spoofer::spawn_elevated_relaunch() {
+                self.spoofer_mgr.shutdown();
+                std::process::exit(0);
+            }
+            self.console
+                .write("[Colours] Hebnix could not relaunch as Administrator.");
+        } else if cancel {
+            self.colour_admin_prompt_open = false;
+        }
+    }
+
+    fn render_item_action_prompt(&mut self, ctx: &egui::Context) {
+        if !self.item_action_prompt_open {
+            return;
+        }
+        let mut quit_rocket_league = false;
+        let mut close = false;
+
+        egui::Window::new("Rocket League is open")
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.label("Rocket League must be closed to swap items, patch, or change colours.");
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button("Quit Rocket League").clicked() {
+                        quit_rocket_league = true;
+                    }
+                    if ui.button("Close Prompt").clicked() {
+                        close = true;
+                    }
+                });
+            });
+
+        if quit_rocket_league {
+            match winutil::kill_rocket_league() {
+                Ok(()) if !hebnix_sdk::process::is_rocket_league_running() => {
+                    self.console
+                        .write("[Patcher] Rocket League was closed. Try the action again.");
+                    self.item_action_prompt_open = false;
+                }
+                Ok(()) => self
+                    .console
+                    .write("[Patcher] Rocket League is still running. Close it and try again."),
+                Err(error) => self
+                    .console
+                    .write(format!("[Patcher] Could not close Rocket League: {error}")),
+            }
+        } else if close {
+            self.item_action_prompt_open = false;
         }
     }
 
@@ -4714,6 +4908,9 @@ impl eframe::App for HebnixApp {
         if ctx.input(|i| i.viewport().close_requested()) && !self.quitting {
             if self.update_info.is_some() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            } else if self.config.settings.close_to_tray {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                self.set_hidden(ctx, true);
             } else {
                 self.force_quit(ctx);
             }
@@ -4741,6 +4938,7 @@ impl eframe::App for HebnixApp {
                     ui.selectable_value(&mut self.tab, Tab::Console, "Console");
                     ui.selectable_value(&mut self.tab, Tab::Workshop, "Workshop Maps");
                     ui.selectable_value(&mut self.tab, Tab::Spoofer, "Spoofer");
+                    ui.selectable_value(&mut self.tab, Tab::Colours, "Colours");
                     ui.selectable_value(&mut self.tab, Tab::Patcher, "Items");
                     ui.selectable_value(&mut self.tab, Tab::Settings, "Settings");
                     ui.selectable_value(&mut self.tab, Tab::Plugins, "Plugins");
@@ -4858,7 +5056,33 @@ impl eframe::App for HebnixApp {
 
                         egui::CentralPanel::default()
                             .frame(egui::Frame::new())
-                            .show(ui, |ui| match self.patcher_subtab {
+                            .show(ui, |ui| {
+                                let catalog_required = matches!(
+                                    self.patcher_subtab,
+                                    PatcherSubTab::Decal | PatcherSubTab::Swapper(_)
+                                );
+                                if self.catalogs_loading {
+                                    ui.horizontal(|ui| {
+                                        ui.spinner();
+                                        ui.label("Loading item catalogs...");
+                                    });
+                                    ui.add_space(8.0);
+                                }
+                                if let Some(error) = self.catalogs_error.clone() {
+                                    ui.colored_label(
+                                        egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
+                                        format!("Catalog download failed: {error}"),
+                                    );
+                                    if ui.button("Reload Catalogs").clicked() {
+                                        self.reload_catalogs(ctx);
+                                    }
+                                    ui.add_space(8.0);
+                                }
+                                if catalog_required && !self.catalogs_loaded {
+                                    return;
+                                }
+
+                                match self.patcher_subtab {
                                 PatcherSubTab::Ball => {
                                     self.patcher_ball.render_ball_tab(
                                         ui,
@@ -4968,6 +5192,7 @@ impl eframe::App for HebnixApp {
                                                     match self.swapper.restore_all_active(
                                                         &cooked_pc,
                                                         &backups_dir,
+                                                        &self.tx,
                                                     ) {
                                                         Ok(count) if count > 0 => {
                                                             let _ = self.tx.send(AppMsg::Log(format!(
@@ -5083,8 +5308,36 @@ impl eframe::App for HebnixApp {
                                 PatcherSubTab::Presets => {
                                     self.render_presets_tab(ui, &backups_dir);
                                 }
+                                }
                             });
                     }
+                    Tab::Colours => {
+                        let cooked_pc = PathBuf::from(&self.config.settings.rl_path)
+                            .join("TAGame")
+                            .join("CookedPCConsole");
+                        let backups_dir = cooked_pc.join("Backups");
+                        self.colours.poll();
+                        if let Some(action) = self.colours.render(ui, &backups_dir) {
+                            if crate::messages::block_item_action_if_game_running(&self.tx) {
+                                self.console.write(
+                                    "[Colours] Close Rocket League before changing game files.",
+                                );
+                            } else if !spoofer::is_admin()
+                                && crate::patcher::colours::needs_admin(&cooked_pc)
+                            {
+                                self.colour_admin_prompt_open = true;
+                            } else {
+                                self.colours.begin(
+                                    action,
+                                    &cooked_pc,
+                                    &backups_dir,
+                                    &self.tx,
+                                    ctx,
+                                );
+                            }
+                        }
+                    }
+
                     Tab::Settings => self.render_settings_tab(ui),
                     Tab::Plugins => self.render_plugins_tab(ui),
                     Tab::About => self.render_about_tab(ui),
@@ -5117,10 +5370,12 @@ impl eframe::App for HebnixApp {
             if close {
                 self.restart_notice = false;
             }
+            self.render_colour_admin_prompt(ctx);
         }
 
         if !self.hidden {
             self.render_admin_prompt(ctx);
+            self.render_item_action_prompt(ctx);
             self.render_owned_proxy_prompt(ctx);
             self.render_statsapi_notice(ctx);
             self.render_web_port_notice(ctx);
@@ -5135,8 +5390,7 @@ impl eframe::App for HebnixApp {
         } else {
             Duration::from_millis(500)
         };
-        self.plugin_mgr
-            .dispatch_tick_if_due(plugin_tick_interval);
+        self.plugin_mgr.dispatch_tick_if_due(plugin_tick_interval);
         self.render_plugin_windows(ctx);
         self.plugin_mgr.flush_window_positions();
         self.render_game_overlay();
