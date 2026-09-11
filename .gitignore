@@ -31,3 +31,4 @@ rlapi_bridge/go.sum
 hebnix_rs/crates/hebnix-app/src/_boost_patcher_zip.rs
 hebnix_rs/crates/hebnix-app/src/_color_scanner.rs
 /hebnix_rs/examples/plugins/ingame_rank
+hebnix_rs/examples/plugins/club/main.lua
