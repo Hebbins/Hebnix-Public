@@ -217,7 +217,7 @@ local function update_players(event)
         roster_seq = 0
     end
 
-    local seen, arrived = {}, {}
+    local seen = {}
     for _, player in ipairs(source) do
         local primary_id = tostring(player.PrimaryId or player.primary_id or "")
         local is_bot = primary_id == "" or hebnix.is_bot(primary_id)
@@ -228,10 +228,9 @@ local function update_players(event)
         local entry = roster[key]
         if not entry then
             roster_seq = roster_seq + 1
-            entry = { order = roster_seq }
+            entry = { order = roster_seq, awaiting_slot = true }
             if not is_bot then entry.request_key = request_profile(primary_id) end
             roster[key] = entry
-            table.insert(arrived, key)
         end
         entry.id = primary_id
         entry.name = name
@@ -249,8 +248,11 @@ local function update_players(event)
         end
     end
 
+
     for key, entry in pairs(roster) do
-        if not seen[key] then entry.ghost = true end
+        if not seen[key] then
+            if entry.bot then roster[key] = nil else entry.ghost = true end
+        end
     end
 
     if not matchmade() then
@@ -259,18 +261,23 @@ local function update_players(event)
         end
     end
 
-    for _, key in ipairs(arrived) do
-        local arrival = roster[key]
-        if arrival then
-            local oldest, oldest_key = nil, nil
-            for k, e in pairs(roster) do
-                if e.ghost and e.team == arrival.team
-                    and (not oldest or e.order < oldest.order) then
-                    oldest, oldest_key = e, k
-                end
-            end
-            if oldest_key then roster[oldest_key] = nil end
+    local claiming = {}
+    for key, entry in pairs(roster) do
+        if entry.awaiting_slot and (entry.team == 0 or entry.team == 1) then
+            table.insert(claiming, { key = key, entry = entry })
         end
+    end
+    table.sort(claiming, function(a, b) return a.entry.order < b.entry.order end)
+    for _, arrival in ipairs(claiming) do
+        arrival.entry.awaiting_slot = nil
+        local oldest, oldest_key = nil, nil
+        for k, e in pairs(roster) do
+            if e.ghost and e.team == arrival.entry.team and k ~= arrival.key
+                and (not oldest or e.order < oldest.order) then
+                oldest, oldest_key = e, k
+            end
+        end
+        if oldest_key then roster[oldest_key] = nil end
     end
 
     players = {}

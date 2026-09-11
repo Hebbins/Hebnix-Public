@@ -1,0 +1,5 @@
+name = "Platform Display"
+author = "Hebbins"
+version = "1.0.2"
+entry = "main.lua"
+plugin_id = "1cb690914da0b22c7d70ca32a1aebde0"
