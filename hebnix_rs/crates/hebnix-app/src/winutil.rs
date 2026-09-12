@@ -298,9 +298,16 @@ fn is_steam_path(game_path: &std::path::Path) -> bool {
 fn simple_launch_uri(cfg: &crate::config::RlLaunchCfg, game_path: &std::path::Path) -> String {
     use crate::config::RlLaunchMode;
     match cfg.mode {
-        RlLaunchMode::SteamNative => format!("steam://rungameid/{}", cfg.steam_id),
+        // a non-Steam shortcut still gets a plain restart THROUGH Steam
+        // (steam overlay/input/presence all work here) - only Workshop
+        // LAN's -multihome relaunch has to bypass Steam for this mode,
+        // since steam://run's argument override refuses non-Steam
+        // shortcuts outright.
+        RlLaunchMode::SteamNative | RlLaunchMode::SteamShortcutToHeroic => {
+            format!("steam://rungameid/{}", cfg.steam_id)
+        }
         RlLaunchMode::EpicDirect => EPIC_LAUNCH_URI.to_string(),
-        RlLaunchMode::Unconfigured | RlLaunchMode::SteamShortcutToHeroic | RlLaunchMode::HeroicDirect => {
+        RlLaunchMode::Unconfigured | RlLaunchMode::HeroicDirect => {
             if is_steam_path(game_path) {
                 "steam://rungameid/252950".to_string()
             } else {
@@ -318,10 +325,7 @@ pub fn start_rocket_league(
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-    if matches!(
-        cfg.mode,
-        RlLaunchMode::SteamShortcutToHeroic | RlLaunchMode::HeroicDirect
-    ) {
+    if cfg.mode == RlLaunchMode::HeroicDirect {
         return crate::rl_launch::heroic_launch(cfg, None)
             .map_err(std::io::Error::other);
     }
@@ -358,10 +362,7 @@ pub fn restart_rocket_league(
         std::thread::sleep(std::time::Duration::from_millis(250));
     }
 
-    if matches!(
-        cfg.mode,
-        RlLaunchMode::SteamShortcutToHeroic | RlLaunchMode::HeroicDirect
-    ) {
+    if cfg.mode == RlLaunchMode::HeroicDirect {
         return crate::rl_launch::heroic_launch(cfg, None)
             .map_err(std::io::Error::other);
     }
