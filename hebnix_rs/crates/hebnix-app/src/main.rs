@@ -30,6 +30,7 @@ mod patch_core {
 }
 mod plugins;
 mod presets;
+mod rl_launch;
 mod spoofer;
 mod statsapi_ini;
 mod swapper {
