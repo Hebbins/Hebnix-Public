@@ -562,6 +562,11 @@ pub struct WorkshopState {
     pub confirm_delete: Option<Value>,
     view: WorkshopView,
     multiplayer: MultiplayerState,
+    /// mirrored from Config.rl_launch by render() each frame, so the
+    /// Workshop LAN -multihome relaunch (deep in prepare_multiplayer, spawned
+    /// on its own thread) knows how to launch Rocket League without every
+    /// intermediate method needing its own copy of the parameter.
+    rl_launch: crate::config::RlLaunchCfg,
 }
 
 impl WorkshopState {
@@ -588,6 +593,7 @@ impl WorkshopState {
             confirm_delete: None,
             view: WorkshopView::Browse,
             multiplayer,
+            rl_launch: crate::config::RlLaunchCfg::default(),
         }
     }
 
@@ -659,8 +665,15 @@ impl WorkshopState {
         );
     }
 
-    /// render the tab. rl_path comes from the app config.
-    pub fn render(&mut self, ui: &mut egui::Ui, rl_path: &str, tx: &Sender<AppMsg>) {
+    /// render the tab. rl_path and rl_launch come from the app config.
+    pub fn render(
+        &mut self,
+        ui: &mut egui::Ui,
+        rl_path: &str,
+        rl_launch: &crate::config::RlLaunchCfg,
+        tx: &Sender<AppMsg>,
+    ) {
+        self.rl_launch = rl_launch.clone();
         let ctx = ui.ctx().clone();
 
         ui.horizontal(|ui| {
@@ -1362,6 +1375,7 @@ impl WorkshopState {
         self.multiplayer.restarting_rocket_league = true;
         self.multiplayer.setup_progress = Some("Preparing the Workshop LAN adapter...".to_string());
         let rl_path = rl_path.to_string();
+        let rl_launch = self.rl_launch.clone();
         let address = address.to_string();
         let join_pin = join_pin.filter(|pin| pin.len() == 4);
         let tx = tx.clone();
@@ -1396,8 +1410,12 @@ impl WorkshopState {
                 let _ = tx.send(AppMsg::WorkshopMultiplayerProgress(
                     "Starting Rocket League with the Workshop LAN address...".to_string(),
                 ));
-                crate::winutil::restart_rocket_league_multihome(Path::new(&rl_path), &address)
-                    .map(|_| (tunnel, joined))
+                crate::winutil::restart_rocket_league_multihome(
+                    &rl_launch,
+                    Path::new(&rl_path),
+                    &address,
+                )
+                .map(|_| (tunnel, joined))
             });
             if result.is_err()
                 && let Some(joined) = cleanup_join
