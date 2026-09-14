@@ -256,7 +256,7 @@ const POINTER_HIT_SCRIPT: &str = r#"
 })();
 "#;
 
-/// beside the extracted curl-impersonate, the install dir is not always writable
+/// webview2 needs its own data dir, the install dir is not always writable
 fn user_data_dir() -> Option<std::path::PathBuf> {
     let dir = dirs::data_local_dir()?.join("Hebnix").join("webview2");
     std::fs::create_dir_all(&dir).ok()?;

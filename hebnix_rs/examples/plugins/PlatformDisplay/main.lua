@@ -22,6 +22,8 @@ local IMAGE_SCALE = 0.48
 local GHOST_OPACITY = 0.4
 local FADE_SECONDS = 0.3
 local PRIVATE_PLAYLIST = 6
+
+local LOG_RETRY_TICKS = 20
 local TOURNAMENT_PLAYLIST = 34
 
 local STYLES = { "Square", "Circle", "Full" }
@@ -73,6 +75,7 @@ local was_drawing = false
 local fade_from = nil
 local shown_first_open = false
 local log_key = nil
+local log_retry = 0
 local last_layout = nil
 
 local function icon_for(primary_id)
@@ -99,6 +102,7 @@ local function clear_players()
     mutator_count = 0
     freeplay = false
     log_key = nil
+    log_retry = 0
     first_tab_pending = true
     in_first_open = false
     scoreboard_was_held = false
@@ -139,7 +143,7 @@ local function update_players(event)
         local entry = roster[key]
         if not entry then
             roster_seq = roster_seq + 1
-            entry = { order = roster_seq, awaiting_slot = true }
+            entry = { order = roster_seq }
             roster[key] = entry
         end
         entry.id = primary_id
@@ -169,25 +173,6 @@ local function update_players(event)
         for key, entry in pairs(roster) do
             if entry.ghost then roster[key] = nil end
         end
-    end
-
-    local claiming = {}
-    for key, entry in pairs(roster) do
-        if entry.awaiting_slot and (entry.team == 0 or entry.team == 1) then
-            table.insert(claiming, { key = key, entry = entry })
-        end
-    end
-    table.sort(claiming, function(a, b) return a.entry.order < b.entry.order end)
-    for _, arrival in ipairs(claiming) do
-        arrival.entry.awaiting_slot = nil
-        local oldest, oldest_key = nil, nil
-        for k, e in pairs(roster) do
-            if e.ghost and e.team == arrival.entry.team and k ~= arrival.key
-                and (not oldest or e.order < oldest.order) then
-                oldest, oldest_key = e, k
-            end
-        end
-        if oldest_key then roster[oldest_key] = nil end
     end
 
     players = {}
@@ -239,6 +224,10 @@ end
 
 local function refresh_playlist()
     if not log_key then
+        if log_retry > 0 then
+            log_retry = log_retry - 1
+            return
+        end
         hebnix.clear_launch_log()
         log_key = hebnix.parse_launch_log_async(false)
         return
@@ -246,7 +235,12 @@ local function refresh_playlist()
     local info = hebnix.launch_log_result(log_key)
     if type(info) ~= "table" then return end
     if type(info.session) == "table" then my_id = info.session.primary_id end
-    if type(info.game) ~= "table" then return end
+    -- a parse before rl writes the match block would cache gameless forever, retry instead
+    if type(info.game) ~= "table" then
+        log_key = nil
+        log_retry = LOG_RETRY_TICKS
+        return
+    end
     current_playlist = tonumber(info.game.playlist_id)
     offline = info.game.offline == true
     mutators = info.game.mutators or {}
@@ -337,6 +331,7 @@ function plugin.on_game_event(event_type, event)
         mutators = {}
         mutator_count = 0
         log_key = nil
+        log_retry = 0
         roster = {}
         roster_seq = 0
         first_tab_pending = true

@@ -79,10 +79,10 @@ pub fn circle(x: f32, y: f32, radius: f32, color: Rgba, width: f32, filled: bool
     });
 }
 
-pub fn text(x: f32, y: f32, s: &str, color: Rgba, size: f32, halign: &str) {
+pub fn text(x: f32, y: f32, s: &str, color: Rgba, size: f32, halign: &str, font: &str) {
     with_canvas(|canvas| match canvas {
-        Canvas::Gdi(hdc) => gdi::text(*hdc, x as i32, y as i32, s, color, size as i32, halign),
-        Canvas::D2d(c) => c.text(x, y, s, color, size, halign),
+        Canvas::Gdi(hdc) => gdi::text(*hdc, x as i32, y as i32, s, color, size as i32, halign), // gdi has no rl faces, keeps its own font
+        Canvas::D2d(c) => c.text(x, y, s, color, size, halign, font),
     });
 }
 

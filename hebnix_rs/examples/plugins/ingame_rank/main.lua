@@ -23,11 +23,21 @@ local MMR_HEADER_DY = -44.6
 local HEADER_CAP = 12.0
 local VALUE_CAP = 17.2
 
-local SEGOE_CAP = 0.7002
-local SEGOE_MID = 0.7290
+-- measured off each rebuilt face. cap is its cap height over the em, mid is
+-- ascent minus half of that, which is where the caps centre sits
+local VALUE_FONT = "rl-header"
+local LABEL_FONT = "rl-body-bold"
+local FONT_METRICS = {
+    ["rl-header"] = { cap = 0.5650, mid = 0.5046 },
+    ["rl-header-thin"] = { cap = 0.5700, mid = 0.4923 },
+    ["rl-body"] = { cap = 0.7150, mid = 0.5639 },
+    ["rl-body-bold"] = { cap = 0.7150, mid = 0.5746 },
+}
 
 local CASUAL_MMR = 0
 local PRIVATE_PLAYLIST = 6
+
+local LOG_RETRY_TICKS = 20
 
 local FADE_SECONDS = 0.3
 local IMAGE_SCALE = 0.48
@@ -78,6 +88,7 @@ local was_drawing = false
 local fade_from = nil
 local shown_first_open = false
 local log_key = nil
+local log_retry = 0
 local mode = "Current"
 local cycle_was_pressed = false
 local capture_target = nil
@@ -187,6 +198,7 @@ local function clear_players(clear_cache)
     mutator_count = 0
     freeplay = false
     log_key = nil
+    log_retry = 0
     first_tab_pending = true
     in_first_open = false
     scoreboard_was_held = false
@@ -228,7 +240,7 @@ local function update_players(event)
         local entry = roster[key]
         if not entry then
             roster_seq = roster_seq + 1
-            entry = { order = roster_seq, awaiting_slot = true }
+            entry = { order = roster_seq }
             if not is_bot then entry.request_key = request_profile(primary_id) end
             roster[key] = entry
         end
@@ -259,25 +271,6 @@ local function update_players(event)
         for key, entry in pairs(roster) do
             if entry.ghost then roster[key] = nil end
         end
-    end
-
-    local claiming = {}
-    for key, entry in pairs(roster) do
-        if entry.awaiting_slot and (entry.team == 0 or entry.team == 1) then
-            table.insert(claiming, { key = key, entry = entry })
-        end
-    end
-    table.sort(claiming, function(a, b) return a.entry.order < b.entry.order end)
-    for _, arrival in ipairs(claiming) do
-        arrival.entry.awaiting_slot = nil
-        local oldest, oldest_key = nil, nil
-        for k, e in pairs(roster) do
-            if e.ghost and e.team == arrival.entry.team and k ~= arrival.key
-                and (not oldest or e.order < oldest.order) then
-                oldest, oldest_key = e, k
-            end
-        end
-        if oldest_key then roster[oldest_key] = nil end
     end
 
     players = {}
@@ -343,6 +336,10 @@ end
 
 local function refresh_playlist()
     if not log_key then
+        if log_retry > 0 then
+            log_retry = log_retry - 1
+            return
+        end
         hebnix.clear_launch_log()
         log_key = hebnix.parse_launch_log_async(false)
         return
@@ -350,7 +347,12 @@ local function refresh_playlist()
     local info = hebnix.launch_log_result(log_key)
     if type(info) ~= "table" then return end
     if type(info.session) == "table" then my_id = info.session.primary_id end
-    if type(info.game) ~= "table" then return end
+    -- a parse before rl writes the match block would cache gameless forever, retry instead
+    if type(info.game) ~= "table" then
+        log_key = nil
+        log_retry = LOG_RETRY_TICKS
+        return
+    end
     current_playlist = tonumber(info.game.playlist_id)
     offline = info.game.offline == true
     mutators = info.game.mutators or {}
@@ -536,12 +538,16 @@ local function last_layout_readout()
         .. (last_layout.watching and " (spectating)" or "")
 end
 
-local function draw_column_text(draw, x, centre_y, text, cap, s, opacity)
-    local em = cap / SEGOE_CAP * s
-    draw.text(x, centre_y - SEGOE_MID * em, text, {
+-- falls back to the ui font without rl, where these metrics are a little off
+local function draw_column_text(draw, x, centre_y, text, cap, s, opacity, font)
+    font = font or VALUE_FONT
+    local metrics = FONT_METRICS[font] or FONT_METRICS[VALUE_FONT]
+    local em = cap / metrics.cap * s
+    draw.text(x, centre_y - metrics.mid * em, text, {
         color = string.format("#ffffff%02x", math.floor(opacity * 255 + 0.5)),
         size = em,
         halign = "center",
+        font = font,
     })
 end
 
@@ -630,6 +636,7 @@ function plugin.on_game_event(event_type, event)
         mutators = {}
         mutator_count = 0
         log_key = nil
+        log_retry = 0
         roster = {}
         roster_seq = 0
         first_tab_pending = true
@@ -771,11 +778,11 @@ function plugin.on_overlay(draw, w, h)
         local head_y = MMR_HEADER_DY * layout.scale + layout.row_half
         if blues > 0 then
             draw_column_text(draw, mmr_x, layout.blue_y + head_y, "MMR",
-                HEADER_CAP, layout.scale, opacity)
+                HEADER_CAP, layout.scale, opacity, LABEL_FONT)
         end
         if oranges > 0 then
             draw_column_text(draw, mmr_x, layout.orange_y + head_y, "MMR",
-                HEADER_CAP, layout.scale, opacity)
+                HEADER_CAP, layout.scale, opacity, LABEL_FONT)
         end
     end
 

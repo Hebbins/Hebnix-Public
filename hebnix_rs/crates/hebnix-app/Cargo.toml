@@ -8,7 +8,7 @@ default = []
 lite = []
 
 [[bin]]
-name = "hebnix-app"
+name = "hebnix"
 path = "src/main.rs"
 
 [[bin]]

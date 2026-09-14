@@ -155,8 +155,8 @@ pub fn circle(x: f32, y: f32, radius: f32, color: Rgba, width: f32, filled: bool
     native::circle(x, y, radius, color, width, filled);
 }
 
-pub fn text(x: f32, y: f32, text: &str, color: Rgba, size: f32, halign: &str) {
-    native::text(x, y, text, color, size, halign);
+pub fn text(x: f32, y: f32, text: &str, color: Rgba, size: f32, halign: &str, font: &str) {
+    native::text(x, y, text, color, size, halign, font);
 }
 
 pub fn polygon(points: &[(f32, f32)], color: Rgba) {

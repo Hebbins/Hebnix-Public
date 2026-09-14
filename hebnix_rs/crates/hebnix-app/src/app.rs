@@ -4887,6 +4887,11 @@ impl eframe::App for HebnixApp {
         let ctx = &ui.ctx().clone();
         self.handle_messages(ctx);
 
+        // rl_path can change after startup, no-ops if unchanged
+        crate::patcher::rl_font::set_install_dir(std::path::Path::new(
+            &self.config.settings.rl_path,
+        ));
+
         if !self.statsapi_checked {
             self.check_statsapi_rate();
             self.check_web_port();

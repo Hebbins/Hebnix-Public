@@ -2664,13 +2664,18 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         })?,
     )?;
 
-    // draw.text(x, y, "string", {color=, size=14, halign="left"|"center"|"right"})
+    // draw.text(x, y, "string", {color=, size=14, halign="left"|"center"|"right",
+    //           font="rl-body"|"rl-body-bold"|"rl-header"|"rl-header-thin"|"rl-digits"})
     draw.set(
         "text",
         lua.create_function(|_, (x, y, s, opts): (f32, f32, String, Option<Table>)| {
             let halign = opts
                 .as_ref()
                 .and_then(|t| t.get::<String>("halign").ok())
+                .unwrap_or_default();
+            let font = opts
+                .as_ref()
+                .and_then(|t| t.get::<String>("font").ok())
                 .unwrap_or_default();
             overlay::text(
                 x,
@@ -2679,6 +2684,7 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                 opt_rgba(&opts, "color", WHITE),
                 opt_f32(&opts, "size", 14.0),
                 &halign,
+                &font,
             );
             Ok(())
         })?,

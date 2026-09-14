@@ -33,8 +33,10 @@ use windows::Win32::Graphics::DirectWrite::{
     DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
     DWRITE_FONT_WEIGHT_NORMAL, DWRITE_MEASURING_MODE_NATURAL, DWRITE_TEXT_ALIGNMENT_CENTER,
     DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_TEXT_ALIGNMENT_TRAILING, DWriteCreateFactory,
-    IDWriteFactory,
+    IDWriteFactory, IDWriteFontCollection,
 };
+#[cfg(not(feature = "lite"))]
+use windows::Win32::Graphics::DirectWrite::IDWriteFactory5;
 use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_ALPHA_MODE_PREMULTIPLIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC,
 };
@@ -101,6 +103,86 @@ fn load_d2d_bitmap(ctx: &ID2D1DeviceContext, path: &str) -> Option<ID2D1Bitmap1>
             &props,
         )
         .ok()
+    }
+}
+
+/// rl's faces as a private directwrite collection built once from the ttfs rl_font rebuilds. None if rl isn't installed or dwrite5 is missing, falls back to segoe 
+fn rl_collection(factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
+    thread_local! {
+        static CACHE: std::cell::RefCell<Option<(u64, Option<IDWriteFontCollection>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
+    // rebuild when the faces change, rl_path is detected after startup so the
+    let generation = rl_generation();
+    CACHE.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if slot.as_ref().map(|(built_for, _)| *built_for) != Some(generation) {
+            let built = build_rl_collection(factory);
+            match &built {
+                Some(c) => tracing::info!("rl font collection ready, {} families", unsafe {
+                    c.GetFontFamilyCount()
+                }),
+                None => tracing::warn!("rl font collection unavailable, overlay text stays on segoe"),
+            }
+            *slot = Some((generation, built));
+        }
+        slot.as_ref().and_then(|(_, c)| c.clone())
+    })
+}
+
+// lite ships without the patcher that rebuilds these
+#[cfg(feature = "lite")]
+fn rl_face(_font: &str) -> Option<&'static str> {
+    None
+}
+
+#[cfg(feature = "lite")]
+fn rl_generation() -> u64 {
+    0
+}
+
+#[cfg(not(feature = "lite"))]
+fn rl_generation() -> u64 {
+    crate::patcher::rl_font::generation()
+}
+
+#[cfg(not(feature = "lite"))]
+fn rl_face(font: &str) -> Option<&'static str> {
+    crate::patcher::rl_font::face_for(font)
+}
+
+#[cfg(feature = "lite")]
+fn build_rl_collection(_factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
+    None
+}
+
+#[cfg(not(feature = "lite"))]
+fn build_rl_collection(factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
+    let fonts = crate::patcher::rl_font::loaded();
+    if fonts.is_empty() {
+        return None;
+    }
+    unsafe {
+        let f5: IDWriteFactory5 = factory.cast().ok()?;
+        let loader = f5.CreateInMemoryFontFileLoader().ok()?;
+        f5.RegisterFontFileLoader(&loader).ok()?;
+        let builder = f5.CreateFontSetBuilder().ok()?;
+        for font in fonts.iter() {
+            // rl_font keeps the bytes for the session, so the reference stays valid
+            let file = loader
+                .CreateInMemoryFontFileReference(
+                    &f5,
+                    font.ttf.as_ptr() as *const core::ffi::c_void,
+                    font.ttf.len() as u32,
+                    None,
+                )
+                .ok()?;
+            builder.AddFontFile(&file).ok()?;
+        }
+        let set = builder.CreateFontSet().ok()?;
+        f5.CreateFontCollectionFromFontSet(&set)
+            .ok()
+            .and_then(|c| c.cast().ok())
     }
 }
 
@@ -226,14 +308,19 @@ impl D2dCanvas {
         }
     }
 
-    pub fn text(&self, x: f32, y: f32, s: &str, c: Rgba, size: f32, halign: &str) {
+    pub fn text(&self, x: f32, y: f32, s: &str, c: Rgba, size: f32, halign: &str, font: &str) {
         self.set_color(c);
-        let family: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
+        let rl = rl_face(font).and_then(|face| rl_collection(&self.dwrite).map(|c| (face, c))); // rl id -> rebuilt face, else ui font
+        let (name, collection) = match &rl {
+            Some((face, collection)) => (*face, Some(collection)),
+            None => ("Segoe UI", None),
+        };
+        let family: Vec<u16> = format!("{name}\0").encode_utf16().collect();
         let locale: Vec<u16> = "en-us\0".encode_utf16().collect();
         unsafe {
             let Ok(format) = self.dwrite.CreateTextFormat(
                 PCWSTR(family.as_ptr()),
-                None,
+                collection,
                 DWRITE_FONT_WEIGHT_NORMAL,
                 DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
@@ -608,5 +695,40 @@ fn create_window() -> Result<HWND> {
             hinst,
             None,
         )
+    }
+}
+
+#[cfg(all(test, not(feature = "lite")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore]
+    fn rl_collection_builds_and_exposes_its_families() {
+        let rl = std::env::var("HEBNIX_RL_DIR")
+            .unwrap_or_else(|_| r"E:\SteamLibrary\steamapps\common\rocketleague".into());
+        crate::patcher::rl_font::set_install_dir(std::path::Path::new(&rl));
+        let faces = crate::patcher::rl_font::loaded();
+        println!("rebuilt faces: {}", faces.len());
+
+        let factory: IDWriteFactory =
+            unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED).expect("dwrite factory") };
+        let f5 = factory.cast::<IDWriteFactory5>();
+        println!("IDWriteFactory5 available: {}", f5.is_ok());
+
+        let collection = build_rl_collection(&factory).expect("rl collection");
+        unsafe {
+            let count = collection.GetFontFamilyCount();
+            println!("families in collection: {count}");
+            for i in 0..count {
+                let fam = collection.GetFontFamily(i).expect("family");
+                let names = fam.GetFamilyNames().expect("names");
+                let len = names.GetStringLength(0).expect("len") as usize;
+                let mut buf = vec![0u16; len + 1];
+                names.GetString(0, &mut buf).expect("string");
+                println!("  [{i}] {}", String::from_utf16_lossy(&buf[..len]));
+            }
+            assert!(count > 0, "collection has no families");
+        }
     }
 }
