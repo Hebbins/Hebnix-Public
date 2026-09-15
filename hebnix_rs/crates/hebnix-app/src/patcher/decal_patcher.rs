@@ -13,8 +13,6 @@ use std::sync::Arc;
 use crate::config::{Config, PatchSource};
 use crate::messages::AppMsg;
 use crate::patch_core::upk;
-use crate::patcher::catalog::PatchCatalog;
-use crate::patcher::patch_source_selector;
 
 // UPK magic constant
 const UPK_MAGIC: u32 = 0x9E2A83C1;
@@ -1739,6 +1737,7 @@ pub struct DecalPatcherState {
     pub search_filter: String,
     pub show_applied: bool,
     pub page: usize,
+    pub(crate) source: PatchSource,
     pub confirm_delete: Option<DecalItem>,
     pub restore_all_confirmed: bool,
     pub skin_dropdown_filter: String,
@@ -2364,6 +2363,7 @@ impl DecalPatcherState {
             search_filter: String::new(),
             show_applied: false,
             page: 0,
+            source: config.patcher.decal_source,
             confirm_delete: None,
             restore_all_confirmed: false,
             car_skins: Vec::new(),

@@ -672,14 +672,11 @@ impl WorkshopState {
 
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.view, WorkshopView::Browse, "Browse Maps");
-<<<<<<< Updated upstream
-=======
             ui.selectable_value(
                 &mut self.view,
                 WorkshopView::BackgroundChanger,
                 "Background Changer",
             );
->>>>>>> Stashed changes
             // multiplayer is temporarily hidden for 2.1.7.
             // ui.selectable_value(&mut self.view, WorkshopView::Multiplayer, "Multiplayer");
         });

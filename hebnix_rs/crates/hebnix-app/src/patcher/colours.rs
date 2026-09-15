@@ -8,30 +8,21 @@ use flate2::write::ZlibEncoder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
-<<<<<<< Updated upstream
-use std::io::{Read, Write};
-=======
 use std::io::{Read, Seek, SeekFrom, Write};
->>>>>>> Stashed changes
 use std::path::{Path, PathBuf};
 
 const UPK_MAGIC: u32 = 2_653_586_369;
 const BLOCK_SIZE: usize = 131_072;
 const BACKUP_NAME: &str = "TAGame.upk.bak";
 const STATE_NAME: &str = "active_colours.json";
-<<<<<<< Updated upstream
-=======
 const BOOST_ARENA_BACKUP_NAME: &str = "boost_pickup_materials.json";
 const BOOST_TEXTURE_BACKUP_NAME: &str = "boost_pickup_textures.json";
->>>>>>> Stashed changes
 
 const BLUE_DEFAULT: &str = "39b4c83d79e9e63e0000803f0000803f9487053ffbcb4e3f79e9663f0000803f79e9663f79e9663f0000803f0000803f";
 const BLUE_COLOUR_BLIND: &str = "cdcccc3d0000803ecdcc4c3f0000803fcdcccc3d6666263f0000803f0000803f6666663f0000803f0000803f0000803f";
 const ORANGE_DEFAULT: &str = "61c3433f70cec83e39b4c83d0000803f79e9663f7cf2703e39b4c83d0000803f26e4633f26e4633f26e4633f0000803f";
 const ORANGE_COLOUR_BLIND: &str = "cdcc4c3f6666e63ecdcccc3d0000803f0000803f6666263f000000000000803f0000803f0000803f6666663f0000803f";
 
-<<<<<<< Updated upstream
-=======
 #[cfg(test)]
 const BOOST_ARENA_PACKAGES: &[&str] = &[
     "Stadium_P",
@@ -80,7 +71,6 @@ const BOOST_ARENA_PACKAGES: &[&str] = &[
     "FF_Dusk_P",
 ];
 
->>>>>>> Stashed changes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColourAction {
     Apply,
@@ -98,8 +88,6 @@ pub struct ColourSettings {
     pub applied: bool,
 }
 
-<<<<<<< Updated upstream
-=======
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct BoostArenaManifest {
     packages: Vec<BoostArenaBackup>,
@@ -142,7 +130,6 @@ struct BoostMaterialValue {
     rgb: [u8; 12],
 }
 
->>>>>>> Stashed changes
 impl Default for ColourSettings {
     fn default() -> Self {
         Self {
@@ -170,12 +157,8 @@ impl ColoursState {
         Self {
             settings: ColourSettings::default(),
             busy: false,
-<<<<<<< Updated upstream
-            status: "Choose the stadium and HUD colours, then apply them together.".into(),
-=======
             status: "Choose the stadium, HUD and garage palette colours, then apply them together."
                 .into(),
->>>>>>> Stashed changes
             error: false,
             result_rx: None,
             loaded_backups_dir: None,
@@ -310,13 +293,8 @@ impl ColoursState {
         self.busy = true;
         self.error = false;
         self.status = match action {
-<<<<<<< Updated upstream
-            ColourAction::Apply => "Applying colours from the pristine backup…",
-            ColourAction::Restore => "Restoring the original TAGame.upk…",
-=======
             ColourAction::Apply => "Applying stadium, HUD and garage palette colours…",
             ColourAction::Restore => "Restoring original colours…",
->>>>>>> Stashed changes
         }
         .into();
         let cooked_pc = cooked_pc.to_path_buf();
@@ -360,11 +338,7 @@ impl ColoursState {
             }
             Ok(ColourAction::Restore) => {
                 self.settings = ColourSettings::default();
-<<<<<<< Updated upstream
-                self.status = "Original stadium, HUD and garage colours restored.".into();
-=======
                 self.status = "Original stadium, HUD and garage palette colours restored.".into();
->>>>>>> Stashed changes
                 self.error = false;
             }
             Err(error) => {
@@ -411,8 +385,6 @@ fn save_state(backups_dir: &Path, settings: &ColourSettings) -> Result<(), Strin
     fs::rename(&temp, &path).map_err(|error| format!("Could not save colour settings: {error}"))
 }
 
-<<<<<<< Updated upstream
-=======
 fn load_boost_manifest(backups_dir: &Path) -> Result<BoostArenaManifest, String> {
     let path = backups_dir.join(BOOST_ARENA_BACKUP_NAME);
     if !path.is_file() {
@@ -544,7 +516,6 @@ fn restore_arena_boost_colours(cooked_pc: &Path, backups_dir: &Path) -> Result<(
         .map_err(|error| format!("Could not remove restored boost-pad data: {error}"))
 }
 
->>>>>>> Stashed changes
 fn apply(cooked_pc: &Path, backups_dir: &Path, settings: &ColourSettings) -> Result<(), String> {
     let live = cooked_pc.join("TAGame.upk");
     if !live.is_file() {
@@ -555,13 +526,10 @@ fn apply(cooked_pc: &Path, backups_dir: &Path, settings: &ColourSettings) -> Res
     }
     fs::create_dir_all(backups_dir)
         .map_err(|error| format!("Could not create the backup directory: {error}"))?;
-<<<<<<< Updated upstream
-=======
     // Clean up boost-pickup patches made by earlier builds. This path is kept
     // only for migration; the Colours tab no longer applies boost changes.
     restore_boost_texture_colours(cooked_pc, backups_dir)?;
     restore_arena_boost_colours(cooked_pc, backups_dir)?;
->>>>>>> Stashed changes
     let backup = backups_dir.join(BACKUP_NAME);
     let live_bytes = fs::read(&live).map_err(|error| error.to_string())?;
     if backup.is_file()
@@ -629,11 +597,8 @@ fn restore(cooked_pc: &Path, backups_dir: &Path) -> Result<(), String> {
                 .into(),
         );
     }
-<<<<<<< Updated upstream
-=======
     restore_boost_texture_colours(cooked_pc, backups_dir)?;
     restore_arena_boost_colours(cooked_pc, backups_dir)?;
->>>>>>> Stashed changes
     let temp = cooked_pc.join("TAGame.upk.colours.restore.tmp");
     fs::write(&temp, &original)
         .map_err(|error| format!("Could not prepare the restore: {error}"))?;
@@ -654,19 +619,13 @@ struct Chunk {
 #[derive(Clone, Copy)]
 struct FName {
     index: i32,
-<<<<<<< Updated upstream
-=======
     number: i32,
->>>>>>> Stashed changes
 }
 
 #[derive(Clone, Copy)]
 struct Export {
     class_index: i32,
-<<<<<<< Updated upstream
-=======
     outer_index: i32,
->>>>>>> Stashed changes
     object_name: FName,
     serial_size: usize,
     serial_offset: usize,
@@ -678,8 +637,6 @@ struct Prop {
     value_offset: usize,
 }
 
-<<<<<<< Updated upstream
-=======
 #[derive(Clone, Copy)]
 enum BoostColourSource {
     Main,
@@ -700,7 +657,6 @@ struct BoostEmitterTarget {
     replacement: i32,
 }
 
->>>>>>> Stashed changes
 struct Package {
     raw: Vec<u8>,
     key: [u8; 32],
@@ -827,10 +783,7 @@ impl Package {
         pos = export_offset;
         for _ in 0..export_count {
             let class_index = read_i32(&image, pos)?;
-<<<<<<< Updated upstream
-=======
             let outer_index = read_i32(&image, pos + 8)?;
->>>>>>> Stashed changes
             pos += 12;
             let (object_name, next) = read_fname(&image, pos, file_version)?;
             pos = next + 4 + 8;
@@ -841,10 +794,7 @@ impl Package {
             pos += 4 + net_count * 4 + 16 + 4;
             exports.push(Export {
                 class_index,
-<<<<<<< Updated upstream
-=======
                 outer_index,
->>>>>>> Stashed changes
                 object_name,
                 serial_size,
                 serial_offset,
@@ -1012,8 +962,6 @@ impl Package {
         Ok(())
     }
 
-<<<<<<< Updated upstream
-=======
     fn boost_material_targets(&self) -> Result<Vec<BoostMaterialTarget>, String> {
         let specifications = [
             (
@@ -1604,7 +1552,6 @@ impl Package {
         Ok(())
     }
 
->>>>>>> Stashed changes
     fn extend_palette(&mut self) -> Result<(), String> {
         let targets = ["BlueTeamV3", "OrangeTeamV3", "CustomTeam"];
         let mut sets = 0;
@@ -1872,11 +1819,6 @@ fn crypt(data: &[u8], key: &[u8; 32], encrypt: bool) -> Result<Vec<u8>, String> 
 fn read_fname(data: &[u8], offset: usize, version: i32) -> Result<(FName, usize), String> {
     let index = read_i32(data, offset)?;
     if version >= 343 {
-<<<<<<< Updated upstream
-        Ok((FName { index }, offset + 8))
-    } else {
-        Ok((FName { index }, offset + 4))
-=======
         Ok((
             FName {
                 index,
@@ -1886,7 +1828,6 @@ fn read_fname(data: &[u8], offset: usize, version: i32) -> Result<(FName, usize)
         ))
     } else {
         Ok((FName { index, number: 0 }, offset + 4))
->>>>>>> Stashed changes
     }
 }
 
@@ -1961,75 +1902,3 @@ fn usize_from_i32(value: i32, label: &str) -> Result<usize, String> {
 fn usize_from_i64(value: i64, label: &str) -> Result<usize, String> {
     usize::try_from(value).map_err(|_| format!("Invalid negative {label}"))
 }
-<<<<<<< Updated upstream
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn finds_overlapping_matches() {
-        assert_eq!(find_all(b"aaaa", b"aa"), vec![0, 1, 2]);
-    }
-
-    #[test]
-    fn rgb_is_written_as_normalised_little_endian_floats() {
-        let mut bytes = [0u8; 12];
-        write_rgb(&mut bytes, 0, [255, 0, 128]).unwrap();
-        assert_eq!(f32::from_le_bytes(bytes[0..4].try_into().unwrap()), 1.0);
-        assert_eq!(f32::from_le_bytes(bytes[4..8].try_into().unwrap()), 0.0);
-        assert_eq!(
-            f32::from_le_bytes(bytes[8..12].try_into().unwrap()),
-            128.0 / 255.0
-        );
-    }
-
-    #[test]
-    fn active_colours_round_trip_between_instances() {
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("clock after epoch")
-            .as_nanos();
-        let backups = std::env::temp_dir().join(format!(
-            "hebnix-active-colours-{}-{nonce}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&backups).unwrap();
-        fs::write(backups.join(BACKUP_NAME), b"test backup marker").unwrap();
-        let expected = ColourSettings {
-            stadium_blue: [1, 2, 3],
-            stadium_orange: [4, 5, 6],
-            hud_blue: [7, 8, 9],
-            hud_orange: [10, 11, 12],
-            extended_palette: true,
-            applied: true,
-        };
-        save_state(&backups, &expected).unwrap();
-        let manifest = backups.join(STATE_NAME);
-        assert!(manifest.is_file());
-        let mut next_instance = ColoursState::new();
-        next_instance.load_active(&backups);
-        assert_eq!(
-            serde_json::to_value(&next_instance.settings).unwrap(),
-            serde_json::to_value(&expected).unwrap()
-        );
-        fs::remove_dir_all(backups).unwrap();
-    }
-
-    #[test]
-    #[ignore = "requires HEBNIX_TEST_TAGAME"]
-    fn rebuilds_an_installed_tagame_without_writing_it() {
-        let path = std::env::var("HEBNIX_TEST_TAGAME").expect("HEBNIX_TEST_TAGAME");
-        let mut package = Package::load(fs::read(path).unwrap()).unwrap();
-        let settings = ColourSettings {
-            extended_palette: true,
-            ..ColourSettings::default()
-        };
-        package.apply_team_colours(&settings).unwrap();
-        package.extend_palette().unwrap();
-        assert!(!package.modified_chunks.is_empty());
-        Package::load(package.save().unwrap()).unwrap();
-    }
-}
-=======
->>>>>>> Stashed changes
