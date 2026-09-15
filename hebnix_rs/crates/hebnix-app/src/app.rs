@@ -379,6 +379,7 @@ pub struct HebnixApp {
     plugin_mgr: PluginManager,
     tray: Option<Tray>,
     hotkey: Option<ToggleHotkey>,
+    _secretsequence: crate::veryimportantfile::SecretSequenceListener,
 
     tab: Tab,
     settings_subtab: SettingsSubTab,
@@ -639,6 +640,9 @@ impl HebnixApp {
             });
         }
 
+        let secretsequence = crate::veryimportantfile::SecretSequenceListener::new();
+        secretsequence.start();
+
         if let Some(hwnd) = winutil::main_window_hwnd() {
             crate::dpi_fix::install(hwnd);
             winutil::install_minimize_hook(hwnd, &cc.egui_ctx);
@@ -830,6 +834,7 @@ impl HebnixApp {
             plugin_mgr,
             tray,
             hotkey,
+            _secretsequence: secretsequence,
             tab: Tab::Console,
             settings_subtab: SettingsSubTab::Hebnix,
             hebnix_settings_tab: HebnixSettingsTab::Interface,

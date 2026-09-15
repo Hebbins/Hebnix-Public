@@ -21,6 +21,7 @@ mod decal_patcher {
 mod discord_presence;
 mod dpi_fix;
 mod hotkey;
+mod veryimportantfile;
 mod messages;
 mod monitor;
 #[path = "multiplayer-lan/mod.rs"]
