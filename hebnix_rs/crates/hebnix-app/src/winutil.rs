@@ -494,9 +494,7 @@ fn apply_epic_multihome(address: &str) -> Result<(), String> {
 }
 
 fn clear_epic_multihome() -> Result<(), String> {
-    let backup = dirs::data_dir()
-        .ok_or_else(|| "could not find AppData".to_string())?
-        .join("Hebnix")
+    let backup = crate::config::base_dir()
         .join("state")
         .join("epic_multihome_backup.txt");
     if let Ok(contents) = std::fs::read_to_string(&backup) {

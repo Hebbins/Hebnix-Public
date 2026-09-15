@@ -1,5 +1,7 @@
-use crate::config::Config;
+use crate::config::{Config, PatchSource};
 use crate::messages::AppMsg;
+use crate::patcher::catalog::PatchCatalog;
+use crate::patcher::patch_source_selector;
 use crossbeam_channel::{Receiver, Sender};
 use eframe::egui;
 use serde::Deserialize;
@@ -54,6 +56,8 @@ pub struct PatcherState {
     pub search_filter: String,
     pub show_applied: bool,
     pub page: usize,
+    pub(crate) source: PatchSource,
+    catalog: PatchCatalog,
     local_tx: Sender<PatcherOp>,
     local_rx: Receiver<PatcherOp>,
     pub confirm_delete: Option<BallItem>,
@@ -79,6 +83,8 @@ impl PatcherState {
             search_filter: String::new(),
             show_applied: false,
             page: 0,
+            source: config.patcher.ball_source,
+            catalog: PatchCatalog::new(base_dir, "ball"),
             confirm_delete: None,
             local_tx,
             local_rx,
@@ -574,8 +580,12 @@ impl PatcherState {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Refresh").clicked() {
-                    self.refresh_balls();
-                    let _ = tx.send(AppMsg::Log("[Patcher] Balls list refreshed.".to_string()));
+                    if self.source == PatchSource::Catalog {
+                        self.catalog.refresh(ctx);
+                    } else {
+                        self.refresh_balls();
+                        let _ = tx.send(AppMsg::Log("[Patcher] Balls list refreshed.".to_string()));
+                    }
                 }
 
                 let restore_enabled =
@@ -598,11 +608,13 @@ impl PatcherState {
                     )
                     .clicked()
                 {
-                    if let Some(file) = rfd::FileDialog::new()
-                        .add_filter("ZIP Archives", &["zip"])
-                        .pick_file()
-                    {
-                        self.import_zip(&file, tx);
+                    let dialog = rfd::FileDialog::new().add_filter("ZIP Archives", &["zip"]);
+                    if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
+                        if self.import_zip(&file, tx) {
+                            self.source = PatchSource::Custom;
+                            config.patcher.ball_source = self.source;
+                            let _ = config.save(&self.base_dir);
+                        }
                     }
                 }
                 if ui
@@ -617,6 +629,23 @@ impl PatcherState {
         ui.add_space(8.0);
         ui.separator();
         ui.add_space(8.0);
+
+        if patch_source_selector(ui, &mut self.source) {
+            config.patcher.ball_source = self.source;
+            let _ = config.save(&self.base_dir);
+        }
+        ui.add_space(8.0);
+
+        if self.source == PatchSource::Catalog {
+            if let Some(path) = self.catalog.render(ui, &self.search_filter, ctx, tx, 4) {
+                if self.import_zip(&path, tx) {
+                    self.source = PatchSource::Custom;
+                    config.patcher.ball_source = self.source;
+                    let _ = config.save(&self.base_dir);
+                }
+            }
+            return;
+        }
 
         egui::ScrollArea::vertical()
             .id_salt("patcher_balls_scroll")
@@ -762,7 +791,7 @@ impl PatcherState {
             });
     }
 
-    fn import_zip(&mut self, zip_path: &Path, tx: &Sender<AppMsg>) {
+    fn import_zip(&mut self, zip_path: &Path, tx: &Sender<AppMsg>) -> bool {
         let _ = tx.send(AppMsg::Log("[Patcher] Extracting ZIP...".to_string()));
 
         match (|| -> Result<(), String> {
@@ -793,12 +822,14 @@ impl PatcherState {
             Ok(_) => {
                 let _ = tx.send(AppMsg::Log("[Patcher] Imported successfully!".to_string()));
                 self.refresh_balls();
+                true
             }
             Err(e) => {
                 let _ = tx.send(AppMsg::Log(format!(
                     "[Patcher] Failed to import ZIP: {}",
                     e
                 )));
+                false
             }
         }
     }

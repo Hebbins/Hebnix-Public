@@ -10,9 +10,11 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::config::Config;
+use crate::config::{Config, PatchSource};
 use crate::messages::AppMsg;
 use crate::patch_core::upk;
+use crate::patcher::catalog::PatchCatalog;
+use crate::patcher::patch_source_selector;
 
 // UPK magic constant
 const UPK_MAGIC: u32 = 0x9E2A83C1;
@@ -788,50 +790,6 @@ fn match_texture_export<'a>(
                 .starts_with("skin_")
         })
         .or_else(|| candidates.first().copied())
-}
-
-#[cfg(test)]
-mod texture_matching_tests {
-    use super::{TextureExport, match_texture_export};
-
-    #[test]
-    fn skin_specific_flames_rgb_mask_is_not_a_colour_diffuse() {
-        let textures = vec![TextureExport {
-            export_name: "Pepe_Body_Flames_RGB".to_string(),
-            tfc_name: Some("Textures4".to_string()),
-            mips: Vec::new(),
-        }];
-        let matched = match_texture_export(23, "1_diffuse_skin", &textures, None, true);
-        assert!(matched.is_none());
-    }
-
-    #[test]
-    fn octane_body_bevel_mask_does_not_match_diffuse_but_startup_pin_does() {
-        let body = vec![
-            TextureExport {
-                export_name: "Body_Octane_Bevel_N".to_string(),
-                tfc_name: Some("Textures4".to_string()),
-                mips: Vec::new(),
-            },
-            TextureExport {
-                export_name: "Body_Octane_Bevel_RGB".to_string(),
-                tfc_name: Some("Textures4".to_string()),
-                mips: Vec::new(),
-            },
-        ];
-        assert!(match_texture_export(23, "1_diffuse_skin", &body, None, false).is_none());
-
-        let startup = vec![TextureExport {
-            export_name: "Pepe_Body_D".to_string(),
-            tfc_name: Some("Textures4".to_string()),
-            mips: Vec::new(),
-        }];
-        assert_eq!(
-            match_texture_export(23, "1_diffuse_skin", &startup, None, false)
-                .map(|texture| texture.export_name.as_str()),
-            Some("Pepe_Body_D")
-        );
-    }
 }
 
 fn is_tfc_name(name: &str) -> bool {

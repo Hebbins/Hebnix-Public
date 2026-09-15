@@ -123,10 +123,7 @@ pub fn embedded_wintun_path() -> Result<PathBuf, String> {
 }
 
 fn embedded_runtime_dir() -> Result<PathBuf, String> {
-    let root = dirs::data_dir()
-        .ok_or_else(|| "could not find AppData".to_string())?
-        .join("Hebnix")
-        .join("multiplayer-lan");
+    let root = crate::config::base_dir().join("multiplayer-lan");
     let driver = root
         .join("tap-driver")
         .join("dist.win10")

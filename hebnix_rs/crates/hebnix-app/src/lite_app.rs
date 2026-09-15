@@ -48,6 +48,7 @@ enum SettingsTab {
 enum HebnixSettingsTab {
     Interface,
     Directories,
+    Discord,
     System,
 }
 
@@ -76,6 +77,7 @@ pub struct LiteApp {
     ws_stats: Arc<WsStatsClient>,
     stats_tx: Sender<StatsEvent>,
     monitor: Monitor,
+    discord_presence: crate::discord_presence::DiscordPresence,
     plugin_mgr: PluginManager,
     tray: Option<Tray>,
     hotkey: Option<ToggleHotkey>,
@@ -121,6 +123,7 @@ pub struct LiteApp {
     statsapi_notice: Option<String>,
     statsapi_blocking: bool,
     in_match: bool,
+    discord_match: Option<crate::discord_presence::MatchInfo>,
     update_info: Option<crate::update::UpdateInfo>,
     update_downloading: bool,
     update_error: Option<String>,
@@ -253,6 +256,13 @@ impl LiteApp {
             winutil::install_minimize_hook(hwnd, &cc.egui_ctx);
         }
 
+        let discord_presence =
+            crate::discord_presence::DiscordPresence::start(config.settings.discord_rich_presence);
+        discord_presence.set_idle(
+            &config.settings,
+            hebnix_sdk::process::is_rocket_league_running(),
+        );
+
         let mut app = Self {
             base_dir,
             themes_dir,
@@ -265,6 +275,7 @@ impl LiteApp {
             ws_stats,
             stats_tx,
             monitor,
+            discord_presence,
             plugin_mgr,
             tray,
             hotkey,
@@ -308,6 +319,7 @@ impl LiteApp {
             statsapi_notice: None,
             statsapi_blocking: false,
             in_match: false,
+            discord_match: None,
             update_info: None,
             update_downloading: false,
             update_error: None,
@@ -454,7 +466,22 @@ impl LiteApp {
             self.status_color = Color32::from_rgb(0xdc, 0xe4, 0xee);
         }
         self.plugin_mgr.shared.borrow_mut().rl_connected = self.currently_connected;
+        if !self.in_match && !self.match_ended {
+            self.discord_presence
+                .set_idle(&self.config.settings, rl_open);
+        }
         self.first_status = false;
+    }
+
+    fn refresh_discord_presence(&self) {
+        if (self.in_match || self.match_ended)
+            && let Some(info) = self.discord_match.as_ref()
+        {
+            self.discord_presence.set_match(&self.config.settings, info);
+        } else {
+            self.discord_presence
+                .set_idle(&self.config.settings, self.last_rl_open);
+        }
     }
 
     fn handle_messages(&mut self, ctx: &egui::Context) {
@@ -660,9 +687,24 @@ impl LiteApp {
     fn handle_game_event(&mut self, event: StatsEvent) {
         match event.event_type.as_str() {
             "UpdateState" => {
+                let entered_match = !self.in_match && !self.match_ended;
                 if !self.match_ended {
                     self.in_match = true;
                     self.plugin_mgr.shared.borrow_mut().in_match = true;
+                }
+                if let Some(state) = event.update_state() {
+                    if entered_match {
+                        let log = hebnix_sdk::log::parse_launch_log(None, true, "INT");
+                        self.discord_match = Some(crate::discord_presence::MatchInfo::from_state(
+                            state,
+                            log.game.as_ref(),
+                        ));
+                    } else if let Some(info) = self.discord_match.as_mut() {
+                        info.update_state(state);
+                    }
+                    if let Some(info) = self.discord_match.as_ref() {
+                        self.discord_presence.set_match(&self.config.settings, info);
+                    }
                 }
                 self.plugin_mgr.dispatch_game_event(&event);
             }
@@ -670,12 +712,15 @@ impl LiteApp {
                 self.in_match = false;
                 self.match_ended = true;
                 self.plugin_mgr.shared.borrow_mut().in_match = false;
+                self.refresh_discord_presence();
                 self.plugin_mgr.dispatch_game_event(&event);
             }
             "MatchDestroyed" => {
                 self.in_match = false;
                 self.match_ended = false;
                 self.plugin_mgr.shared.borrow_mut().in_match = false;
+                self.discord_match = None;
+                self.refresh_discord_presence();
                 if !self.config.settings.suppress_left_alerts {
                     self.console
                         .write("[Core] Left match or game closed. Resetting plugin metrics.");
@@ -763,6 +808,7 @@ impl LiteApp {
         self.stats.stop();
         self.ws_stats.stop();
         self.monitor.stop();
+        self.discord_presence.stop();
         self.tray = None;
         std::process::exit(0);
     }
@@ -1676,17 +1722,24 @@ impl LiteApp {
                     HebnixSettingsTab::System,
                     "System",
                 );
+                ui.selectable_value(
+                    &mut self.hebnix_settings_tab,
+                    HebnixSettingsTab::Discord,
+                    "Discord",
+                );
             });
         ui.vertical(|ui| {
             ui.heading(match self.hebnix_settings_tab {
                 HebnixSettingsTab::Interface => "Interface Configuration",
                 HebnixSettingsTab::Directories => "Directories & Files Configuration",
+                HebnixSettingsTab::Discord => "Discord",
                 HebnixSettingsTab::System => "System Configuration",
             });
             ui.add_space(8.0);
             match self.hebnix_settings_tab {
                 HebnixSettingsTab::Interface => self.render_interface_settings(ui),
                 HebnixSettingsTab::Directories => self.render_stats_settings(ui),
+                HebnixSettingsTab::Discord => self.render_discord_settings(ui),
                 HebnixSettingsTab::System => self.render_system_settings(ui),
             }
         });
@@ -1838,6 +1891,94 @@ impl LiteApp {
             self.refresh_statsapi();
         }
         ui.weak("Changes to the ini apply after restarting Rocket League.");
+    }
+
+    fn render_discord_settings(&mut self, ui: &mut egui::Ui) {
+        let mut changed = false;
+        if ui
+            .checkbox(
+                &mut self.config.settings.discord_rich_presence,
+                "Enable Discord Rich Presence",
+            )
+            .changed()
+        {
+            self.discord_presence
+                .configure(self.config.settings.discord_rich_presence);
+            changed = true;
+        }
+        ui.add_space(8.0);
+        ui.label("Message:");
+        let mut game_state = self.config.settings.discord_game_state;
+        if ui.checkbox(&mut game_state, "Game State").changed() {
+            self.config.settings.discord_game_state = game_state;
+            changed = true;
+        }
+
+        let selected = self.config.settings.discord_show_score as u8
+            + self.config.settings.discord_show_map as u8
+            + self.config.settings.discord_show_gamemode as u8;
+        if ui
+            .add_enabled(
+                !self.config.settings.discord_show_score || selected > 1,
+                egui::Checkbox::new(&mut self.config.settings.discord_show_score, "Show score"),
+            )
+            .changed()
+        {
+            changed = true;
+        }
+        let selected = self.config.settings.discord_show_score as u8
+            + self.config.settings.discord_show_map as u8
+            + self.config.settings.discord_show_gamemode as u8;
+        if ui
+            .add_enabled(
+                !self.config.settings.discord_show_map || selected > 1,
+                egui::Checkbox::new(&mut self.config.settings.discord_show_map, "Show map"),
+            )
+            .changed()
+        {
+            changed = true;
+        }
+        let selected = self.config.settings.discord_show_score as u8
+            + self.config.settings.discord_show_map as u8
+            + self.config.settings.discord_show_gamemode as u8;
+        if ui
+            .add_enabled(
+                !self.config.settings.discord_show_gamemode || selected > 1,
+                egui::Checkbox::new(
+                    &mut self.config.settings.discord_show_gamemode,
+                    "Show gamemode",
+                ),
+            )
+            .changed()
+        {
+            changed = true;
+        }
+
+        ui.horizontal(|ui| {
+            let mut custom = !self.config.settings.discord_game_state;
+            if ui.checkbox(&mut custom, "Custom").changed() {
+                self.config.settings.discord_game_state = !custom;
+                changed = true;
+            }
+            if ui
+                .add_enabled(
+                    custom,
+                    egui::TextEdit::singleline(&mut self.config.settings.discord_custom_message)
+                        .hint_text("Custom message")
+                        .desired_width(280.0),
+                )
+                .changed()
+            {
+                changed = true;
+            }
+        });
+        if self.config.settings.discord_game_state {
+            ui.weak("The custom message is disabled while Game State is selected.");
+        }
+        if changed {
+            self.save_config();
+            self.refresh_discord_presence();
+        }
     }
 
     fn render_system_settings(&mut self, ui: &mut egui::Ui) {
@@ -2362,6 +2503,7 @@ impl Drop for LiteApp {
         self.stats.stop();
         self.ws_stats.stop();
         self.monitor.stop();
+        self.discord_presence.stop();
     }
 }
 

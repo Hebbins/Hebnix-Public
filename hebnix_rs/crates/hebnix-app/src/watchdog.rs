@@ -63,9 +63,7 @@ pub fn run(parent_pid: u32) {
 }
 
 fn watchdog_owner_path() -> std::path::PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("Hebnix")
+    crate::config::base_dir()
         .join("state")
         .join("watchdog_owner.pid")
 }

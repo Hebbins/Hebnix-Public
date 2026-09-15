@@ -5,8 +5,9 @@ target/ (no deps/, build/, .ilk, .d...).
 dist/ =
   hebnix-app.exe
   hebnix-lite.exe
-  steam_api64.dll         eos steam auth
-  rlapi-bridge.exe        psynet bridge (from rlapi_bridge/dist/)
+
+Support programs are embedded in both executables and extracted under
+%AppData%\Hebnix at runtime.
 
 pdb (target/release/hebnix_app.pdb, big) is not shipped by default. keep it
 archived per release so you can symbolicate a user's crash.txt later. -WithPdb
@@ -57,9 +58,7 @@ New-Item -ItemType Directory -Path $distDir | Out-Null
 
 $files = @(
     (Join-Path $releaseDir 'hebnix-app.exe'),
-    (Join-Path $releaseDir 'hebnix-lite.exe'),
-    $steamDll,
-    $bridgeExe
+    (Join-Path $releaseDir 'hebnix-lite.exe')
 )
 # rust names the exe hebnix-app.exe but the pdb hebnix_app.pdb (underscore),
 # and that underscore name is what's baked into the exe, so ship it as-is.
