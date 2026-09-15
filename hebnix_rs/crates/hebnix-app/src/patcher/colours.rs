@@ -8,19 +8,79 @@ use flate2::write::ZlibEncoder;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
+<<<<<<< Updated upstream
 use std::io::{Read, Write};
+=======
+use std::io::{Read, Seek, SeekFrom, Write};
+>>>>>>> Stashed changes
 use std::path::{Path, PathBuf};
 
 const UPK_MAGIC: u32 = 2_653_586_369;
 const BLOCK_SIZE: usize = 131_072;
 const BACKUP_NAME: &str = "TAGame.upk.bak";
 const STATE_NAME: &str = "active_colours.json";
+<<<<<<< Updated upstream
+=======
+const BOOST_ARENA_BACKUP_NAME: &str = "boost_pickup_materials.json";
+const BOOST_TEXTURE_BACKUP_NAME: &str = "boost_pickup_textures.json";
+>>>>>>> Stashed changes
 
 const BLUE_DEFAULT: &str = "39b4c83d79e9e63e0000803f0000803f9487053ffbcb4e3f79e9663f0000803f79e9663f79e9663f0000803f0000803f";
 const BLUE_COLOUR_BLIND: &str = "cdcccc3d0000803ecdcc4c3f0000803fcdcccc3d6666263f0000803f0000803f6666663f0000803f0000803f0000803f";
 const ORANGE_DEFAULT: &str = "61c3433f70cec83e39b4c83d0000803f79e9663f7cf2703e39b4c83d0000803f26e4633f26e4633f26e4633f0000803f";
 const ORANGE_COLOUR_BLIND: &str = "cdcc4c3f6666e63ecdcccc3d0000803f0000803f6666263f000000000000803f0000803f0000803f6666663f0000803f";
 
+<<<<<<< Updated upstream
+=======
+#[cfg(test)]
+const BOOST_ARENA_PACKAGES: &[&str] = &[
+    "Stadium_P",
+    "Stadium_Day_P",
+    "Stadium_Foggy_P",
+    "Stadium_Winter_P",
+    "EuroStadium_P",
+    "EuroStadium_Night_P",
+    "EuroStadium_Dusk_P",
+    "EuroStadium_Rainy_P",
+    "EuroStadium_SnowNight_P",
+    "UtopiaStadium_P",
+    "UtopiaStadium_Dusk_P",
+    "UtopiaStadium_Snow_P",
+    "UtopiaStadium_Lux_P",
+    "TrainStation_P",
+    "TrainStation_Night_P",
+    "TrainStation_Dawn_P",
+    "Park_P",
+    "Park_Night_P",
+    "Park_Rainy_P",
+    "Park_Snowy_P",
+    "Outlaw_P",
+    "UF_Night_P",
+    "Street_P",
+    "Farm_P",
+    "Farm_Night_P",
+    "Farm_GRS_P",
+    "UF_Day_P",
+    "Paname_Dusk_P",
+    "CS_P",
+    "CS_Day_P",
+    "Beach_P",
+    "Beach_Night_P",
+    "NeoTokyo_Standard_P",
+    "Underwater_P",
+    "Wasteland_S_P",
+    "Wasteland_Night_S_P",
+    "CHN_Stadium_P",
+    "CHN_Stadium_Day_P",
+    "ARC_Standard_P",
+    "Music_P",
+    "Woods_P",
+    "Woods_Night_P",
+    "Mall_Day_P",
+    "FF_Dusk_P",
+];
+
+>>>>>>> Stashed changes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColourAction {
     Apply,
@@ -38,6 +98,51 @@ pub struct ColourSettings {
     pub applied: bool,
 }
 
+<<<<<<< Updated upstream
+=======
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct BoostArenaManifest {
+    packages: Vec<BoostArenaBackup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BoostArenaBackup {
+    file: String,
+    guid: [u8; 16],
+    values: Vec<BoostMaterialValue>,
+    #[serde(default)]
+    emitter_values: Vec<BoostEmitterValue>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct BoostEmitterValue {
+    key: String,
+    object_ref: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct BoostTextureManifest {
+    regions: Vec<BoostTextureBackup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BoostTextureBackup {
+    tfc: String,
+    file_size: u64,
+    offset: u64,
+    size: usize,
+    backup_file: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct BoostMaterialValue {
+    export: String,
+    parameter: String,
+    instance: i32,
+    rgb: [u8; 12],
+}
+
+>>>>>>> Stashed changes
 impl Default for ColourSettings {
     fn default() -> Self {
         Self {
@@ -65,7 +170,12 @@ impl ColoursState {
         Self {
             settings: ColourSettings::default(),
             busy: false,
+<<<<<<< Updated upstream
             status: "Choose the stadium and HUD colours, then apply them together.".into(),
+=======
+            status: "Choose the stadium, HUD and garage palette colours, then apply them together."
+                .into(),
+>>>>>>> Stashed changes
             error: false,
             result_rx: None,
             loaded_backups_dir: None,
@@ -200,8 +310,13 @@ impl ColoursState {
         self.busy = true;
         self.error = false;
         self.status = match action {
+<<<<<<< Updated upstream
             ColourAction::Apply => "Applying colours from the pristine backup…",
             ColourAction::Restore => "Restoring the original TAGame.upk…",
+=======
+            ColourAction::Apply => "Applying stadium, HUD and garage palette colours…",
+            ColourAction::Restore => "Restoring original colours…",
+>>>>>>> Stashed changes
         }
         .into();
         let cooked_pc = cooked_pc.to_path_buf();
@@ -245,7 +360,11 @@ impl ColoursState {
             }
             Ok(ColourAction::Restore) => {
                 self.settings = ColourSettings::default();
+<<<<<<< Updated upstream
                 self.status = "Original stadium, HUD and garage colours restored.".into();
+=======
+                self.status = "Original stadium, HUD and garage palette colours restored.".into();
+>>>>>>> Stashed changes
                 self.error = false;
             }
             Err(error) => {
@@ -292,6 +411,140 @@ fn save_state(backups_dir: &Path, settings: &ColourSettings) -> Result<(), Strin
     fs::rename(&temp, &path).map_err(|error| format!("Could not save colour settings: {error}"))
 }
 
+<<<<<<< Updated upstream
+=======
+fn load_boost_manifest(backups_dir: &Path) -> Result<BoostArenaManifest, String> {
+    let path = backups_dir.join(BOOST_ARENA_BACKUP_NAME);
+    if !path.is_file() {
+        return Ok(BoostArenaManifest::default());
+    }
+    serde_json::from_slice(
+        &fs::read(&path)
+            .map_err(|error| format!("Could not read boost-pad restore data: {error}"))?,
+    )
+    .map_err(|error| format!("Boost-pad restore data is invalid: {error}"))
+}
+
+fn load_boost_texture_manifest(backups_dir: &Path) -> Result<BoostTextureManifest, String> {
+    let path = backups_dir.join(BOOST_TEXTURE_BACKUP_NAME);
+    if !path.is_file() {
+        return Ok(BoostTextureManifest::default());
+    }
+    serde_json::from_slice(
+        &fs::read(&path)
+            .map_err(|error| format!("Could not read boost texture restore data: {error}"))?,
+    )
+    .map_err(|error| format!("Boost texture restore data is invalid: {error}"))
+}
+
+fn read_file_region(path: &Path, offset: u64, size: usize) -> Result<Vec<u8>, String> {
+    let mut file = fs::File::open(path)
+        .map_err(|error| format!("Could not open {}: {error}", path.display()))?;
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|error| format!("Could not seek {}: {error}", path.display()))?;
+    let mut bytes = vec![0u8; size];
+    file.read_exact(&mut bytes)
+        .map_err(|error| format!("Could not read {} at {offset}: {error}", path.display()))?;
+    Ok(bytes)
+}
+
+fn write_file_region(path: &Path, offset: u64, bytes: &[u8]) -> Result<(), String> {
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(path)
+        .map_err(|error| format!("Could not open {} for writing: {error}", path.display()))?;
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|error| format!("Could not seek {}: {error}", path.display()))?;
+    file.write_all(bytes)
+        .map_err(|error| format!("Could not write {} at {offset}: {error}", path.display()))?;
+    file.flush()
+        .map_err(|error| format!("Could not flush {}: {error}", path.display()))
+}
+
+fn restore_boost_texture_colours(cooked_pc: &Path, backups_dir: &Path) -> Result<(), String> {
+    let manifest_path = backups_dir.join(BOOST_TEXTURE_BACKUP_NAME);
+    if !manifest_path.is_file() {
+        return Ok(());
+    }
+    let manifest = load_boost_texture_manifest(backups_dir)?;
+    for saved in &manifest.regions {
+        let tfc_path = cooked_pc.join(&saved.tfc);
+        let file_size = fs::metadata(&tfc_path)
+            .map_err(|error| format!("Could not inspect {}: {error}", tfc_path.display()))?
+            .len();
+        if file_size != saved.file_size {
+            return Err(format!(
+                "{} changed after its boost textures were backed up; it was not restored.",
+                saved.tfc
+            ));
+        }
+        let backup_path = backups_dir.join(&saved.backup_file);
+        let bytes = fs::read(&backup_path)
+            .map_err(|error| format!("Could not read {}: {error}", backup_path.display()))?;
+        if bytes.len() != saved.size {
+            return Err(format!("{} has the wrong size", backup_path.display()));
+        }
+        write_file_region(&tfc_path, saved.offset, &bytes)?;
+        if read_file_region(&tfc_path, saved.offset, saved.size)? != bytes {
+            return Err(format!("{} did not restore exactly", saved.tfc));
+        }
+    }
+    for saved in &manifest.regions {
+        let _ = fs::remove_file(backups_dir.join(&saved.backup_file));
+    }
+    fs::remove_file(&manifest_path)
+        .map_err(|error| format!("Could not remove restored boost texture data: {error}"))
+}
+fn restore_arena_boost_colours(cooked_pc: &Path, backups_dir: &Path) -> Result<(), String> {
+    let path = backups_dir.join(BOOST_ARENA_BACKUP_NAME);
+    if !path.is_file() {
+        return Ok(());
+    }
+    let manifest = load_boost_manifest(backups_dir)?;
+    for saved in &manifest.packages {
+        let live = cooked_pc.join(&saved.file);
+        let raw = fs::read(&live).map_err(|error| {
+            format!(
+                "Could not read {} while restoring boost-pad colours: {error}",
+                saved.file
+            )
+        })?;
+        if package_guid(&raw)? != saved.guid {
+            return Err(format!(
+                "{} changed after its boost-pad colours were backed up; it was not restored.",
+                saved.file
+            ));
+        }
+        let mut package = Package::load(raw)
+            .map_err(|error| format!("Could not parse {} while restoring: {error}", saved.file))?;
+        package
+            .restore_active_boost_materials(&saved.values)
+            .map_err(|error| format!("Could not restore boost pads in {}: {error}", saved.file))?;
+        package
+            .restore_active_boost_emitters(&saved.emitter_values)
+            .map_err(|error| format!("Could not restore boost orbs in {}: {error}", saved.file))?;
+        let temp = cooked_pc.join(format!("{}.boost-colours.restore.tmp", saved.file));
+        fs::write(&temp, package.save()?)
+            .map_err(|error| format!("Could not prepare {} for restore: {error}", saved.file))?;
+        Package::load(fs::read(&temp).map_err(|error| {
+            format!("Could not validate {} during restore: {error}", saved.file)
+        })?)
+        .map_err(|error| format!("Restored {} failed validation: {error}", saved.file))?;
+        if let Err(error) = fs::copy(&temp, &live) {
+            let _ = fs::remove_file(&temp);
+            return Err(format!(
+                "Could not restore active boost pads in {}: {error}",
+                saved.file
+            ));
+        }
+        let _ = fs::remove_file(&temp);
+    }
+    fs::remove_file(&path)
+        .map_err(|error| format!("Could not remove restored boost-pad data: {error}"))
+}
+
+>>>>>>> Stashed changes
 fn apply(cooked_pc: &Path, backups_dir: &Path, settings: &ColourSettings) -> Result<(), String> {
     let live = cooked_pc.join("TAGame.upk");
     if !live.is_file() {
@@ -302,6 +555,13 @@ fn apply(cooked_pc: &Path, backups_dir: &Path, settings: &ColourSettings) -> Res
     }
     fs::create_dir_all(backups_dir)
         .map_err(|error| format!("Could not create the backup directory: {error}"))?;
+<<<<<<< Updated upstream
+=======
+    // Clean up boost-pickup patches made by earlier builds. This path is kept
+    // only for migration; the Colours tab no longer applies boost changes.
+    restore_boost_texture_colours(cooked_pc, backups_dir)?;
+    restore_arena_boost_colours(cooked_pc, backups_dir)?;
+>>>>>>> Stashed changes
     let backup = backups_dir.join(BACKUP_NAME);
     let live_bytes = fs::read(&live).map_err(|error| error.to_string())?;
     if backup.is_file()
@@ -369,6 +629,11 @@ fn restore(cooked_pc: &Path, backups_dir: &Path) -> Result<(), String> {
                 .into(),
         );
     }
+<<<<<<< Updated upstream
+=======
+    restore_boost_texture_colours(cooked_pc, backups_dir)?;
+    restore_arena_boost_colours(cooked_pc, backups_dir)?;
+>>>>>>> Stashed changes
     let temp = cooked_pc.join("TAGame.upk.colours.restore.tmp");
     fs::write(&temp, &original)
         .map_err(|error| format!("Could not prepare the restore: {error}"))?;
@@ -389,11 +654,19 @@ struct Chunk {
 #[derive(Clone, Copy)]
 struct FName {
     index: i32,
+<<<<<<< Updated upstream
+=======
+    number: i32,
+>>>>>>> Stashed changes
 }
 
 #[derive(Clone, Copy)]
 struct Export {
     class_index: i32,
+<<<<<<< Updated upstream
+=======
+    outer_index: i32,
+>>>>>>> Stashed changes
     object_name: FName,
     serial_size: usize,
     serial_offset: usize,
@@ -405,6 +678,29 @@ struct Prop {
     value_offset: usize,
 }
 
+<<<<<<< Updated upstream
+=======
+#[derive(Clone, Copy)]
+enum BoostColourSource {
+    Main,
+    Secondary,
+}
+
+struct BoostMaterialTarget {
+    export: &'static str,
+    parameter: &'static str,
+    instance: i32,
+    offset: usize,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+struct BoostEmitterTarget {
+    key: &'static str,
+    offset: usize,
+    replacement: i32,
+}
+
+>>>>>>> Stashed changes
 struct Package {
     raw: Vec<u8>,
     key: [u8; 32],
@@ -531,6 +827,10 @@ impl Package {
         pos = export_offset;
         for _ in 0..export_count {
             let class_index = read_i32(&image, pos)?;
+<<<<<<< Updated upstream
+=======
+            let outer_index = read_i32(&image, pos + 8)?;
+>>>>>>> Stashed changes
             pos += 12;
             let (object_name, next) = read_fname(&image, pos, file_version)?;
             pos = next + 4 + 8;
@@ -541,6 +841,10 @@ impl Package {
             pos += 4 + net_count * 4 + 16 + 4;
             exports.push(Export {
                 class_index,
+<<<<<<< Updated upstream
+=======
+                outer_index,
+>>>>>>> Stashed changes
                 object_name,
                 serial_size,
                 serial_offset,
@@ -708,6 +1012,599 @@ impl Package {
         Ok(())
     }
 
+<<<<<<< Updated upstream
+=======
+    fn boost_material_targets(&self) -> Result<Vec<BoostMaterialTarget>, String> {
+        let specifications = [
+            (
+                "BoostPad_Glowing_INST",
+                "BoostPad_Color",
+                0,
+                BoostColourSource::Main,
+                1.0,
+            ),
+            (
+                "BoostPad_Scroll_INST",
+                "BoostPad_ScrollColor",
+                2,
+                BoostColourSource::Main,
+                1.0,
+            ),
+            (
+                "BoostPad_Scroll_INST",
+                "BoostPad_ScrollColor",
+                3,
+                BoostColourSource::Secondary,
+                2.0,
+            ),
+        ];
+        let mut targets = Vec::with_capacity(27);
+        for (export_name, parameter, instance, _source, _intensity) in specifications {
+            let export = self
+                .exports
+                .iter()
+                .copied()
+                .find(|export| {
+                    self.name_of(export.object_name).map(strip_suffix) == Some(export_name)
+                })
+                .ok_or_else(|| format!("{export_name} was not found"))?;
+            let vectors = self
+                .parse_props(export)
+                .into_iter()
+                .find(|prop| prop.name == "VectorParameterValues")
+                .ok_or_else(|| format!("{export_name}.VectorParameterValues was not found"))?;
+            let start = export.serial_offset + vectors.value_offset;
+            let end = start + vectors.size;
+            let mut value_offset = None;
+            if end >= start + 56 {
+                for at in (start + 4..=end - 52).step_by(4) {
+                    if self.raw_fname_matches(at, parameter, instance)
+                        && self.raw_fname_matches(at + 8, "ParameterValue", 0)
+                        && self.raw_fname_matches(at + 16, "StructProperty", 0)
+                        && read_i32(&self.image, at + 24).ok() == Some(16)
+                        && self.raw_fname_matches(at + 32, "LinearColor", 0)
+                    {
+                        value_offset = Some(at + 40);
+                        break;
+                    }
+                }
+            }
+            targets.push(BoostMaterialTarget {
+                export: export_name,
+                parameter,
+                instance,
+                offset: value_offset.ok_or_else(|| {
+                    format!("{export_name}.{parameter}_{instance} has changed layout")
+                })?,
+            });
+        }
+
+        for (instance, _intensity) in [(2, 7.0), (5, 10.0)] {
+            let export = self
+                .exports
+                .iter()
+                .copied()
+                .find(|export| {
+                    self.class_of(*export).map(strip_suffix) == Some("ParticleModuleColor")
+                        && self.name_of(export.object_name).map(strip_suffix)
+                            == Some("ParticleModuleColor")
+                        && export.object_name.number == instance
+                        && self.export_has_outer_named(*export, "BoostOrb_PS")
+                })
+                .ok_or_else(|| {
+                    format!("BoostOrb_PS.ParticleModuleColor_{instance} was not found")
+                })?;
+            let start_colour = self
+                .parse_props(export)
+                .into_iter()
+                .find(|prop| prop.name == "StartColor" && prop.size == 96)
+                .ok_or_else(|| {
+                    format!("BoostOrb_PS.ParticleModuleColor_{instance}.StartColor changed layout")
+                })?;
+            let start = export.serial_offset + start_colour.value_offset;
+            if !self.raw_fname_matches(start, "Distribution", 0)
+                || !self.raw_fname_matches(start + 8, "ObjectProperty", 0)
+                || read_i32(&self.image, start + 16).ok() != Some(4)
+                || !self.raw_fname_matches(start + 28, "LookupTable", 0)
+                || !self.raw_fname_matches(start + 36, "ArrayProperty", 0)
+                || read_i32(&self.image, start + 44).ok() != Some(36)
+                || read_i32(&self.image, start + 52).ok() != Some(8)
+            {
+                return Err(format!(
+                    "BoostOrb_PS.ParticleModuleColor_{instance}.StartColor lookup table changed layout"
+                ));
+            }
+            for (parameter, offset) in [
+                ("StartColorLookupA", start + 64),
+                ("StartColorLookupB", start + 76),
+            ] {
+                targets.push(BoostMaterialTarget {
+                    export: "ParticleModuleColor",
+                    parameter,
+                    instance,
+                    offset,
+                });
+            }
+        }
+
+        let cone = self
+            .exports
+            .iter()
+            .copied()
+            .find(|export| {
+                self.class_of(*export).map(strip_suffix)
+                    == Some("MaterialExpressionVectorParameter")
+                    && self.name_of(export.object_name).map(strip_suffix)
+                        == Some("MaterialExpressionVectorParameter")
+                    && export.object_name.number == 1
+                    && self.export_has_outer_named(*export, "BoostPad_LightCone_03_Mat")
+            })
+            .ok_or("BoostPad_LightCone_03_Mat colour expression was not found")?;
+        let cone_colour = self
+            .parse_props(cone)
+            .into_iter()
+            .find(|prop| prop.name == "DefaultValue" && prop.size == 16)
+            .ok_or("BoostPad_LightCone_03_Mat colour expression changed layout")?;
+        targets.push(BoostMaterialTarget {
+            export: "MaterialExpressionVectorParameter",
+            parameter: "BoostPadLightConeDefaultValue",
+            instance: 1,
+            offset: cone.serial_offset + cone_colour.value_offset,
+        });
+
+        for (parameter, _source, _intensity) in [
+            ("ColorA", BoostColourSource::Main, 0.88),
+            ("ColorB", BoostColourSource::Secondary, 1.0),
+            ("ColorC", BoostColourSource::Main, 1.0),
+        ] {
+            let expression = self
+                .exports
+                .iter()
+                .copied()
+                .find(|export| {
+                    if self.class_of(*export).map(strip_suffix)
+                        != Some("MaterialExpressionVectorParameter")
+                        || !self.export_has_outer_named(*export, "BoostPad_02_Mat")
+                    {
+                        return false;
+                    }
+                    self.parse_props(*export)
+                        .into_iter()
+                        .find(|prop| prop.name == "ParameterName" && prop.size == 8)
+                        .and_then(|prop| {
+                            read_fname(
+                                &self.image,
+                                export.serial_offset + prop.value_offset,
+                                self.file_version,
+                            )
+                            .ok()
+                        })
+                        .and_then(|(name, _)| self.name_of(name))
+                        .map(strip_suffix)
+                        == Some(parameter)
+                })
+                .ok_or_else(|| format!("BoostPad_02_Mat.{parameter} was not found"))?;
+            let value = self
+                .parse_props(expression)
+                .into_iter()
+                .find(|prop| prop.name == "DefaultValue" && prop.size == 16)
+                .ok_or_else(|| format!("BoostPad_02_Mat.{parameter} changed layout"))?;
+            targets.push(BoostMaterialTarget {
+                export: "BoostPad_02_Mat",
+                parameter,
+                instance: 0,
+                offset: expression.serial_offset + value.value_offset,
+            });
+        }
+
+        for (material, parameter_name, key, _source, _intensity) in [
+            (
+                "BoostPad_Glowing_Mat",
+                "BoostPad_Color",
+                "ParentVectorDefault",
+                BoostColourSource::Main,
+                1.0f32,
+            ),
+            (
+                "BoostPad_Scrolling_Mat",
+                "BoostPad_ScrollColor",
+                "ParentVectorDefault",
+                BoostColourSource::Main,
+                8.0,
+            ),
+        ] {
+            let expression = self
+                .exports
+                .iter()
+                .copied()
+                .find(|export| {
+                    if self.class_of(*export).map(strip_suffix)
+                        != Some("MaterialExpressionVectorParameter")
+                        || !self.export_has_outer_named(*export, material)
+                    {
+                        return false;
+                    }
+                    self.parse_props(*export)
+                        .into_iter()
+                        .find(|prop| prop.name == "ParameterName" && prop.size == 8)
+                        .and_then(|prop| {
+                            read_fname(
+                                &self.image,
+                                export.serial_offset + prop.value_offset,
+                                self.file_version,
+                            )
+                            .ok()
+                        })
+                        .and_then(|(name, _)| self.name_of(name))
+                        .map(strip_suffix)
+                        == Some(parameter_name)
+                })
+                .ok_or_else(|| format!("{material}.{parameter_name} was not found"))?;
+            let value = self
+                .parse_props(expression)
+                .into_iter()
+                .find(|prop| prop.name == "DefaultValue" && prop.size == 16)
+                .ok_or_else(|| format!("{material}.{parameter_name} changed layout"))?;
+            targets.push(BoostMaterialTarget {
+                export: material,
+                parameter: key,
+                instance: -1,
+                offset: expression.serial_offset + value.value_offset,
+            });
+        }
+
+        for (material, outer, parameter, _source, _intensity, relative_offsets) in [
+            (
+                "BoostOrb_2D_Mat",
+                "Pickup_Boost",
+                "BakedYellow",
+                BoostColourSource::Main,
+                1.0f32,
+                &[0x471usize][..],
+            ),
+            (
+                "BoostOrb_Glow_Mat",
+                "Materials",
+                "BakedYellow",
+                BoostColourSource::Main,
+                1.0,
+                &[0x1e8usize][..],
+            ),
+            (
+                "Glow01_Mat",
+                "Mat",
+                "BakedYellow",
+                BoostColourSource::Main,
+                1.0,
+                &[0x200usize][..],
+            ),
+            (
+                "Glow_Mat",
+                "Materials",
+                "BakedYellow",
+                BoostColourSource::Main,
+                1.0,
+                &[0x236usize, 0x29a][..],
+            ),
+            (
+                "BoostPad_Mat",
+                "Materials",
+                "BakedYellow",
+                BoostColourSource::Main,
+                1.0,
+                &[0x302usize][..],
+            ),
+            (
+                "BoostPad_Mat",
+                "Materials",
+                "BakedYellowHdr",
+                BoostColourSource::Main,
+                16.0,
+                &[0x312usize][..],
+            ),
+            (
+                "BoostPad_02_Mat",
+                "Pickup_Boost",
+                "BakedYellow",
+                BoostColourSource::Main,
+                1.0,
+                &[0x2d3usize][..],
+            ),
+            (
+                "BoostPad_LightCone_03_Mat",
+                "Pickup_Boost",
+                "BakedYellow",
+                BoostColourSource::Secondary,
+                1.0,
+                &[0x308usize, 0x36c][..],
+            ),
+            (
+                "BoostPad_Glowing_Mat",
+                "QOL",
+                "BakedYellow",
+                BoostColourSource::Main,
+                1.0,
+                &[0x2c3usize, 0x327][..],
+            ),
+        ] {
+            let export = self
+                .exports
+                .iter()
+                .copied()
+                .find(|export| {
+                    self.class_of(*export).map(strip_suffix) == Some("Material")
+                        && self.name_of(export.object_name).map(strip_suffix) == Some(material)
+                        && self.export_has_outer_named(*export, outer)
+                })
+                .ok_or_else(|| format!("{outer}.{material} was not found"))?;
+            for (instance, relative) in relative_offsets.iter().copied().enumerate() {
+                if relative + 12 > export.serial_size {
+                    return Err(format!(
+                        "{outer}.{material}.{parameter}_{instance} changed layout"
+                    ));
+                }
+                let offset = export.serial_offset + relative;
+                let values = (0..3)
+                    .map(|index| {
+                        f32::from_le_bytes(
+                            self.image[offset + index * 4..offset + index * 4 + 4]
+                                .try_into()
+                                .unwrap(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                if values
+                    .iter()
+                    .any(|value| !value.is_finite() || *value < 0.0 || *value > 32.0)
+                {
+                    return Err(format!(
+                        "{outer}.{material}.{parameter}_{instance} is not a valid colour vector"
+                    ));
+                }
+                targets.push(BoostMaterialTarget {
+                    export: material,
+                    parameter,
+                    instance: instance as i32,
+                    offset,
+                });
+            }
+        }
+
+        let small_pad = self
+            .exports
+            .iter()
+            .copied()
+            .find(|export| {
+                self.class_of(*export).map(strip_suffix) == Some("MaterialInstanceConstant")
+                    && self.name_of(export.object_name).map(strip_suffix)
+                        == Some("BoostPad_Small_MIC")
+            })
+            .ok_or("BoostPad_Small_MIC was not found")?;
+        for (parameter, instance, relative, _intensity) in [
+            ("BakedYellow", 0, 0x15dusize, 1.0f32),
+            ("BakedYellowHdr", 0, 0x16dusize, 16.0f32),
+        ] {
+            if relative + 12 > small_pad.serial_size {
+                return Err(format!("BoostPad_Small_MIC.{parameter} changed layout"));
+            }
+            let offset = small_pad.serial_offset + relative;
+            let values = (0..3)
+                .map(|index| {
+                    f32::from_le_bytes(
+                        self.image[offset + index * 4..offset + index * 4 + 4]
+                            .try_into()
+                            .unwrap(),
+                    )
+                })
+                .collect::<Vec<_>>();
+            if values
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0 || *value > 32.0)
+            {
+                return Err(format!(
+                    "BoostPad_Small_MIC.{parameter} is not a valid colour vector"
+                ));
+            }
+            targets.push(BoostMaterialTarget {
+                export: "BoostPad_Small_MIC",
+                parameter,
+                instance,
+                offset,
+            });
+        }
+        Ok(targets)
+    }
+
+    fn boost_emitter_targets(&self) -> Result<Vec<BoostEmitterTarget>, String> {
+        let lod_ref = |instance: i32| -> Result<(usize, i32), String> {
+            let emitter = self
+                .exports
+                .iter()
+                .copied()
+                .find(|export| {
+                    self.class_of(*export).map(strip_suffix) == Some("ParticleSpriteEmitter")
+                        && self.name_of(export.object_name).map(strip_suffix)
+                            == Some("ParticleSpriteEmitter")
+                        && export.object_name.number == instance
+                        && self.export_has_ancestor_named(*export, "BoostOrb_PS")
+                })
+                .ok_or_else(|| {
+                    format!("BoostOrb_PS.ParticleSpriteEmitter_{instance} was not found")
+                })?;
+            let levels = self
+                .parse_props(emitter)
+                .into_iter()
+                .find(|prop| prop.name == "LODLevels" && prop.size == 8)
+                .ok_or_else(|| {
+                    format!("BoostOrb_PS.ParticleSpriteEmitter_{instance}.LODLevels changed layout")
+                })?;
+            let start = emitter.serial_offset + levels.value_offset;
+            if read_i32(&self.image, start).ok() != Some(1) {
+                return Err(format!(
+                    "BoostOrb_PS.ParticleSpriteEmitter_{instance} no longer has one LOD"
+                ));
+            }
+            let object_ref = read_i32(&self.image, start + 4)?;
+            let lod_index = object_ref
+                .checked_sub(1)
+                .and_then(|index| usize::try_from(index).ok())
+                .ok_or_else(|| {
+                    format!("BoostOrb_PS.ParticleSpriteEmitter_{instance} has an invalid LOD")
+                })?;
+            let lod = self.exports.get(lod_index).copied().ok_or_else(|| {
+                format!("BoostOrb_PS.ParticleSpriteEmitter_{instance} has an invalid LOD")
+            })?;
+            if self.class_of(lod).map(strip_suffix) != Some("ParticleLODLevel")
+                || !self.export_has_ancestor_named(lod, "BoostOrb_PS")
+            {
+                return Err(format!(
+                    "BoostOrb_PS.ParticleSpriteEmitter_{instance} has an unexpected LOD"
+                ));
+            }
+            Ok((start + 4, object_ref))
+        };
+
+        let (yellow_orb, _) = lod_ref(1)?;
+        let (yellow_glow, _) = lod_ref(2)?;
+        let (_, coloured_orb) = lod_ref(3)?;
+        let (_, coloured_glow) = lod_ref(8)?;
+        Ok(vec![
+            BoostEmitterTarget {
+                key: "BoostOrbSolidPass",
+                offset: yellow_orb,
+                replacement: coloured_orb,
+            },
+            BoostEmitterTarget {
+                key: "BoostOrbGlowPass",
+                offset: yellow_glow,
+                replacement: coloured_glow,
+            },
+        ])
+    }
+    fn export_has_outer_named(&self, export: Export, expected: &str) -> bool {
+        if export.outer_index <= 0 {
+            return false;
+        }
+        self.exports
+            .get((export.outer_index - 1) as usize)
+            .and_then(|outer| self.name_of(outer.object_name))
+            .map(strip_suffix)
+            == Some(expected)
+    }
+    fn export_has_ancestor_named(&self, export: Export, expected: &str) -> bool {
+        let mut outer = export.outer_index;
+        for _ in 0..16 {
+            if outer <= 0 {
+                return false;
+            }
+            let Some(parent) = self.exports.get((outer - 1) as usize) else {
+                return false;
+            };
+            if self.name_of(parent.object_name).map(strip_suffix) == Some(expected) {
+                return true;
+            }
+            outer = parent.outer_index;
+        }
+        false
+    }
+    fn raw_fname_matches(&self, offset: usize, expected: &str, instance: i32) -> bool {
+        read_fname(&self.image, offset, self.file_version)
+            .ok()
+            .and_then(|(name, _)| self.name_of(name))
+            .map(strip_suffix)
+            == Some(expected)
+            && read_i32(&self.image, offset + 4).ok() == Some(instance)
+    }
+
+    #[cfg(test)]
+    fn capture_boost_material_values(&self) -> Result<Vec<BoostMaterialValue>, String> {
+        self.boost_material_targets()?
+            .into_iter()
+            .map(|target| {
+                let rgb = self
+                    .image
+                    .get(target.offset..target.offset + 12)
+                    .ok_or("A boost-pad material colour is outside the package")?
+                    .try_into()
+                    .map_err(|_| "A boost-pad material colour has the wrong size")?;
+                Ok(BoostMaterialValue {
+                    export: target.export.into(),
+                    parameter: target.parameter.into(),
+                    instance: target.instance,
+                    rgb,
+                })
+            })
+            .collect()
+    }
+
+    #[cfg(test)]
+    fn capture_boost_emitter_values(&self) -> Result<Vec<BoostEmitterValue>, String> {
+        self.boost_emitter_targets()?
+            .into_iter()
+            .map(|target| {
+                Ok(BoostEmitterValue {
+                    key: target.key.into(),
+                    object_ref: read_i32(&self.image, target.offset)?,
+                })
+            })
+            .collect()
+    }
+    fn restore_active_boost_materials(
+        &mut self,
+        values: &[BoostMaterialValue],
+    ) -> Result<(), String> {
+        let targets = self.boost_material_targets()?;
+        for value in values {
+            let target = targets
+                .iter()
+                .find(|target| {
+                    target.export == value.export
+                        && target.parameter == value.parameter
+                        && target.instance == value.instance
+                })
+                .ok_or_else(|| {
+                    format!(
+                        "{}.{}_{} was not found while restoring",
+                        value.export, value.parameter, value.instance
+                    )
+                })?;
+            self.patch_bytes(target.offset, &value.rgb)?;
+        }
+        Ok(())
+    }
+
+    fn restore_active_boost_emitters(
+        &mut self,
+        values: &[BoostEmitterValue],
+    ) -> Result<(), String> {
+        let targets = self.boost_emitter_targets()?;
+        for value in values {
+            let target = targets
+                .iter()
+                .find(|target| target.key == value.key)
+                .ok_or_else(|| format!("{} was not found while restoring", value.key))?;
+            self.patch_bytes(target.offset, &value.object_ref.to_le_bytes())?;
+        }
+        Ok(())
+    }
+    fn patch_bytes(&mut self, offset: usize, bytes: &[u8]) -> Result<(), String> {
+        let end = offset
+            .checked_add(bytes.len())
+            .ok_or("Colour patch overflow")?;
+        self.image
+            .get_mut(offset..end)
+            .ok_or("Colour patch is outside the package")?
+            .copy_from_slice(bytes);
+        let chunk = self
+            .chunks
+            .iter()
+            .position(|chunk| offset >= chunk.u_off && end <= chunk.u_off + chunk.u_size)
+            .ok_or("Colour patch is outside the package's compressed chunks")?;
+        self.modified_chunks.insert(chunk);
+        Ok(())
+    }
+
+>>>>>>> Stashed changes
     fn extend_palette(&mut self) -> Result<(), String> {
         let targets = ["BlueTeamV3", "OrangeTeamV3", "CustomTeam"];
         let mut sets = 0;
@@ -975,9 +1872,21 @@ fn crypt(data: &[u8], key: &[u8; 32], encrypt: bool) -> Result<Vec<u8>, String> 
 fn read_fname(data: &[u8], offset: usize, version: i32) -> Result<(FName, usize), String> {
     let index = read_i32(data, offset)?;
     if version >= 343 {
+<<<<<<< Updated upstream
         Ok((FName { index }, offset + 8))
     } else {
         Ok((FName { index }, offset + 4))
+=======
+        Ok((
+            FName {
+                index,
+                number: read_i32(data, offset + 4)?,
+            },
+            offset + 8,
+        ))
+    } else {
+        Ok((FName { index, number: 0 }, offset + 4))
+>>>>>>> Stashed changes
     }
 }
 
@@ -1052,6 +1961,7 @@ fn usize_from_i32(value: i32, label: &str) -> Result<usize, String> {
 fn usize_from_i64(value: i64, label: &str) -> Result<usize, String> {
     usize::try_from(value).map_err(|_| format!("Invalid negative {label}"))
 }
+<<<<<<< Updated upstream
 
 #[cfg(test)]
 mod tests {
@@ -1121,3 +2031,5 @@ mod tests {
         Package::load(package.save().unwrap()).unwrap();
     }
 }
+=======
+>>>>>>> Stashed changes

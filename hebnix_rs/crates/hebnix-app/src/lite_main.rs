@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
+mod discord_presence;
 mod dpi_fix;
 mod hotkey;
 mod lite_app;
@@ -9,6 +10,7 @@ mod messages;
 mod monitor;
 mod overlay;
 mod plugins;
+mod runtime_assets;
 mod statsapi_ini;
 mod theme;
 mod tray;
@@ -37,7 +39,7 @@ fn load_window_icon(base_dir: &std::path::Path) -> Option<eframe::egui::IconData
     })
 }
 
-/// on panic dump msg + backtrace to crash.txt next to the exe, then fall
+/// On panic dump msg + backtrace to AppData's crash.txt, then fall
 /// through to the default hook.
 fn setup_panic_hook(base_dir: &std::path::Path) {
     let crash_path = base_dir.join("crash.txt");
@@ -102,6 +104,9 @@ fn dcomp_wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
 fn main() -> eframe::Result {
     let base_dir = config::base_dir();
     setup_logging(&base_dir);
+    if let Err(error) = runtime_assets::ensure_present(&base_dir) {
+        tracing::warn!("failed to prepare Hebnix runtime assets: {error}");
+    }
     setup_panic_hook(&base_dir);
     let Some(_mutex) = winutil::acquire_single_instance() else {
         winutil::focus_existing_instance();

@@ -18,6 +18,7 @@ mod cosmetic_upk {
 mod decal_patcher {
     pub use crate::patcher::decal_patcher::*;
 }
+mod discord_presence;
 mod dpi_fix;
 mod hotkey;
 mod messages;
@@ -30,6 +31,7 @@ mod patch_core {
 }
 mod plugins;
 mod presets;
+mod runtime_assets;
 mod spoofer;
 mod statsapi_ini;
 mod swapper {
@@ -61,6 +63,28 @@ fn load_window_icon(base_dir: &std::path::Path) -> Option<eframe::egui::IconData
     })
 }
 
+fn open_fresh_log(base_dir: &std::path::Path) -> std::io::Result<std::fs::File> {
+    let log_path = base_dir.join("hebnix.log");
+    let old_log_path = base_dir.join("hebnix.log.old");
+
+    match std::fs::remove_file(&old_log_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+    match std::fs::rename(&log_path, &old_log_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
+
+    std::fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(log_path)
+}
+
 fn setup_logging(base_dir: &std::path::Path) {
     use tracing_subscriber::fmt::writer::MakeWriterExt;
 
@@ -69,14 +93,12 @@ fn setup_logging(base_dir: &std::path::Path) {
 
     // sync writer, nothing buffered so the log survives a hard crash.
     // volume's low enough that sync writes don't matter.
-    let log_file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(base_dir.join("hebnix.log"))
-        .ok();
+    let log_file = open_fresh_log(base_dir).map_err(|error| {
+        eprintln!("failed to refresh hebnix.log: {error}");
+    });
 
     match log_file {
-        Some(file) => {
+        Ok(file) => {
             let file = std::sync::Mutex::new(file);
             tracing_subscriber::fmt()
                 .with_env_filter(filter)
@@ -84,13 +106,13 @@ fn setup_logging(base_dir: &std::path::Path) {
                 .with_writer(file.and(std::io::stdout))
                 .init();
         }
-        None => {
+        Err(()) => {
             tracing_subscriber::fmt().with_env_filter(filter).init();
         }
     }
 }
 
-/// on panic dump msg + backtrace to crash.txt next to the exe, also log it,
+/// On panic dump msg + backtrace to AppData's crash.txt, also log it,
 /// then fall through to the default hook.
 fn setup_panic_hook(base_dir: &std::path::Path) {
     let crash_path = base_dir.join("crash.txt");
@@ -141,6 +163,9 @@ fn main() -> eframe::Result {
         return Ok(());
     }
     setup_logging(&base_dir);
+    if let Err(error) = runtime_assets::ensure_present(&base_dir) {
+        tracing::warn!("failed to prepare Hebnix runtime assets: {error}");
+    }
     setup_panic_hook(&base_dir);
     tracing::info!("Hebnix {} starting", app::APP_VERSION);
 

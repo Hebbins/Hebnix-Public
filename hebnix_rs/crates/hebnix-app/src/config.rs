@@ -1,5 +1,5 @@
-//! app config, stored as config.toml next to the exe. first run imports an
-//! old config.ini (python version) if present so settings carry over.
+//! App config, stored under `%AppData%\Hebnix`. First run imports an old
+//! config.ini (python version) if present so settings carry over.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -20,8 +20,8 @@ pub struct WindowCfg {
 impl Default for WindowCfg {
     fn default() -> Self {
         Self {
-            width: 1000,
-            height: 600,
+            width: 1250,
+            height: 700,
         }
     }
 }
@@ -45,6 +45,15 @@ pub struct SettingsCfg {
     pub restrict_hotkey_to_hebnix_or_rocket_league: bool,
     /// relaunch elevated on start, the hosts file needs admin
     pub run_as_admin: bool,
+    /// Publish Hebnix/Rocket League activity to the local Discord client.
+    pub discord_rich_presence: bool,
+    /// Include the selected live match fields in Rich Presence.
+    #[serde(alias = "discord_current_gamemode")]
+    pub discord_game_state: bool,
+    pub discord_show_score: bool,
+    pub discord_show_map: bool,
+    pub discord_show_gamemode: bool,
+    pub discord_custom_message: String,
 }
 
 impl Default for SettingsCfg {
@@ -64,8 +73,21 @@ impl Default for SettingsCfg {
             allow_draw_on_hebnix_focus: true,
             restrict_hotkey_to_hebnix_or_rocket_league: true,
             run_as_admin: false,
+            discord_rich_presence: true,
+            discord_game_state: true,
+            discord_show_score: true,
+            discord_show_map: true,
+            discord_show_gamemode: true,
+            discord_custom_message: "Playing Rocket League".to_string(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PatchSource {
+    #[default]
+    Catalog,
+    Custom,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -75,6 +97,9 @@ pub struct PatcherCfg {
     pub active_ball: Option<String>,
     pub active_boost: Option<String>,
     pub active_decals: std::collections::HashMap<String, String>,
+    pub ball_source: PatchSource,
+    pub boost_source: PatchSource,
+    pub decal_source: PatchSource,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -187,13 +212,38 @@ fn parse_ini_bool(v: &str, default: bool) -> bool {
     }
 }
 
-/// app root dir: next to the exe, or HEBNIX_BASE_DIR if set (dev runs)
-pub fn base_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("HEBNIX_BASE_DIR") {
-        return PathBuf::from(dir);
+#[cfg(test)]
+mod tests {
+    use super::{PatchSource, PatcherCfg};
+
+    #[test]
+    fn older_patcher_config_defaults_sources_to_catalog() {
+        let config: PatcherCfg = toml::from_str("active_boost = \"Existing\"").unwrap();
+
+        assert_eq!(config.ball_source, PatchSource::Catalog);
+        assert_eq!(config.boost_source, PatchSource::Catalog);
+        assert_eq!(config.decal_source, PatchSource::Catalog);
     }
-    std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(Path::to_path_buf))
-        .unwrap_or_else(|| PathBuf::from("."))
+
+    #[test]
+    fn patcher_sources_round_trip_independently() {
+        let config = PatcherCfg {
+            ball_source: PatchSource::Custom,
+            boost_source: PatchSource::Catalog,
+            decal_source: PatchSource::Custom,
+            ..PatcherCfg::default()
+        };
+
+        let encoded = toml::to_string(&config).unwrap();
+        let decoded: PatcherCfg = toml::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded.ball_source, PatchSource::Custom);
+        assert_eq!(decoded.boost_source, PatchSource::Catalog);
+        assert_eq!(decoded.decal_source, PatchSource::Custom);
+    }
+}
+
+/// App root dir: `%AppData%\Hebnix`, or `HEBNIX_BASE_DIR` for dev runs.
+pub fn base_dir() -> PathBuf {
+    hebnix_sdk::utils::paths::base_dir()
 }

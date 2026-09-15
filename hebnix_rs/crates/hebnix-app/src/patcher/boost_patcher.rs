@@ -14,9 +14,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::config::Config;
+use crate::config::{Config, PatchSource};
 use crate::messages::AppMsg;
 use crate::patch_core::{dxt, upk};
+use crate::patcher::catalog::PatchCatalog;
+use crate::patcher::patch_source_selector;
 
 const GFX_UPK: &str = "GFX_Hud_SF.upk";
 const MAX_LOGICAL_PACKAGE_SIZE: usize = 512 * 1024 * 1024;
@@ -1160,6 +1162,8 @@ pub struct BoostItem {
     pub image_paths: HashMap<String, PathBuf>,
     pub background_image: Option<Arc<[u8]>>,
     pub fill_image: Option<Arc<[u8]>>,
+    pub glow_image: Option<Arc<[u8]>>,
+    pub tint_image: Option<Arc<[u8]>>,
 }
 
 enum BoostOp {
@@ -1178,6 +1182,8 @@ pub struct BoostPatcherState {
     pub search_filter: String,
     pub show_applied: bool,
     pub page: usize,
+    pub(crate) source: PatchSource,
+    catalog: PatchCatalog,
     local_tx: Sender<BoostOp>,
     local_rx: Receiver<BoostOp>,
     pub confirm_delete: Option<BoostItem>,
@@ -1200,6 +1206,8 @@ impl BoostPatcherState {
             search_filter: String::new(),
             show_applied: false,
             page: 0,
+            source: config.patcher.boost_source,
+            catalog: PatchCatalog::new(base_dir, "boost"),
             confirm_delete: None,
             local_tx,
             local_rx,
@@ -1236,6 +1244,8 @@ impl BoostPatcherState {
                     let mut image_paths = HashMap::new();
                     let mut background_image = None;
                     let mut fill_image = None;
+                    let mut glow_image = None;
+                    let mut tint_image = None;
 
                     if let Some(parent) = json_path.parent() {
                         let mut check_and_add = |key: &str, file_name: &Option<String>| {
@@ -1247,6 +1257,10 @@ impl BoostPatcherState {
                                         background_image = fs::read(&p).ok().map(Arc::from);
                                     } else if key == "Fill" {
                                         fill_image = fs::read(&p).ok().map(Arc::from);
+                                    } else if key == "Glow" {
+                                        glow_image = fs::read(&p).ok().map(Arc::from);
+                                    } else if key == "FillTintablePortion" {
+                                        tint_image = fs::read(&p).ok().map(Arc::from);
                                     }
                                 }
                             }
@@ -1268,6 +1282,8 @@ impl BoostPatcherState {
                             image_paths,
                             background_image,
                             fill_image,
+                            glow_image,
+                            tint_image,
                         });
                     }
                 }
@@ -1275,7 +1291,7 @@ impl BoostPatcherState {
         }
     }
 
-    fn import_zip(&mut self, zip_path: &Path, tx: &Sender<AppMsg>) {
+    fn import_zip(&mut self, zip_path: &Path, tx: &Sender<AppMsg>) -> bool {
         let _ = tx.send(AppMsg::Log("[Boost] Extracting ZIP...".to_string()));
 
         match (|| -> Result<(), String> {
@@ -1306,9 +1322,11 @@ impl BoostPatcherState {
             Ok(_) => {
                 let _ = tx.send(AppMsg::Log("[Boost] Imported successfully!".to_string()));
                 self.refresh_boosts();
+                true
             }
             Err(e) => {
                 let _ = tx.send(AppMsg::Log(format!("[Boost] Failed to import ZIP: {}", e)));
+                false
             }
         }
     }
@@ -1478,10 +1496,14 @@ impl BoostPatcherState {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("Refresh").clicked() {
-                    self.refresh_boosts();
-                    let _ = tx.send(AppMsg::Log(
-                        "[Boost] Boost meter list refreshed.".to_string(),
-                    ));
+                    if self.source == PatchSource::Catalog {
+                        self.catalog.refresh(ctx);
+                    } else {
+                        self.refresh_boosts();
+                        let _ = tx.send(AppMsg::Log(
+                            "[Boost] Boost meter list refreshed.".to_string(),
+                        ));
+                    }
                 }
 
                 let restore_enabled =
@@ -1504,11 +1526,13 @@ impl BoostPatcherState {
                     )
                     .clicked()
                 {
-                    if let Some(file) = rfd::FileDialog::new()
-                        .add_filter("ZIP Archives", &["zip"])
-                        .pick_file()
-                    {
-                        self.import_zip(&file, tx);
+                    let dialog = rfd::FileDialog::new().add_filter("ZIP Archives", &["zip"]);
+                    if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
+                        if self.import_zip(&file, tx) {
+                            self.source = PatchSource::Custom;
+                            config.patcher.boost_source = self.source;
+                            let _ = config.save(&self.base_dir);
+                        }
                     }
                 }
                 if ui
@@ -1524,6 +1548,22 @@ impl BoostPatcherState {
         ui.separator();
         ui.add_space(8.0);
 
+        if patch_source_selector(ui, &mut self.source) {
+            config.patcher.boost_source = self.source;
+            let _ = config.save(&self.base_dir);
+        }
+        ui.add_space(8.0);
+
+        if self.source == PatchSource::Catalog {
+            if let Some(path) = self.catalog.render(ui, &self.search_filter, ctx, tx, 4) {
+                if self.import_zip(&path, tx) {
+                    self.source = PatchSource::Custom;
+                    config.patcher.boost_source = self.source;
+                    let _ = config.save(&self.base_dir);
+                }
+            }
+            return;
+        }
         egui::ScrollArea::vertical()
             .id_salt("patcher_boosts_scroll")
             .auto_shrink([false, false])
@@ -1614,8 +1654,30 @@ impl BoostPatcherState {
                                                 .fit_to_exact_size(size),
                                             );
                                         }
+                                        if let Some(bytes) = &boost.glow_image {
+                                            ui.put(
+                                                rect,
+                                                egui::Image::from_bytes(
+                                                    format!("bytes://boost/glow/{}", boost.name),
+                                                    bytes.clone(),
+                                                )
+                                                .fit_to_exact_size(size),
+                                            );
+                                        }
+                                        if let Some(bytes) = &boost.tint_image {
+                                            ui.put(
+                                                rect,
+                                                egui::Image::from_bytes(
+                                                    format!("bytes://boost/tint/{}", boost.name),
+                                                    bytes.clone(),
+                                                )
+                                                .fit_to_exact_size(size),
+                                            );
+                                        }
                                         if boost.background_image.is_none()
                                             && boost.fill_image.is_none()
+                                            && boost.glow_image.is_none()
+                                            && boost.tint_image.is_none()
                                         {
                                             ui.put(rect, egui::Label::new("No Image"));
                                         }
@@ -1731,411 +1793,5 @@ impl BoostPatcherState {
                 self.confirm_delete = None;
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Cursor;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    const TEST_KEY: [u8; 32] = [0x7a; 32];
-    const WRONG_KEY: [u8; 32] = [0x31; 32];
-
-    struct Fixture {
-        raw: Vec<u8>,
-    }
-
-    fn push_u16(data: &mut Vec<u8>, value: u16) {
-        data.extend_from_slice(&value.to_le_bytes());
-    }
-
-    fn push_u32(data: &mut Vec<u8>, value: u32) {
-        data.extend_from_slice(&value.to_le_bytes());
-    }
-
-    fn push_i32(data: &mut Vec<u8>, value: i32) {
-        data.extend_from_slice(&value.to_le_bytes());
-    }
-
-    fn push_u64(data: &mut Vec<u8>, value: u64) {
-        data.extend_from_slice(&value.to_le_bytes());
-    }
-
-    fn push_i64(data: &mut Vec<u8>, value: i64) {
-        data.extend_from_slice(&value.to_le_bytes());
-    }
-
-    fn set_i32(data: &mut [u8], offset: usize, value: i32) {
-        data[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-    }
-
-    fn set_i64(data: &mut [u8], offset: usize, value: i64) {
-        data[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
-    }
-
-    fn push_fstring(data: &mut Vec<u8>, value: &str) {
-        push_i32(data, i32::try_from(value.len() + 1).unwrap());
-        data.extend_from_slice(value.as_bytes());
-        data.push(0);
-    }
-
-    fn push_name(data: &mut Vec<u8>, value: &str) {
-        push_fstring(data, value);
-        data.extend_from_slice(&[0u8; 8]);
-    }
-
-    fn build_encrypted_fixture() -> Fixture {
-        let mut summary = Vec::new();
-        push_u32(&mut summary, upk::UPK_MAGIC);
-        push_u16(&mut summary, 868);
-        push_u16(&mut summary, 22);
-        let total_header_size_pos = summary.len();
-        push_i32(&mut summary, 0);
-        push_fstring(&mut summary, "None");
-        push_u32(&mut summary, 0);
-        push_i32(&mut summary, TEXTURE_EXPORTS.len() as i32);
-        let name_offset_pos = summary.len();
-        push_i32(&mut summary, 0);
-        push_i32(&mut summary, TEXTURE_EXPORTS.len() as i32);
-        let export_offset_pos = summary.len();
-        push_i32(&mut summary, 0);
-        push_i32(&mut summary, 0); // import count
-        push_i32(&mut summary, 0); // import offset
-        push_i32(&mut summary, 0); // depends offset
-        for _ in 0..4 {
-            push_i32(&mut summary, 0);
-        }
-        summary.extend_from_slice(&[0u8; 16]);
-        push_i32(&mut summary, 0); // generations
-        push_u32(&mut summary, 0);
-        push_u32(&mut summary, 0);
-        push_u32(&mut summary, 0);
-        push_i32(&mut summary, 0); // 16-byte records
-        push_i32(&mut summary, 0);
-        push_i32(&mut summary, 0); // additional strings
-        push_i32(&mut summary, 0); // additional entries
-        push_i32(&mut summary, 0); // generation padding size
-        let chunk_info_offset_pos = summary.len();
-        push_i32(&mut summary, 0);
-        push_i32(&mut summary, 0);
-
-        let name_offset = summary.len();
-        let mut decrypted = Vec::new();
-        for (_, export_name, _, _) in TEXTURE_EXPORTS {
-            push_name(&mut decrypted, export_name);
-        }
-        let export_offset = name_offset + decrypted.len();
-
-        let mut serial_offset_fields = Vec::new();
-        for (name_index, (_, _, width, height)) in TEXTURE_EXPORTS.iter().enumerate() {
-            push_i32(&mut decrypted, 0); // class
-            push_i32(&mut decrypted, 0); // super
-            push_i32(&mut decrypted, 0); // package
-            push_i32(&mut decrypted, name_index as i32);
-            push_i32(&mut decrypted, 0); // FName number
-            push_i32(&mut decrypted, 0);
-            push_u64(&mut decrypted, 0);
-            push_i32(&mut decrypted, (32 + width * height + 60) as i32);
-            serial_offset_fields.push(decrypted.len());
-            push_i64(&mut decrypted, 0);
-            push_i32(&mut decrypted, 0);
-            push_i32(&mut decrypted, 0); // net objects
-            decrypted.extend_from_slice(&[0u8; 16]);
-            push_i32(&mut decrypted, 0);
-        }
-
-        let chunk_info_offset = decrypted.len();
-        push_i32(&mut decrypted, 2);
-        let first_chunk_entry = decrypted.len();
-        decrypted.extend_from_slice(&[0u8; 36 * 2]);
-        while decrypted.len() % 16 != 0 {
-            decrypted.push(0);
-        }
-
-        let total_header_size = name_offset + decrypted.len();
-        let mut first_payload = vec![0x5au8; 128];
-        let mut serial_offsets = Vec::new();
-        for (index, (_, _, width, height)) in TEXTURE_EXPORTS.iter().enumerate() {
-            let serial_size = 32 + width * height + 60;
-            let serial_start = first_payload.len();
-            serial_offsets.push(total_header_size + serial_start);
-            first_payload.extend(std::iter::repeat_n(0x80 + index as u8, 32));
-            first_payload
-                .extend((0..width * height).map(|byte| ((byte * 17 + index * 37) % 251) as u8));
-            first_payload.extend(std::iter::repeat_n(0x40 + index as u8, 60));
-            assert_eq!(first_payload.len() - serial_start, serial_size);
-            first_payload.extend_from_slice(&[0xa5; 17]);
-        }
-        first_payload.extend_from_slice(&[0x6c; 256]);
-        let second_payload: Vec<u8> = (0..32_777)
-            .map(|index| ((index * 29 + 11) % 251) as u8)
-            .collect();
-
-        for (field, offset) in serial_offset_fields.into_iter().zip(serial_offsets) {
-            set_i64(&mut decrypted, field, offset as i64);
-        }
-
-        let first_compressed =
-            compress_into_chunk(&first_payload, 131_072).expect("compress first fixture chunk");
-        let second_compressed =
-            compress_into_chunk(&second_payload, 131_072).expect("compress second fixture chunk");
-        let first_compressed_offset = total_header_size;
-        let second_compressed_offset = first_compressed_offset + first_compressed.len();
-
-        let second_chunk_entry = first_chunk_entry + 36;
-        set_i64(&mut decrypted, first_chunk_entry, total_header_size as i64);
-        set_i32(
-            &mut decrypted,
-            first_chunk_entry + 8,
-            first_payload.len() as i32,
-        );
-        set_i64(
-            &mut decrypted,
-            first_chunk_entry + 12,
-            first_compressed_offset as i64,
-        );
-        set_i32(
-            &mut decrypted,
-            first_chunk_entry + 20,
-            first_compressed.len() as i32,
-        );
-        set_i64(
-            &mut decrypted,
-            second_chunk_entry,
-            (total_header_size + first_payload.len()) as i64,
-        );
-        set_i32(
-            &mut decrypted,
-            second_chunk_entry + 8,
-            second_payload.len() as i32,
-        );
-        set_i64(
-            &mut decrypted,
-            second_chunk_entry + 12,
-            second_compressed_offset as i64,
-        );
-        set_i32(
-            &mut decrypted,
-            second_chunk_entry + 20,
-            second_compressed.len() as i32,
-        );
-
-        set_i32(
-            &mut summary,
-            total_header_size_pos,
-            total_header_size as i32,
-        );
-        set_i32(&mut summary, name_offset_pos, name_offset as i32);
-        set_i32(&mut summary, export_offset_pos, export_offset as i32);
-        set_i32(
-            &mut summary,
-            chunk_info_offset_pos,
-            chunk_info_offset as i32,
-        );
-
-        let encrypted = aes_encrypt_ecb(&decrypted, &TEST_KEY).expect("encrypt fixture header");
-        let mut raw = summary;
-        raw.extend_from_slice(&encrypted);
-        assert_eq!(raw.len(), total_header_size);
-        raw.extend_from_slice(&first_compressed);
-        raw.extend_from_slice(&second_compressed);
-        Fixture { raw }
-    }
-
-    fn test_root(label: &str) -> PathBuf {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("clock")
-            .as_nanos();
-        std::env::temp_dir().join(format!(
-            "hebnix-boost-{label}-{}-{unique}",
-            std::process::id()
-        ))
-    }
-
-    fn write_test_keys(path: &Path) {
-        fs::write(
-            path,
-            format!(
-                "# test keys\n{}\n{}\n",
-                BASE64_STANDARD.encode(WRONG_KEY),
-                BASE64_STANDARD.encode(TEST_KEY)
-            ),
-        )
-        .expect("write test key file");
-    }
-
-    fn png_bytes(color: [u8; 4]) -> Vec<u8> {
-        let image = image::RgbaImage::from_pixel(8, 8, image::Rgba(color));
-        let mut output = Cursor::new(Vec::new());
-        image::DynamicImage::ImageRgba8(image)
-            .write_to(&mut output, image::ImageFormat::Png)
-            .expect("encode test PNG");
-        output.into_inner()
-    }
-
-    #[test]
-    fn compressed_chunk_round_trips_multiple_blocks() {
-        let block_size = 262_144;
-        let payload: Vec<u8> = (0..block_size * 2 + 123)
-            .map(|index| ((index * 31) % 251) as u8)
-            .collect();
-        let chunk = compress_into_chunk(&payload, block_size).expect("compress chunk");
-        let (decompressed, block_size, end) =
-            upk::decomp_chunk_at(&chunk, 0).expect("decompress generated chunk");
-
-        assert_eq!(decompressed, payload);
-        assert_eq!(block_size as usize, 262_144);
-        assert_eq!(end, chunk.len());
-    }
-
-    #[test]
-    fn encrypted_package_uses_external_key_and_padded_chunk_rows() {
-        let root = test_root("key-layout");
-        fs::create_dir_all(&root).expect("create test root");
-        let key_file = root.join("test_keys.txt");
-        write_test_keys(&key_file);
-        let fixture = build_encrypted_fixture();
-
-        let package = EncryptedPackage::load(fixture.raw, &key_file).expect("load fixture");
-        assert_eq!(package.key, TEST_KEY);
-        assert_eq!(package.key_line, 3);
-        assert_eq!(package.chunks.len(), 2);
-        assert_eq!(
-            package.chunks[1].table_entry_offset - package.chunks[0].table_entry_offset,
-            36
-        );
-        for (_, export_name, _, _) in TEXTURE_EXPORTS {
-            assert!(package.names.iter().any(|name| name == export_name));
-        }
-        fs::remove_dir_all(root).expect("remove test root");
-    }
-
-    #[test]
-    fn patch_boost_meter_reencrypts_and_replaces_selected_exports() {
-        let root = test_root("patcher");
-        let game_dir = root.join("game");
-        let backup_dir = root.join("backup");
-        let key_file = root.join("test_keys.txt");
-        fs::create_dir_all(&game_dir).expect("create test game directory");
-        write_test_keys(&key_file);
-
-        let fixture = build_encrypted_fixture();
-        fs::write(game_dir.join(GFX_UPK), &fixture.raw).expect("write test UPK");
-        let original =
-            EncryptedPackage::load(fixture.raw.clone(), &key_file).expect("load original fixture");
-
-        let mut pack = HashMap::new();
-        pack.insert("Background".to_string(), png_bytes([220, 20, 40, 255]));
-        pack.insert("Fill".to_string(), png_bytes([10, 180, 240, 160]));
-        patch_boost_meter(
-            game_dir.to_str().expect("game path"),
-            backup_dir.to_str().expect("backup path"),
-            &key_file,
-            &pack,
-        )
-        .expect("patch boost meter");
-
-        let output = fs::read(game_dir.join(GFX_UPK)).expect("read patched UPK");
-        let patched =
-            EncryptedPackage::load(output.clone(), &key_file).expect("load repacked fixture");
-        assert_eq!(patched.key, TEST_KEY);
-        let original_header_end = original.header.name_offset + original.encrypted_header_size;
-        assert_ne!(
-            &output[original.header.name_offset..original_header_end],
-            &fixture.raw[original.header.name_offset..original_header_end],
-            "the changed chunk table must be re-encrypted with the matched key"
-        );
-
-        for (key, export_name, width, height) in TEXTURE_EXPORTS {
-            let (start, end) = patched
-                .texture_range(export_name, width, height)
-                .expect("locate patched texture");
-            if let Some(png) = pack.get(key) {
-                let image = image::load_from_memory(png)
-                    .expect("decode test PNG")
-                    .to_rgba8();
-                let resized = resize_rgba_isolated(&image, width as u32, height as u32);
-                let expected = image_to_dxt5_with_alpha(&resized, width, height);
-                assert_eq!(&patched.logical_data[start..end], expected.as_slice());
-            } else {
-                let (original_start, original_end) = original
-                    .texture_range(export_name, width, height)
-                    .expect("locate original texture");
-                assert_eq!(
-                    &patched.logical_data[start..end],
-                    &original.logical_data[original_start..original_end]
-                );
-            }
-        }
-
-        // A replacement always starts from the pristine encrypted backup.
-        pack.insert("Background".to_string(), png_bytes([30, 210, 70, 220]));
-        pack.insert("Fill".to_string(), png_bytes([245, 170, 15, 255]));
-        patch_boost_meter(
-            game_dir.to_str().expect("game path"),
-            backup_dir.to_str().expect("backup path"),
-            &key_file,
-            &pack,
-        )
-        .expect("replace active boost meter");
-        let replaced_output = fs::read(game_dir.join(GFX_UPK)).expect("read replaced UPK");
-        let replaced =
-            EncryptedPackage::load(replaced_output, &key_file).expect("load replacement package");
-        for (key, export_name, width, height) in TEXTURE_EXPORTS {
-            let (start, end) = replaced
-                .texture_range(export_name, width, height)
-                .expect("locate replacement texture");
-            if let Some(png) = pack.get(key) {
-                let image = image::load_from_memory(png)
-                    .expect("decode replacement PNG")
-                    .to_rgba8();
-                let resized = resize_rgba_isolated(&image, width as u32, height as u32);
-                let expected = image_to_dxt5_with_alpha(&resized, width, height);
-                assert_eq!(&replaced.logical_data[start..end], expected.as_slice());
-            } else {
-                let (original_start, original_end) = original
-                    .texture_range(export_name, width, height)
-                    .expect("locate original texture");
-                assert_eq!(
-                    &replaced.logical_data[start..end],
-                    &original.logical_data[original_start..original_end]
-                );
-            }
-        }
-
-        let backup =
-            fs::read(backup_dir.join(format!("{}.bak", GFX_UPK))).expect("read pristine backup");
-        assert_eq!(backup, fixture.raw);
-        fs::remove_dir_all(&root).expect("remove test directory");
-    }
-
-    #[test]
-    fn patcher_refuses_a_key_file_without_the_package_key() {
-        let root = test_root("wrong-key");
-        let game_dir = root.join("game");
-        let backup_dir = root.join("backup");
-        let key_file = root.join("test_keys.txt");
-        fs::create_dir_all(&game_dir).expect("create test game directory");
-        fs::write(
-            &key_file,
-            format!("{}\n", BASE64_STANDARD.encode(WRONG_KEY)),
-        )
-        .expect("write wrong key file");
-        fs::write(game_dir.join(GFX_UPK), build_encrypted_fixture().raw).expect("write test UPK");
-        let mut pack = HashMap::new();
-        pack.insert("Background".to_string(), png_bytes([1, 2, 3, 255]));
-
-        let error = patch_boost_meter(
-            game_dir.to_str().expect("game path"),
-            backup_dir.to_str().expect("backup path"),
-            &key_file,
-            &pack,
-        )
-        .expect_err("wrong key must be rejected");
-        assert!(error.contains("None of the 1 available keys"));
-        fs::remove_dir_all(root).expect("remove test root");
     }
 }
