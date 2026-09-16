@@ -16,6 +16,19 @@ pub struct PluginManifest {
     pub version: String,
     pub entry: String,
     pub plugin_id: Option<String>,
+    /// capabilities the plugin declares it needs, enforced by the host.
+    pub permissions: PluginPermissions,
+}
+
+/// per-plugin capability grants, declared under [permissions] in plugin.toml.
+/// Absent keys default to no access, so a plugin only gets what it asks for.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct PluginPermissions {
+    /// directory roots this plugin may read via hebnix.read_file. Entries may
+    /// contain %VAR% environment placeholders (e.g. "%LOCALAPPDATA%/Spotify").
+    /// A read is allowed only if the target canonicalizes under one of these.
+    pub read_roots: Vec<String>,
 }
 
 impl Default for PluginManifest {
@@ -26,6 +39,7 @@ impl Default for PluginManifest {
             version: "1.0".to_string(),
             entry: String::new(),
             plugin_id: None,
+            permissions: PluginPermissions::default(),
         }
     }
 }

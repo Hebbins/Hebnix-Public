@@ -64,6 +64,17 @@ pub fn rect(
     });
 }
 
+// gdi has no gradient, it fills with the first colour
+#[allow(clippy::too_many_arguments)]
+pub fn gradient(x: f32, y: f32, w: f32, h: f32, c1: Rgba, c2: Rgba, radius: f32, angle: f32) {
+    with_canvas(|canvas| match canvas {
+        Canvas::Gdi(hdc) => gdi::rect(
+            *hdc, x as i32, y as i32, w as i32, h as i32, c1, c1, 0, true, radius as i32,
+        ),
+        Canvas::D2d(c) => c.gradient(x, y, w, h, c1, c2, radius, angle),
+    });
+}
+
 pub fn circle(x: f32, y: f32, radius: f32, color: Rgba, width: f32, filled: bool) {
     with_canvas(|canvas| match canvas {
         Canvas::Gdi(hdc) => gdi::circle(
@@ -79,10 +90,21 @@ pub fn circle(x: f32, y: f32, radius: f32, color: Rgba, width: f32, filled: bool
     });
 }
 
-pub fn text(x: f32, y: f32, s: &str, color: Rgba, size: f32, halign: &str, font: &str) {
+#[allow(clippy::too_many_arguments)]
+pub fn text(
+    x: f32,
+    y: f32,
+    s: &str,
+    color: Rgba,
+    size: f32,
+    halign: &str,
+    font: &str,
+    bold: bool,
+    clip: Option<(f32, f32)>,
+) {
     with_canvas(|canvas| match canvas {
-        Canvas::Gdi(hdc) => gdi::text(*hdc, x as i32, y as i32, s, color, size as i32, halign), // gdi has no rl faces, keeps its own font
-        Canvas::D2d(c) => c.text(x, y, s, color, size, halign, font),
+        Canvas::Gdi(hdc) => gdi::text(*hdc, x as i32, y as i32, s, color, size as i32, halign), // gdi keeps its own font, no bold or clip
+        Canvas::D2d(c) => c.text(x, y, s, color, size, halign, font, bold, clip),
     });
 }
 
@@ -99,10 +121,11 @@ pub fn polygon(points: &[(f32, f32)], color: Rgba) {
     });
 }
 
-pub fn image(path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32) {
+// gdi can't round, it just ignores the radius
+pub fn image(path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32, radius: f32) {
     with_canvas(|canvas| match canvas {
         Canvas::Gdi(hdc) => gdi::image(*hdc, path, x as i32, y as i32, w as i32, h as i32, opacity),
-        Canvas::D2d(c) => c.image(path, x, y, w, h, opacity),
+        Canvas::D2d(c) => c.image(path, x, y, w, h, opacity, radius),
     });
 }
 

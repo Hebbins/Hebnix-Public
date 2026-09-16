@@ -1726,6 +1726,29 @@ impl HebnixApp {
                         .on_http_upload_response(&slug, &req_id, status, &body);
                     ctx.request_repaint();
                 }
+                AppMsg::PluginHttpResult {
+                    slug,
+                    req_id,
+                    status,
+                    body,
+                    headers,
+                } => {
+                    self.plugin_mgr
+                        .on_http_result(&slug, &req_id, status, &body, &headers);
+                    ctx.request_repaint();
+                }
+                AppMsg::PluginWsOpen { slug, id } => {
+                    self.plugin_mgr.on_ws_open(&slug, &id);
+                    ctx.request_repaint();
+                }
+                AppMsg::PluginWsMessage { slug, id, data } => {
+                    self.plugin_mgr.on_ws_message(&slug, &id, &data);
+                    ctx.request_repaint();
+                }
+                AppMsg::PluginWsClose { slug, id, reason } => {
+                    self.plugin_mgr.on_ws_close(&slug, &id, &reason);
+                    ctx.request_repaint();
+                }
             }
         }
     }

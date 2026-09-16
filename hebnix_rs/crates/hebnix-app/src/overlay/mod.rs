@@ -56,6 +56,11 @@ pub(crate) fn register_hwnd(hwnd: HWND) {
 }
 
 /// hosts a plugin may load pictures, audio and video from.
+/// segoe ui pixel width of a string, for text layout without a live canvas
+pub fn measure_text(s: &str, size: f32, bold: bool) -> f32 {
+    dcomp::measure_text(s, size, bold)
+}
+
 pub fn media_host_allowed(uri: &str) -> bool {
     uri.split('/').nth(2).is_some_and(|authority| {
         authority.split(':').next().is_some_and(|host| {
@@ -151,20 +156,36 @@ pub fn rect(
     native::rect(x, y, w, h, fill, border, width, filled, radius);
 }
 
+#[allow(clippy::too_many_arguments)]
+pub fn gradient(x: f32, y: f32, w: f32, h: f32, c1: Rgba, c2: Rgba, radius: f32, angle: f32) {
+    native::gradient(x, y, w, h, c1, c2, radius, angle);
+}
+
 pub fn circle(x: f32, y: f32, radius: f32, color: Rgba, width: f32, filled: bool) {
     native::circle(x, y, radius, color, width, filled);
 }
 
-pub fn text(x: f32, y: f32, text: &str, color: Rgba, size: f32, halign: &str, font: &str) {
-    native::text(x, y, text, color, size, halign, font);
+#[allow(clippy::too_many_arguments)]
+pub fn text(
+    x: f32,
+    y: f32,
+    text: &str,
+    color: Rgba,
+    size: f32,
+    halign: &str,
+    font: &str,
+    bold: bool,
+    clip: Option<(f32, f32)>,
+) {
+    native::text(x, y, text, color, size, halign, font, bold, clip);
 }
 
 pub fn polygon(points: &[(f32, f32)], color: Rgba) {
     native::polygon(points, color);
 }
 
-pub fn image(path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32) {
-    native::image(path, x, y, w, h, opacity);
+pub fn image(path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32, radius: f32) {
+    native::image(path, x, y, w, h, opacity, radius);
 }
 /// the overlay window. inner is None when DirectComposition would not start,
 /// then every method no-ops and there is no overlay at all.
