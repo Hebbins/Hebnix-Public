@@ -4,6 +4,7 @@
 //! thread-local stack the host pushes before on_settings/on_window, pops after.
 
 use std::cell::RefCell;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
@@ -30,6 +31,65 @@ pub struct HostShared {
     /// eos/rlapi calls that don't pass one.
     pub platform: String,
     pub suppress_plugin_logs: bool,
+    /// Directory containing DefaultStatsAPI.ini and the game configuration
+    /// files exposed through the deliberately small Lua config API.
+    pub rl_config_dir: PathBuf,
+}
+
+const RL_CONFIG_FILES: [(&str, &str); 2] = [
+    ("TASystemSettings", "TASystemSettings.ini"),
+    ("TAInput", "TAInput.ini"),
+];
+
+fn rl_config_path(config_dir: &Path, filename: &str) -> Option<PathBuf> {
+    RL_CONFIG_FILES
+        .iter()
+        .find(|(name, file)| filename == *name || filename == *file)
+        .map(|(_, file)| config_dir.join(file))
+}
+
+fn rl_backup_path(path: &Path) -> PathBuf {
+    let mut backup = path.as_os_str().to_os_string();
+    backup.push(".bak");
+    PathBuf::from(backup)
+}
+
+fn write_rl_config(config_dir: &Path, filename: &str, content: &[u8]) -> bool {
+    let Some(path) = rl_config_path(config_dir, filename) else {
+        return false;
+    };
+    if !path.is_file() {
+        return false;
+    }
+
+    let backup = rl_backup_path(&path);
+    if backup.exists() {
+        if !backup.is_file() {
+            return false;
+        }
+    } else if std::fs::copy(&path, &backup).is_err() {
+        return false;
+    }
+
+    std::fs::write(path, content).is_ok()
+}
+
+fn restore_rl_configs(config_dir: &Path) -> bool {
+    let mut restored_any = false;
+    let mut succeeded = true;
+
+    for (_, filename) in RL_CONFIG_FILES {
+        let path = config_dir.join(filename);
+        let backup = rl_backup_path(&path);
+        if backup.is_file() {
+            restored_any = true;
+            if std::fs::copy(backup, path).is_err() {
+                succeeded = false;
+            }
+        }
+    }
+
+    restored_any && succeeded
 }
 
 /// a window side, either a size in points or a share of the monitor RL is on
@@ -958,6 +1018,59 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         hebnix.set(
             "rl_connected",
             lua.create_function(move |_, ()| Ok(host.shared.borrow().rl_connected))?,
+        )?;
+    }
+
+    // Rocket League config editing. Only the allowlisted files in the same
+    // directory as DefaultStatsAPI.ini are ever reachable from Lua.
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "rl_read_config",
+            lua.create_function(move |lua, filename: String| {
+                let config_dir = host.shared.borrow().rl_config_dir.clone();
+                let Some(path) = rl_config_path(&config_dir, &filename) else {
+                    return Ok(LuaValue::Nil);
+                };
+                match std::fs::read(path) {
+                    Ok(content) => Ok(LuaValue::String(lua.create_string(&content)?)),
+                    Err(_) => Ok(LuaValue::Nil),
+                }
+            })?,
+        )?;
+    }
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "rl_write_config",
+            lua.create_function(move |_, (filename, content): (String, mlua::String)| {
+                let config_dir = host.shared.borrow().rl_config_dir.clone();
+                Ok(write_rl_config(
+                    &config_dir,
+                    &filename,
+                    content.as_bytes().as_ref(),
+                ))
+            })?,
+        )?;
+    }
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "rl_config_exists",
+            lua.create_function(move |_, filename: String| {
+                let config_dir = host.shared.borrow().rl_config_dir.clone();
+                Ok(rl_config_path(&config_dir, &filename).is_some_and(|path| path.is_file()))
+            })?,
+        )?;
+    }
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "rl_restore",
+            lua.create_function(move |_, ()| {
+                let config_dir = host.shared.borrow().rl_config_dir.clone();
+                Ok(restore_rl_configs(&config_dir))
+            })?,
         )?;
     }
 
@@ -3377,6 +3490,34 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         assert!(asset_path(&dir, "logo.png").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rl_config_writes_one_backup_and_restores_it() {
+        let dir = std::env::temp_dir().join("hebnix_rl_config_api_test");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let settings = dir.join("TASystemSettings.ini");
+        std::fs::write(&settings, b"original").unwrap();
+
+        assert!(write_rl_config(&dir, "TASystemSettings", b"first edit"));
+        assert_eq!(std::fs::read(&settings).unwrap(), b"first edit");
+        assert_eq!(
+            std::fs::read(rl_backup_path(&settings)).unwrap(),
+            b"original"
+        );
+
+        assert!(write_rl_config(&dir, "TASystemSettings", b"second edit"));
+        assert_eq!(
+            std::fs::read(rl_backup_path(&settings)).unwrap(),
+            b"original"
+        );
+        assert!(restore_rl_configs(&dir));
+        assert_eq!(std::fs::read(&settings).unwrap(), b"original");
+
+        assert!(!write_rl_config(&dir, "DefaultEngine.ini", b"nope"));
+        assert!(rl_config_path(&dir, "../TAInput.ini").is_none());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

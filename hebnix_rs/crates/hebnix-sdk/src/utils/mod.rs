@@ -1,6 +1,7 @@
 //! shared helpers: ranks, platform id parsing, psynet config api, game ini.
 
 pub mod constants;
+pub mod paths;
 pub mod platforms;
 pub mod psynet;
 pub mod ranks;

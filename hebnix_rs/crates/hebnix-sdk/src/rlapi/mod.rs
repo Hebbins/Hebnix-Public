@@ -19,9 +19,8 @@ use crate::eos::{self, EOSToken, Platform};
 
 /// Locate `rlapi-bridge.exe`. Lookup order:
 /// 1. `HEBNIX_RLAPI_BRIDGE` (explicit full path).
-/// 2. `rlapi-bridge.exe` next to the running executable.
-/// 3. `dist/rlapi-bridge.exe` next to the running executable.
-/// 4. `rlapi-bridge`/`rlapi-bridge.exe` on `PATH`.
+/// 2. `rlapi-bridge.exe` in the Hebnix AppData folder.
+/// 3. `rlapi-bridge`/`rlapi-bridge.exe` on `PATH`.
 pub fn bridge_binary() -> Option<std::path::PathBuf> {
     if let Ok(p) = std::env::var("HEBNIX_RLAPI_BRIDGE") {
         let path = std::path::PathBuf::from(p);
@@ -34,14 +33,9 @@ pub fn bridge_binary() -> Option<std::path::PathBuf> {
     } else {
         "rlapi-bridge"
     };
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            for candidate in [dir.join(exe_name), dir.join("dist").join(exe_name)] {
-                if candidate.is_file() {
-                    return Some(candidate);
-                }
-            }
-        }
+    let candidate = crate::utils::paths::base_dir().join(exe_name);
+    if candidate.is_file() {
+        return Some(candidate);
     }
     // Fall back to PATH resolution by the OS.
     Some(std::path::PathBuf::from(exe_name))

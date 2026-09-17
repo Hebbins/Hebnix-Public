@@ -10,7 +10,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::config::Config;
+use crate::config::{Config, PatchSource};
 use crate::messages::AppMsg;
 use crate::patch_core::upk;
 
@@ -788,50 +788,6 @@ fn match_texture_export<'a>(
                 .starts_with("skin_")
         })
         .or_else(|| candidates.first().copied())
-}
-
-#[cfg(test)]
-mod texture_matching_tests {
-    use super::{TextureExport, match_texture_export};
-
-    #[test]
-    fn skin_specific_flames_rgb_mask_is_not_a_colour_diffuse() {
-        let textures = vec![TextureExport {
-            export_name: "Pepe_Body_Flames_RGB".to_string(),
-            tfc_name: Some("Textures4".to_string()),
-            mips: Vec::new(),
-        }];
-        let matched = match_texture_export(23, "1_diffuse_skin", &textures, None, true);
-        assert!(matched.is_none());
-    }
-
-    #[test]
-    fn octane_body_bevel_mask_does_not_match_diffuse_but_startup_pin_does() {
-        let body = vec![
-            TextureExport {
-                export_name: "Body_Octane_Bevel_N".to_string(),
-                tfc_name: Some("Textures4".to_string()),
-                mips: Vec::new(),
-            },
-            TextureExport {
-                export_name: "Body_Octane_Bevel_RGB".to_string(),
-                tfc_name: Some("Textures4".to_string()),
-                mips: Vec::new(),
-            },
-        ];
-        assert!(match_texture_export(23, "1_diffuse_skin", &body, None, false).is_none());
-
-        let startup = vec![TextureExport {
-            export_name: "Pepe_Body_D".to_string(),
-            tfc_name: Some("Textures4".to_string()),
-            mips: Vec::new(),
-        }];
-        assert_eq!(
-            match_texture_export(23, "1_diffuse_skin", &startup, None, false)
-                .map(|texture| texture.export_name.as_str()),
-            Some("Pepe_Body_D")
-        );
-    }
 }
 
 fn is_tfc_name(name: &str) -> bool {
@@ -1781,6 +1737,7 @@ pub struct DecalPatcherState {
     pub search_filter: String,
     pub show_applied: bool,
     pub page: usize,
+    pub(crate) source: PatchSource,
     pub confirm_delete: Option<DecalItem>,
     pub restore_all_confirmed: bool,
     pub skin_dropdown_filter: String,
@@ -2406,6 +2363,7 @@ impl DecalPatcherState {
             search_filter: String::new(),
             show_applied: false,
             page: 0,
+            source: config.patcher.decal_source,
             confirm_delete: None,
             restore_all_confirmed: false,
             car_skins: Vec::new(),

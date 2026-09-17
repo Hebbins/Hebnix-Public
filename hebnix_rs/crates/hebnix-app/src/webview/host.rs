@@ -256,9 +256,9 @@ const POINTER_HIT_SCRIPT: &str = r#"
 })();
 "#;
 
-/// beside the extracted curl-impersonate, the install dir is not always writable
+/// Keep WebView state with the rest of Hebnix's AppData.
 fn user_data_dir() -> Option<std::path::PathBuf> {
-    let dir = dirs::data_local_dir()?.join("Hebnix").join("webview2");
+    let dir = crate::config::base_dir().join("webview2");
     std::fs::create_dir_all(&dir).ok()?;
     Some(dir)
 }

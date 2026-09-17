@@ -44,8 +44,7 @@ unsafe impl Send for SteamState {}
 
 static STATE: Mutex<Option<SteamState>> = Mutex::new(None);
 
-// find steam_api64.dll. order: HEBNIX_STEAM_API_DLL env (full path), then next
-// to the exe, then _dlls/ next to the exe.
+// Find steam_api64.dll. An explicit override wins, then use Hebnix's AppData.
 fn locate_dll() -> Option<std::path::PathBuf> {
     if let Ok(p) = std::env::var("HEBNIX_STEAM_API_DLL") {
         let path = std::path::PathBuf::from(p);
@@ -53,10 +52,10 @@ fn locate_dll() -> Option<std::path::PathBuf> {
             return Some(path);
         }
     }
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let base_dir = crate::utils::paths::base_dir();
     let candidates = [
-        exe_dir.join("steam_api64.dll"),
-        exe_dir.join("_dlls").join("steam_api64.dll"),
+        base_dir.join("steam_api64.dll"),
+        base_dir.join("_dlls").join("steam_api64.dll"),
     ];
     candidates.into_iter().find(|p| p.is_file())
 }
@@ -77,7 +76,7 @@ fn ensure_init(state: &mut Option<SteamState>) -> Result<(), String> {
     }
 
     let dll = locate_dll().ok_or_else(|| {
-        "steam_api64.dll not found (set HEBNIX_STEAM_API_DLL or place it next to the exe)"
+        "steam_api64.dll not found in the Hebnix AppData folder (or set HEBNIX_STEAM_API_DLL)"
             .to_string()
     })?;
 

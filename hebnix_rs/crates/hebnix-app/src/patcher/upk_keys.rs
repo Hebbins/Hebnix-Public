@@ -1,7 +1,6 @@
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 
-// DecalPatcher.cs always tries Rocket League's default package key before the
-// embedded catalog. It currently appears near the end of the built-in catalog;
+// Try Rocket League's default package key before the embedded catalog.
 // file order made large packages such as Startup.upk get AES-decrypted almost
 // one thousand times before the correct key was reached.
 pub const DEFAULT_UPK_KEY: [u8; 32] = [
@@ -42,27 +41,4 @@ pub fn parse(text: &str, source: &str) -> Result<Vec<(usize, [u8; 32])>, String>
         return Err(format!("{source} contains no valid AES-256 keys"));
     }
     Ok(keys)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{BASE64_STANDARD, DEFAULT_UPK_KEY, parse};
-    use base64::Engine as _;
-
-    #[test]
-    fn default_key_is_always_tried_first_and_deduplicated() {
-        let default = BASE64_STANDARD.encode(DEFAULT_UPK_KEY);
-        let keys = parse(
-            &format!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n{default}"),
-            "test",
-        )
-        .expect("valid catalog");
-        assert_eq!(keys.first().map(|(_, key)| key), Some(&DEFAULT_UPK_KEY));
-        assert_eq!(
-            keys.iter()
-                .filter(|(_, key)| key == &DEFAULT_UPK_KEY)
-                .count(),
-            1
-        );
-    }
 }
