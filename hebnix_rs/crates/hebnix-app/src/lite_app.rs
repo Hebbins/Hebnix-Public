@@ -18,7 +18,7 @@ use crate::plugins::PluginManager;
 use crate::tray::Tray;
 use crate::{dpi_fix, statsapi_ini, theme, winutil};
 
-pub const APP_VERSION: &str = "2.1.7";
+pub const APP_VERSION: &str = "2.1.8";
 pub const DEFAULT_WIDTH: f32 = 760.0;
 pub const DEFAULT_HEIGHT: f32 = 520.0;
 pub const MIN_WIDTH: f32 = 520.0;
@@ -663,10 +663,8 @@ impl LiteApp {
                 } => match result {
                     Ok(message) => {
                         self.console.write(format!("[Console] {message}"));
-                        self.plugin_mgr.refresh(&mut self.config, true);
-                        if was_enabled {
-                            self.plugin_mgr.set_enabled(&slug, true, &mut self.config);
-                        }
+                        self.plugin_mgr
+                            .reload_updated_plugin(&slug, was_enabled, &mut self.config);
                         self.save_config();
                     }
                     Err(error) => self
@@ -1601,7 +1599,7 @@ impl LiteApp {
         });
     }
 
-    fn check_plugin_updates(&self) {
+    fn check_plugin_updates(&mut self) {
         let payload = self
             .plugin_mgr
             .plugins
@@ -1646,6 +1644,10 @@ impl LiteApp {
                 .and_then(Value::as_str)
                 .or_else(|| update.get("id").and_then(Value::as_str))
                 .unwrap_or("");
+            let update_version = update
+                .get("version")
+                .and_then(Value::as_str)
+                .unwrap_or("unknown");
             if plugin_id.is_empty() {
                 continue;
             }
@@ -1659,20 +1661,18 @@ impl LiteApp {
             };
             let slug = plugin.slug.clone();
             let name = plugin.display_name().to_string();
+            let version = update_version.to_string();
             let was_enabled = plugin.enabled;
             let plugin_dir = self.plugin_dir.clone();
             let tx = self.tx.clone();
-            let id = plugin_id.to_string();
-            self.console
-                .write(format!("[Core] Updating plugin '{name}'..."));
-            // unload first, the zip lands on top of files lua still has open
+            let id = plugin_id.to_string(); // unload first, the zip lands on top of files lua still has open
             if was_enabled {
                 self.plugin_mgr.set_enabled(&slug, false, &mut self.config);
                 self.save_config();
             }
             std::thread::spawn(move || {
                 let result = download_and_extract_plugin(&id, &plugin_dir)
-                    .map(|_| format!("Plugin '{slug}' updated."));
+                    .map(|_| format!("Successfully updated {name} to {version}."));
                 let _ = tx.send(AppMsg::PluginAutoUpdateDone {
                     slug,
                     was_enabled,
@@ -2610,8 +2610,7 @@ impl eframe::App for LiteApp {
         } else {
             Duration::from_millis(500)
         };
-        self.plugin_mgr
-            .dispatch_tick_if_due(plugin_tick_interval);
+        self.plugin_mgr.dispatch_tick_if_due(plugin_tick_interval);
         // render first, it is what records new positions to flush
         self.render_plugin_windows(&ctx);
         self.plugin_mgr.flush_window_positions();

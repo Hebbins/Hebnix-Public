@@ -25,7 +25,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.7";
+pub const APP_VERSION: &str = "2.1.8";
 
 pub const DEFAULT_WIDTH: f32 = 1250.0;
 pub const DEFAULT_HEIGHT: f32 = 700.0;
@@ -1443,6 +1443,10 @@ impl HebnixApp {
                                     .or_else(|| update.get("id"))
                                     .and_then(|value| value.as_str())
                                     .unwrap_or("");
+                                let update_version = update
+                                    .get("version")
+                                    .and_then(|value| value.as_str())
+                                    .unwrap_or("unknown");
                                 if plugin_id.is_empty() {
                                     continue;
                                 }
@@ -1454,16 +1458,14 @@ impl HebnixApp {
                                     let slug = local_p.slug.clone();
                                     let name = local_p.display_name().to_string();
                                     let was_enabled = local_p.enabled;
-
-                                    self.console.write(format!(
-                                        "[Core] Downloading update for plugin '{name}'..."
-                                    ));
                                     self.plugin_mgr.set_enabled(&slug, false, &mut self.config);
                                     self.save_config();
 
                                     let plugin_dir = self.plugin_dir.clone();
                                     let id_str = plugin_id.to_string();
                                     let name_str = name.to_string();
+                                    let version_str = update_version.to_string();
+                                    let slug_str = slug.clone();
                                     let tx = self.tx.clone();
 
                                     std::thread::spawn(move || {
@@ -1482,10 +1484,17 @@ impl HebnixApp {
                                                 .join(format!("temp_plugin_{id_str}.zip"));
                                             std::fs::write(&temp_zip, &bytes)
                                                 .map_err(|e| e.to_string())?;
-                                            let extract = install_zip(&temp_zip, &plugin_dir);
+                                            let extract = install_plugin_update(
+                                                &temp_zip,
+                                                &plugin_dir,
+                                                &slug_str,
+                                                &id_str,
+                                            );
                                             let _ = std::fs::remove_file(&temp_zip);
                                             extract?;
-                                            Ok(format!("Plugin '{name_str}' updated successfully."))
+                                            Ok(format!(
+                                                "Successfully updated {name_str} to {version_str}."
+                                            ))
                                         })(
                                         );
                                         let _ = tx.send(AppMsg::PluginAutoUpdateDone {
@@ -1507,10 +1516,8 @@ impl HebnixApp {
                 } => match result {
                     Ok(msg) => {
                         self.console.write(format!("[Console] {msg}"));
-                        self.plugin_mgr.refresh(&mut self.config, true);
-                        if was_enabled {
-                            self.plugin_mgr.set_enabled(&slug, true, &mut self.config);
-                        }
+                        self.plugin_mgr
+                            .reload_updated_plugin(&slug, was_enabled, &mut self.config);
                         self.save_config();
                     }
                     Err(e) => {
@@ -5021,6 +5028,56 @@ impl HebnixApp {
     }
 }
 
+fn install_plugin_update(
+    zip_path: &std::path::Path,
+    plugin_dir: &std::path::Path,
+    slug: &str,
+    plugin_id: &str,
+) -> Result<(), String> {
+    let target = plugin_dir.join(slug);
+    let backup = plugin_dir.join(format!(".{slug}.updating"));
+    let _ = std::fs::remove_dir_all(&backup);
+    if target.exists() {
+        std::fs::rename(&target, &backup).map_err(|error| error.to_string())?;
+    }
+    let result = (|| {
+        install_zip(zip_path, plugin_dir)?;
+        let extracted = std::fs::read_dir(plugin_dir)
+            .map_err(|error| error.to_string())?
+            .flatten()
+            .map(|entry| entry.path())
+            .find(|path| {
+                path.is_dir()
+                    && path != &backup
+                    && std::fs::read_to_string(path.join("plugin.toml"))
+                        .ok()
+                        .and_then(|text| {
+                            toml::from_str::<crate::plugins::manifest::PluginManifest>(&text).ok()
+                        })
+                        .and_then(|manifest| manifest.plugin_id)
+                        .as_deref()
+                        == Some(plugin_id)
+            })
+            .ok_or_else(|| format!("Updated archive did not contain plugin ID {plugin_id}"))?;
+        if extracted != target {
+            std::fs::rename(&extracted, &target).map_err(|error| error.to_string())?;
+        }
+        Ok(())
+    })();
+    match result {
+        Ok(()) => {
+            let _ = std::fs::remove_dir_all(&backup);
+            Ok(())
+        }
+        Err(error) => {
+            let _ = std::fs::remove_dir_all(&target);
+            if backup.exists() {
+                let _ = std::fs::rename(&backup, &target);
+            }
+            Err(error)
+        }
+    }
+}
 fn install_zip(zip_path: &std::path::Path, plugin_dir: &std::path::Path) -> Result<(), String> {
     let file = std::fs::File::open(zip_path).map_err(|e| e.to_string())?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
