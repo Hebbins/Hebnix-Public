@@ -1686,7 +1686,6 @@ fn restore_package_texture_regions(
         .map_err(|error| format!("Failed to restore {package_name}: {error}"))?;
     Ok(())
 }
-
 // ============================================================================
 // DECAL ITEMS - UI State
 // ============================================================================

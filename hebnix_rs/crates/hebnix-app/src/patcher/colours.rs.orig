@@ -89,6 +89,10 @@ pub struct ColourSettings {
     pub hud_colours: bool,
     pub heatseeker_glow: bool,
     pub heatseeker_max_speed: [u8; 3],
+    pub menu_button_colours: bool,
+    pub menu_button_normal: [u8; 3],
+    pub menu_button_hover: [u8; 3],
+    pub menu_button_pressed: [u8; 3],
     pub applied: bool,
 }
 
@@ -146,6 +150,10 @@ impl Default for ColourSettings {
             hud_colours: true,
             heatseeker_glow: false,
             heatseeker_max_speed: [255, 64, 0],
+            menu_button_colours: false,
+            menu_button_normal: [36, 123, 255],
+            menu_button_hover: [80, 160, 255],
+            menu_button_pressed: [20, 80, 190],
             applied: false,
         }
     }
@@ -273,6 +281,18 @@ impl ColoursState {
                         colour_row(ui, "Max speed", &mut self.settings.heatseeker_max_speed);
                     });
                 });
+                ui.add_space(10.0);
+                ui.vertical(|ui| {
+                    ui.heading("Main-menu buttons");
+                    ui.checkbox(&mut self.settings.menu_button_colours, "Override main-menu button states locally");
+                    ui.weak("Normal, hover and pressed are separate textures.");
+                    ui.add_enabled_ui(self.settings.menu_button_colours, |ui| {
+                        colour_row(ui, "Normal", &mut self.settings.menu_button_normal);
+                        colour_row(ui, "Hover", &mut self.settings.menu_button_hover);
+                        colour_row(ui, "Pressed", &mut self.settings.menu_button_pressed);
+                    });
+                });
+
 
                 ui.add_space(14.0);
                 ui.horizontal(|ui| {
@@ -602,6 +622,18 @@ fn apply(cooked_pc: &Path, backups_dir: &Path, settings: &ColourSettings) -> Res
         ));
     }
     let _ = fs::remove_file(&temp);
+    if settings.menu_button_colours {
+        crate::patcher::decal_patcher::patch_menu_button_colours(
+            cooked_pc, backups_dir, cooked_pc,
+            crate::patcher::decal_patcher::MenuButtonColours {
+                normal: settings.menu_button_normal,
+                hover: settings.menu_button_hover,
+                pressed: settings.menu_button_pressed,
+            },
+        )?;
+    } else {
+        crate::patcher::decal_patcher::restore_menu_button_colours(cooked_pc, backups_dir, cooked_pc)?;
+    }
     let mut saved = settings.clone();
     saved.applied = true;
     save_state(backups_dir, &saved)
@@ -632,6 +664,7 @@ fn restore(cooked_pc: &Path, backups_dir: &Path) -> Result<(), String> {
     restore_boost_texture_colours(cooked_pc, backups_dir)?;
     restore_arena_boost_colours(cooked_pc, backups_dir)?;
     crate::patcher::heatseeker::restore(cooked_pc, backups_dir)?;
+    crate::patcher::decal_patcher::restore_menu_button_colours(cooked_pc, backups_dir, cooked_pc)?;
     let temp = cooked_pc.join("TAGame.upk.colours.restore.tmp");
     fs::write(&temp, &original)
         .map_err(|error| format!("Could not prepare the restore: {error}"))?;

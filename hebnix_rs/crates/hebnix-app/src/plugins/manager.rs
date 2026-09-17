@@ -240,6 +240,29 @@ impl PluginManager {
         }
     }
 
+    /// Refresh one plugin after its files were replaced by an auto-update.
+    /// Disabled plugins remain disabled; enabled plugins are re-instantiated from disk.
+    pub fn reload_updated_plugin(&mut self, slug: &str, was_enabled: bool, config: &mut Config) {
+        if was_enabled {
+            let _ = self.set_enabled(slug, true, config);
+            return;
+        }
+
+        let Some(index) = self.plugins.iter().position(|plugin| plugin.slug == slug) else {
+            return;
+        };
+        if let Some(discovered) = discover_plugins(&self.plugin_dir)
+            .into_iter()
+            .find(|plugin| plugin.slug == slug && plugin.error.is_none())
+        {
+            self.plugins[index].filename = discovered.filename();
+            self.plugins[index].manifest = discovered.manifest;
+            self.plugins[index].load_error = None;
+        }
+        self.plugins[index].enabled = false;
+        self.plugins[index].runtime = None;
+        config.plugins.insert(slug.to_string(), false);
+    }
     /// Recreate enabled plugin runtimes after an actual Steam/Epic transition.
     /// This intentionally emits no success messages; plugins simply receive the
     /// updated shared platform on their next `on_load` call.
@@ -257,15 +280,12 @@ impl PluginManager {
         self.shared.borrow_mut().suppress_plugin_logs = false;
     }
 
-    fn update_rl_config_dir(&self, config: &Config) {
-        let statsapi_path = crate::statsapi_ini::resolve_ini_path(
-            &config.settings.statsapi_path,
-            &config.settings.rl_path,
-        );
-        self.shared.borrow_mut().rl_config_dir = statsapi_path
-            .parent()
-            .map(std::path::Path::to_path_buf)
-            .unwrap_or_default();
+    fn update_rl_config_dir(&self, _config: &Config) {
+        self.shared.borrow_mut().rl_config_dir =
+            hebnix_sdk::utils::system_settings::find_system_settings()
+                .parent()
+                .map(std::path::Path::to_path_buf)
+                .unwrap_or_default();
     }
 
     fn instantiate(&self, disc: &DiscoveredPlugin) -> Result<PluginRuntime, String> {
