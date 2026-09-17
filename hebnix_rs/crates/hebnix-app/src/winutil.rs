@@ -282,25 +282,67 @@ pub fn kill_rocket_league() -> std::io::Result<()> {
         .map(|_| ())
 }
 
-pub fn start_rocket_league(game_path: &std::path::Path) -> std::io::Result<()> {
+const EPIC_LAUNCH_URI: &str = "com.epicgames.launcher://apps/9773aa1aa54f4f7b80e44bef04986cea%3A530145df28a24424923f5828cc9031a1%3ASugar?action=launch&silent=true";
+
+// The monitor updates SettingsCfg.rl_path from the running process before a
+// launch command is handled. Steam installs can live in any library, so use
+// the Steam-owned directory markers rather than a fixed drive/path.
+fn is_steam_path(game_path: &std::path::Path) -> bool {
+    let path = game_path.to_string_lossy().to_ascii_lowercase();
+    path.contains("steamapps") || path.contains("steam\\common") || path.contains("steam/library")
+}
+
+/// steam://... or com.epicgames.launcher://... for the modes that just need
+/// a URI opened via `cmd /C start` - everything except Heroic, which spawns
+/// its own binary directly (see rl_launch::heroic_launch).
+fn simple_launch_uri(cfg: &crate::config::RlLaunchCfg, game_path: &std::path::Path) -> String {
+    use crate::config::RlLaunchMode;
+    match cfg.mode {
+        // a non-Steam shortcut still gets a plain restart THROUGH Steam
+        // (steam overlay/input/presence all work here) - only Workshop
+        // LAN's -multihome relaunch has to bypass Steam for this mode,
+        // since steam://run's argument override refuses non-Steam
+        // shortcuts outright.
+        RlLaunchMode::SteamNative | RlLaunchMode::SteamShortcutToHeroic => {
+            format!("steam://rungameid/{}", cfg.steam_id)
+        }
+        RlLaunchMode::EpicDirect => EPIC_LAUNCH_URI.to_string(),
+        RlLaunchMode::Unconfigured | RlLaunchMode::HeroicDirect => {
+            if is_steam_path(game_path) {
+                "steam://rungameid/252950".to_string()
+            } else {
+                EPIC_LAUNCH_URI.to_string()
+            }
+        }
+    }
+}
+
+pub fn start_rocket_league(
+    cfg: &crate::config::RlLaunchCfg,
+    game_path: &std::path::Path,
+) -> std::io::Result<()> {
+    use crate::config::RlLaunchMode;
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let path = game_path.to_string_lossy().to_ascii_lowercase();
-    let launch = if path.contains("steamapps")
-        || path.contains("steam\\common")
-        || path.contains("steam/library")
-    {
-        "steam://rungameid/252950"
-    } else {
-        "com.epicgames.launcher://apps/9773aa1aa54f4f7b80e44bef04986cea%3A530145df28a24424923f5828cc9031a1%3ASugar?action=launch&silent=true"
-    };
+
+    if cfg.mode == RlLaunchMode::HeroicDirect {
+        return crate::rl_launch::heroic_launch(cfg, None)
+            .map_err(std::io::Error::other);
+    }
+
+    let launch = simple_launch_uri(cfg, game_path);
     std::process::Command::new("cmd")
-        .args(["/C", "start", "", launch])
+        .args(["/C", "start", "", &launch])
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map(|_| ())
 }
-pub fn restart_rocket_league(game_path: &std::path::Path) -> std::io::Result<()> {
+
+pub fn restart_rocket_league(
+    cfg: &crate::config::RlLaunchCfg,
+    game_path: &std::path::Path,
+) -> std::io::Result<()> {
+    use crate::config::RlLaunchMode;
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let _ = kill_rocket_league();
@@ -319,29 +361,26 @@ pub fn restart_rocket_league(game_path: &std::path::Path) -> std::io::Result<()>
         }
         std::thread::sleep(std::time::Duration::from_millis(250));
     }
-    let path = game_path.to_string_lossy().to_ascii_lowercase();
-    // The monitor updates SettingsCfg.rl_path from the running process before
-    // this command is handled. Steam installs can live in any library, so use
-    // the Steam-owned directory markers rather than a fixed drive/path.
-    let is_steam = path.contains("steamapps")
-        || path.contains("steam\\common")
-        || path.contains("steam/library");
-    let launch = if is_steam {
-        "steam://rungameid/252950"
-    } else {
-        "com.epicgames.launcher://apps/9773aa1aa54f4f7b80e44bef04986cea%3A530145df28a24424923f5828cc9031a1%3ASugar?action=launch&silent=true"
-    };
+
+    if cfg.mode == RlLaunchMode::HeroicDirect {
+        return crate::rl_launch::heroic_launch(cfg, None)
+            .map_err(std::io::Error::other);
+    }
+
+    let launch = simple_launch_uri(cfg, game_path);
     std::process::Command::new("cmd")
-        .args(["/C", "start", "", launch])
+        .args(["/C", "start", "", &launch])
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map(|_| ())
 }
 
 pub fn restart_rocket_league_multihome(
+    cfg: &crate::config::RlLaunchCfg,
     game_path: &std::path::Path,
     address: &str,
 ) -> Result<(), String> {
+    use crate::config::RlLaunchMode;
     use std::os::windows::process::CommandExt;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -352,12 +391,27 @@ pub fn restart_rocket_league_multihome(
         }
         std::thread::sleep(std::time::Duration::from_millis(250));
     }
-    let path = game_path.to_string_lossy().to_ascii_lowercase();
-    let is_steam = path.contains("steamapps")
-        || path.contains("steam\\common")
-        || path.contains("steam/library");
+
+    if matches!(
+        cfg.mode,
+        RlLaunchMode::SteamShortcutToHeroic | RlLaunchMode::HeroicDirect
+    ) {
+        return crate::rl_launch::heroic_launch(cfg, Some(address));
+    }
+
+    let is_steam = match cfg.mode {
+        RlLaunchMode::SteamNative => true,
+        RlLaunchMode::EpicDirect => false,
+        RlLaunchMode::Unconfigured => is_steam_path(game_path),
+        RlLaunchMode::SteamShortcutToHeroic | RlLaunchMode::HeroicDirect => unreachable!(),
+    };
     if is_steam {
-        let launch = format!("steam://run/252950//-multihome%3D{address}/");
+        let steam_id = if cfg.mode == RlLaunchMode::SteamNative {
+            cfg.steam_id.as_str()
+        } else {
+            "252950"
+        };
+        let launch = format!("steam://run/{steam_id}//-multihome%3D{address}/");
         std::process::Command::new("cmd")
             .args(["/C", "start", "", &launch])
             .creation_flags(CREATE_NO_WINDOW)
@@ -368,12 +422,7 @@ pub fn restart_rocket_league_multihome(
     apply_epic_multihome(address)?;
     restart_epic_launcher_for_multihome()?;
     std::process::Command::new("cmd")
-        .args([
-            "/C",
-            "start",
-            "",
-            "com.epicgames.launcher://apps/9773aa1aa54f4f7b80e44bef04986cea%3A530145df28a24424923f5828cc9031a1%3ASugar?action=launch&silent=true",
-        ])
+        .args(["/C", "start", "", EPIC_LAUNCH_URI])
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map_err(|error| error.to_string())?;

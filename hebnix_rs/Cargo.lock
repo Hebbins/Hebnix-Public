@@ -2334,6 +2334,7 @@ dependencies = [
  "aes",
  "base64 0.21.7",
  "bcdec_rs",
+ "crc32fast",
  "crossbeam-channel",
  "dirs",
  "eframe",

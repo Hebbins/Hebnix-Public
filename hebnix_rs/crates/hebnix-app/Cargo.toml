@@ -18,6 +18,7 @@ required-features = ["lite"]
 
 [dependencies]
 aes = "0.8"
+crc32fast = "1"
 crossbeam-channel.workspace = true
 dirs = "6.0.0"
 eframe = "0.35.0"

@@ -32,6 +32,7 @@ mod patch_core {
 }
 mod plugins;
 mod presets;
+mod rl_launch;
 mod runtime_assets;
 mod spoofer;
 mod statsapi_ini;
