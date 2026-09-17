@@ -5,8 +5,9 @@ target/ (no deps/, build/, .ilk, .d...).
 dist/ =
   hebnix.exe
   hebnix-lite.exe
-  steam_api64.dll         eos steam auth
-  rlapi-bridge.exe        psynet bridge (from rlapi_bridge/dist/)
+
+Support programs are embedded in both executables and extracted under
+%AppData%\Hebnix at runtime.
 
 pdb (target/release/hebnix.pdb, big) is not shipped by default. keep it
 archived per release so you can symbolicate a user's crash.txt later. -WithPdb

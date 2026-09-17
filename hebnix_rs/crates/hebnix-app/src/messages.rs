@@ -46,6 +46,7 @@ pub enum AppMsg {
     WorkshopOpDone {
         message: String,
     },
+    BackgroundChangerDone(Result<String, String>),
     WorkshopMultiplayerProgress(String),
     WorkshopMultiplayerPrepared {
         result: Result<

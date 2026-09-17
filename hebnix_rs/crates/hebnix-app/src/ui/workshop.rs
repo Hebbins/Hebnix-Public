@@ -19,6 +19,8 @@ use crate::multiplayer_lan::{
     HostSession, JoinRoomRequest, JoinedRoom, MapDescriptor, RoomClient, UpdatePlayerRequest,
     ensure_host_rule, ensure_join_rule_if_needed, ensure_rocket_league_lan_rule,
 };
+mod background_changer;
+use background_changer::BackgroundChangerState;
 
 const MULTIHOME_CHECK_MAX_ATTEMPTS: u8 = 30;
 const MULTIHOME_CHECK_INTERVAL: Duration = Duration::from_secs(2);
@@ -94,9 +96,7 @@ fn multiplayer_join_request() -> JoinRoomRequest {
 fn multiplayer_client_token() -> String {
     use rand::RngCore;
 
-    let path = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("Hebnix")
+    let path = crate::config::base_dir()
         .join("state")
         .join("multiplayer_player_token.txt");
     if let Ok(token) = std::fs::read_to_string(&path) {
@@ -458,6 +458,7 @@ pub enum ImageState {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum WorkshopView {
     Browse,
+    BackgroundChanger,
     Multiplayer,
 }
 
@@ -561,7 +562,13 @@ pub struct WorkshopState {
     pub fetched: bool,
     pub confirm_delete: Option<Value>,
     view: WorkshopView,
+    background_changer: BackgroundChangerState,
     multiplayer: MultiplayerState,
+    /// mirrored from Config.rl_launch by render() each frame, so the
+    /// Workshop LAN -multihome relaunch (deep in prepare_multiplayer, spawned
+    /// on its own thread) knows how to launch Rocket League without every
+    /// intermediate method needing its own copy of the parameter.
+    rl_launch: crate::config::RlLaunchCfg,
 }
 
 impl WorkshopState {
@@ -587,8 +594,14 @@ impl WorkshopState {
             fetched: false,
             confirm_delete: None,
             view: WorkshopView::Browse,
+            background_changer: BackgroundChangerState::default(),
             multiplayer,
+            rl_launch: crate::config::RlLaunchCfg::default(),
         }
+    }
+
+    pub fn finish_background_changer(&mut self, result: Result<String, String>) -> String {
+        self.background_changer.finish(result)
     }
 
     pub fn total_pages(&self) -> usize {
@@ -659,18 +672,34 @@ impl WorkshopState {
         );
     }
 
-    /// render the tab. rl_path comes from the app config.
-    pub fn render(&mut self, ui: &mut egui::Ui, rl_path: &str, tx: &Sender<AppMsg>) {
+    /// render the tab. rl_path and rl_launch come from the app config.
+    pub fn render(
+        &mut self,
+        ui: &mut egui::Ui,
+        rl_path: &str,
+        rl_launch: &crate::config::RlLaunchCfg,
+        tx: &Sender<AppMsg>,
+    ) {
+        self.rl_launch = rl_launch.clone();
         let ctx = ui.ctx().clone();
 
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.view, WorkshopView::Browse, "Browse Maps");
+            ui.selectable_value(
+                &mut self.view,
+                WorkshopView::BackgroundChanger,
+                "Background Changer",
+            );
             // multiplayer is temporarily hidden for 2.1.7.
             // ui.selectable_value(&mut self.view, WorkshopView::Multiplayer, "Multiplayer");
         });
         ui.separator();
         if self.view == WorkshopView::Multiplayer {
             self.render_multiplayer(ui, rl_path, tx, &ctx);
+            return;
+        }
+        if self.view == WorkshopView::BackgroundChanger {
+            self.background_changer.render(ui, rl_path, tx);
             return;
         }
 
@@ -1362,6 +1391,7 @@ impl WorkshopState {
         self.multiplayer.restarting_rocket_league = true;
         self.multiplayer.setup_progress = Some("Preparing the Workshop LAN adapter...".to_string());
         let rl_path = rl_path.to_string();
+        let rl_launch = self.rl_launch.clone();
         let address = address.to_string();
         let join_pin = join_pin.filter(|pin| pin.len() == 4);
         let tx = tx.clone();
@@ -1396,8 +1426,12 @@ impl WorkshopState {
                 let _ = tx.send(AppMsg::WorkshopMultiplayerProgress(
                     "Starting Rocket League with the Workshop LAN address...".to_string(),
                 ));
-                crate::winutil::restart_rocket_league_multihome(Path::new(&rl_path), &address)
-                    .map(|_| (tunnel, joined))
+                crate::winutil::restart_rocket_league_multihome(
+                    &rl_launch,
+                    Path::new(&rl_path),
+                    &address,
+                )
+                .map(|_| (tunnel, joined))
             });
             if result.is_err()
                 && let Some(joined) = cleanup_join
@@ -1898,18 +1932,42 @@ impl WorkshopState {
         if self.multiplayer.restarting_rocket_league {
             return;
         }
-        if let Some(mut session) = self.multiplayer.hosted.take() {
-            let _ = session.stop();
-        }
+
+        let hosted = self.multiplayer.hosted.take();
+        let joined = self.multiplayer.joined.take();
+        let prepared_tap = self.multiplayer.prepared_tap.take();
+        let cleanup_needed = hosted.is_some()
+            || joined.is_some()
+            || prepared_tap.is_some()
+            || self.multiplayer.tap_ready_before_launch;
+
         self.clear_host_state();
-        if let Some(mut session) = self.multiplayer.joined.take() {
-            let _ = session.leave();
-        }
-        self.multiplayer.prepared_tap.take();
-        let _ = crate::winutil::clear_rocket_league_multihome();
-        let _ = crate::multiplayer_lan::cleanup_system_state();
+        self.multiplayer.pending_join = None;
+        self.multiplayer.tap_ready_before_launch = false;
         self.multiplayer.status =
             "Workshop multiplayer stopped because Rocket League closed.".to_string();
+
+        // Stopping a session can wait for a network heartbeat, while firewall
+        // and TAP cleanup launch external commands. This method runs from the
+        // egui message handler, so doing any of that here freezes the whole app
+        // when Rocket League exits. Ordinary (non-multiplayer) exits need no
+        // cleanup at all; tear down real multiplayer state on a worker.
+        if cleanup_needed {
+            std::thread::Builder::new()
+                .name("workshop-shutdown".into())
+                .spawn(move || {
+                    if let Some(mut session) = hosted {
+                        let _ = session.stop();
+                    }
+                    if let Some(mut session) = joined {
+                        let _ = session.leave();
+                    }
+                    drop(prepared_tap);
+                    let _ = crate::winutil::clear_rocket_league_multihome();
+                    let _ = crate::multiplayer_lan::cleanup_system_state();
+                })
+                .ok();
+        }
     }
 
     pub fn rocket_league_reopened(&mut self) {

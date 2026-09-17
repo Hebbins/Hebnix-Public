@@ -94,6 +94,7 @@ impl PluginManager {
                 app_version: app_version.to_string(),
                 platform: String::new(),
                 suppress_plugin_logs: false,
+                rl_config_dir: PathBuf::new(),
             })),
             last_pos_flush: std::time::Instant::now(),
             last_tick_dispatch: std::time::Instant::now() - std::time::Duration::from_secs(1),
@@ -106,6 +107,7 @@ impl PluginManager {
 
     /// full refresh: unload all, re-discover, load the enabled ones
     pub fn refresh(&mut self, config: &mut Config, _verbose: bool) {
+        self.update_rl_config_dir(config);
         for plugin in &mut self.plugins {
             if plugin.enabled {
                 Self::call_on_unload(plugin);
@@ -180,6 +182,7 @@ impl PluginManager {
 
     /// enable+(re)load or disable+unload one plugin, returns success
     pub fn set_enabled(&mut self, slug: &str, enabled: bool, config: &mut Config) -> bool {
+        self.update_rl_config_dir(config);
         let Some(idx) = self.plugins.iter().position(|p| p.slug == slug) else {
             return false;
         };
@@ -252,6 +255,17 @@ impl PluginManager {
             let _ = self.set_enabled(&slug, true, config);
         }
         self.shared.borrow_mut().suppress_plugin_logs = false;
+    }
+
+    fn update_rl_config_dir(&self, config: &Config) {
+        let statsapi_path = crate::statsapi_ini::resolve_ini_path(
+            &config.settings.statsapi_path,
+            &config.settings.rl_path,
+        );
+        self.shared.borrow_mut().rl_config_dir = statsapi_path
+            .parent()
+            .map(std::path::Path::to_path_buf)
+            .unwrap_or_default();
     }
 
     fn instantiate(&self, disc: &DiscoveredPlugin) -> Result<PluginRuntime, String> {
