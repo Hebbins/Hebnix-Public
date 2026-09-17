@@ -1,25 +1,7 @@
 # Third-party components
 
-Binaries that ship with to `hebnix-app.exe`. Not ours, not covered by Hebnix's
+Binaries that ship with to `hebnix.exe`. Not ours, not covered by Hebnix's
 licence.
-
-## curl-impersonate.exe
-
-From lexiforest/curl-impersonate v1.5.6, `bin/` inside
-
-    https://github.com/lexiforest/curl-impersonate/releases/download/v1.5.6/libcurl-impersonate-v1.5.6.x86_64-win32.tar.gz
-
-sha256 `0b4e5552a818190dc1fd8bc89a4e78ea45df5546c69af8e935c791621bed66f5`
-
-
-## cacert.pem
-
-CA bundle, BoringSSL can't read the Windows cert store. MPL-2.0, Mozilla's CA
-store as published by curl.
-
-    https://curl.se/ca/cacert-2026-05-14.pem
-
-sha256 `86a1f3366afac7c6f8ae9f3c779ac221129328c43f0ab2b8817eb2f362a5025c`, CRLF via `.gitattributes`.
 
 ## steam_api64.dll
 

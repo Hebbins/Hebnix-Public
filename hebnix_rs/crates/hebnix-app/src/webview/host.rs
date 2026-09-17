@@ -256,7 +256,7 @@ const POINTER_HIT_SCRIPT: &str = r#"
 })();
 "#;
 
-/// Keep WebView state with the rest of Hebnix's AppData.
+/// webview2 needs its own data dir, the install dir is not always writable
 fn user_data_dir() -> Option<std::path::PathBuf> {
     let dir = crate::config::base_dir().join("webview2");
     std::fs::create_dir_all(&dir).ok()?;

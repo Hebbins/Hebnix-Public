@@ -178,6 +178,9 @@ pub struct HostCtx {
     pub dir: std::path::PathBuf,
     /// asset bytes by relative path. None means it failed and was already logged, the ui callbacks run every frame so it can only be said once.
     pub assets: RefCell<std::collections::HashMap<String, Option<std::sync::Arc<[u8]>>>>,
+    /// canonicalized directory roots this plugin may read via read_file,
+    /// expanded from [permissions] read_roots in its plugin.toml
+    pub read_roots: Vec<std::path::PathBuf>,
 }
 
 impl HostCtx {
@@ -191,6 +194,118 @@ impl HostCtx {
 }
 
 // Plugin assets
+
+// pulls a small palette out of an image so a plugin can theme its ui off it.
+// dominant is the most common colour, vibrant the most saturated, light/dark
+// are the dominant nudged toward white/black
+fn image_palette(path: &std::path::Path) -> Option<[(&'static str, String); 10]> {
+    let img = image::open(path).ok()?.to_rgb8();
+    let small = image::imageops::resize(&img, 48, 48, image::imageops::FilterType::Triangle);
+
+    let mut buckets: std::collections::HashMap<u16, (u64, u64, u64, u64)> =
+        std::collections::HashMap::new();
+    let (mut ar, mut ag, mut ab, mut total) = (0u64, 0u64, 0u64, 0u64);
+    for p in small.pixels() {
+        let (r, g, b) = (p[0] as u64, p[1] as u64, p[2] as u64);
+        ar += r;
+        ag += g;
+        ab += b;
+        total += 1;
+        let key = (((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)) as u16;
+        let e = buckets.entry(key).or_default();
+        e.0 += 1;
+        e.1 += r;
+        e.2 += g;
+        e.3 += b;
+    }
+    if total == 0 {
+        return None;
+    }
+
+    let mean = |b: &(u64, u64, u64, u64)| (b.1 / b.0, b.2 / b.0, b.3 / b.0);
+    let dominant = mean(buckets.values().max_by_key(|v| v.0)?);
+
+    // vibrant is the most saturated colour, base is the one the panel is themed
+    // off, prominence weighted so a washed background loses to a real colour
+    let min_count = (total / 200).max(2);
+    let mut vibrant = dominant;
+    let mut base = dominant;
+    let (mut best_sat, mut best_base) = (-1.0f64, -1.0f64);
+    for v in buckets.values() {
+        if v.0 < min_count {
+            continue;
+        }
+        let (r, g, b) = mean(v);
+        let mx = r.max(g).max(b) as f64;
+        let mn = r.min(g).min(b) as f64;
+        let sat = if mx <= 0.0 { 0.0 } else { (mx - mn) / mx };
+        let vib = sat * (v.0 as f64).sqrt();
+        if vib > best_sat {
+            best_sat = vib;
+            vibrant = (r, g, b);
+        }
+        let prom = (v.0 as f64) * (0.35 + sat);
+        if prom > best_base {
+            best_base = prom;
+            base = (r, g, b);
+        }
+    }
+
+    let hex = |(r, g, b): (u64, u64, u64)| format!("#{:02x}{:02x}{:02x}", r.min(255), g.min(255), b.min(255));
+    let lighten = |(r, g, b): (u64, u64, u64), t: f64| {
+        let f = |c: u64| (c as f64 + (255.0 - c as f64) * t) as u64;
+        (f(r), f(g), f(b))
+    };
+    let darken = |(r, g, b): (u64, u64, u64), t: f64| {
+        let f = |c: u64| (c as f64 * (1.0 - t)) as u64;
+        (f(r), f(g), f(b))
+    };
+
+    // readable text colour on the dominant panel, WCAG contrast. prefer the
+    // vibrant accent when it stands out enough, else plain black or white
+    let lum = |(r, g, b): (u64, u64, u64)| {
+        let f = |c: u64| {
+            let c = c as f64 / 255.0;
+            if c <= 0.03928 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+        };
+        0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+    };
+    let contrast = |a, b| {
+        let (la, lb) = (lum(a), lum(b));
+        let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
+        (hi + 0.05) / (lo + 0.05)
+    };
+    let black = (0u64, 0u64, 0u64);
+    let white = (255u64, 255u64, 255u64);
+    // text and accent read against base, the panel's mid tone
+    let bw = if contrast(base, black) >= contrast(base, white) { black } else { white };
+    let text = if contrast(base, vibrant) >= 3.0 { vibrant } else { bw };
+
+    // accent keeps the vibrant hue but nudges toward bw until it's clearly seen
+    let mix = |a: (u64, u64, u64), b: (u64, u64, u64), t: f64| {
+        let f = |x: u64, y: u64| (x as f64 + (y as f64 - x as f64) * t) as u64;
+        (f(a.0, b.0), f(a.1, b.1), f(a.2, b.2))
+    };
+    let mut accent = vibrant;
+    let mut step = 0;
+    while contrast(base, accent) < 3.0 && step < 10 {
+        accent = mix(accent, bw, 0.3);
+        step += 1;
+    }
+
+    Some([
+        ("average", hex((ar / total, ag / total, ab / total))),
+        ("dominant", hex(dominant)),
+        ("vibrant", hex(vibrant)),
+        ("base", hex(base)),
+        ("grad1", hex(lighten(base, 0.16))),
+        ("grad2", hex(darken(base, 0.4))),
+        ("light", hex(lighten(base, 0.35))),
+        ("dark", hex(darken(base, 0.45))),
+        ("text", hex(text)),
+        ("accent", hex(accent)),
+    ])
+}
 
 // asset path where root is relative to plugin <slug>/assets/
 fn asset_path(plugin_dir: &std::path::Path, rel: &str) -> Result<std::path::PathBuf, String> {
@@ -246,6 +361,52 @@ fn load_asset(host: &HostCtx, rel: &str) -> Option<std::sync::Arc<[u8]>> {
         .borrow_mut()
         .insert(rel.to_string(), entry.clone());
     entry
+}
+
+/// resolve a writable path under the plugin's own assets/ folder, rejecting
+/// any .. or drive-letter escape. unlike asset_path this doesn't require the
+/// file to exist, so it's usable for writes.
+fn writable_asset_path(plugin_dir: &std::path::Path, rel: &str) -> Option<std::path::PathBuf> {
+    let cleaned = rel.replace('\\', "/");
+    let cleaned = cleaned.trim_start_matches('/');
+    if cleaned.is_empty() {
+        return None;
+    }
+    for part in cleaned.split('/') {
+        if part == ".." || part.contains(':') {
+            return None;
+        }
+    }
+    Some(plugin_dir.join("assets").join(cleaned))
+}
+
+/// write bytes to a file under the plugin's own assets/ (creating parents).
+fn write_asset(plugin_dir: &std::path::Path, rel: &str, data: &[u8]) -> bool {
+    let Some(path) = writable_asset_path(plugin_dir, rel) else {
+        return false;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    std::fs::write(path, data).is_ok()
+}
+
+/// remove every file directly inside assets/<rel> (the directory itself stays).
+fn clear_asset_dir(plugin_dir: &std::path::Path, rel: &str) -> bool {
+    let Some(dir) = writable_asset_path(plugin_dir, rel) else {
+        return false;
+    };
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return false;
+    };
+    let mut ok = true;
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_file() && std::fs::remove_file(&p).is_err() {
+            ok = false;
+        }
+    }
+    ok
 }
 
 // Current-Ui stack
@@ -830,6 +991,184 @@ fn send_req(req: reqwest::blocking::RequestBuilder) -> (u16, String) {
     match req.send() {
         Ok(res) => (res.status().as_u16(), res.text().unwrap_or_default()),
         Err(e) => (0, e.to_string()),
+    }
+}
+
+/// like send_req but returns the body as raw bytes (byte-safe for binary, e.g.
+/// protobuf) plus response headers as a JSON object string (lowercased keys).
+/// status 0 / "{}" when the request never landed.
+fn send_req_full(req: reqwest::blocking::RequestBuilder) -> (u16, Vec<u8>, String) {
+    match req.send() {
+        Ok(res) => {
+            let status = res.status().as_u16();
+            let mut map = serde_json::Map::new();
+            for (k, v) in res.headers().iter() {
+                if let Ok(s) = v.to_str() {
+                    map.insert(
+                        k.as_str().to_lowercase(),
+                        serde_json::Value::String(s.to_string()),
+                    );
+                }
+            }
+            let headers = serde_json::to_string(&map).unwrap_or_else(|_| "{}".to_string());
+            let body = res.bytes().map(|b| b.to_vec()).unwrap_or_default();
+            (status, body, headers)
+        }
+        Err(e) => (0, e.to_string().into_bytes(), "{}".to_string()),
+    }
+}
+
+// P-256 / ES256 signing (for plugins that speak DPoP etc.)
+
+/// load a P-256 signing key from a PKCS#8 key, PEM or DER.
+fn load_p256_signing(key: &[u8]) -> Option<p256::ecdsa::SigningKey> {
+    use p256::pkcs8::DecodePrivateKey;
+    if let Ok(s) = std::str::from_utf8(key) {
+        if s.contains("BEGIN") {
+            if let Ok(sk) = p256::ecdsa::SigningKey::from_pkcs8_pem(s) {
+                return Some(sk);
+            }
+        }
+    }
+    p256::ecdsa::SigningKey::from_pkcs8_der(key).ok()
+}
+
+/// ES256 signature (SHA-256 + ECDSA P-256), returned as the 64-byte fixed
+/// r||s form JWS/DPoP expects. None if the key can't be parsed.
+fn p256_sign(key: &[u8], msg: &[u8]) -> Option<Vec<u8>> {
+    use p256::ecdsa::{signature::Signer, Signature};
+    let sk = load_p256_signing(key)?;
+    let sig: Signature = sk.sign(msg);
+    Some(sig.to_bytes().to_vec())
+}
+
+/// the public key as an uncompressed SEC1 point: 65 bytes, 0x04 || x || y.
+fn p256_public(key: &[u8]) -> Option<Vec<u8>> {
+    let sk = load_p256_signing(key)?;
+    Some(sk.verifying_key().to_encoded_point(false).as_bytes().to_vec())
+}
+
+// generic websocket for plugins (ws_connect_async / ws_send / ws_close)
+
+enum WsCmd {
+    Send(String),
+    Close,
+}
+
+/// live plugin websocket connections, keyed by "slug\0id" -> command channel.
+fn ws_registry(
+) -> &'static std::sync::Mutex<std::collections::HashMap<String, std::sync::mpsc::Sender<WsCmd>>> {
+    static R: OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, std::sync::mpsc::Sender<WsCmd>>>,
+    > = OnceLock::new();
+    R.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+fn ws_key(slug: &str, id: &str) -> String {
+    format!("{slug}\u{0}{id}")
+}
+
+fn set_ws_read_timeout(
+    socket: &mut tungstenite::WebSocket<tungstenite::stream::MaybeTlsStream<std::net::TcpStream>>,
+    dur: Duration,
+) {
+    use tungstenite::stream::MaybeTlsStream;
+    match socket.get_ref() {
+        MaybeTlsStream::Plain(s) => {
+            let _ = s.set_read_timeout(Some(dur));
+        }
+        MaybeTlsStream::NativeTls(s) => {
+            let _ = s.get_ref().set_read_timeout(Some(dur));
+        }
+        _ => {}
+    }
+}
+
+/// open a websocket on a background thread. delivers PluginWsOpen, then a
+/// PluginWsMessage per text/binary frame, then PluginWsClose. reads with a
+/// short timeout so ws_send / ws_close and server pings are serviced promptly.
+fn ws_connect(tx: Sender<AppMsg>, slug: String, id: String, url: String) {
+    let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<WsCmd>();
+    let key = ws_key(&slug, &id);
+    ws_registry().lock().unwrap().insert(key.clone(), cmd_tx);
+
+    std::thread::spawn(move || {
+        let mut socket = match tungstenite::connect(&url) {
+            Ok((s, _resp)) => s,
+            Err(e) => {
+                ws_registry().lock().unwrap().remove(&key);
+                let _ = tx.send(AppMsg::PluginWsClose {
+                    slug,
+                    id,
+                    reason: format!("connect failed: {e}"),
+                });
+                return;
+            }
+        };
+        set_ws_read_timeout(&mut socket, Duration::from_millis(200));
+        let _ = tx.send(AppMsg::PluginWsOpen {
+            slug: slug.clone(),
+            id: id.clone(),
+        });
+
+        let reason = 'outer: loop {
+            // outgoing: sends + close requests from the plugin
+            loop {
+                match cmd_rx.try_recv() {
+                    Ok(WsCmd::Send(text)) => {
+                        let _ = socket.send(tungstenite::Message::Text(text));
+                    }
+                    Ok(WsCmd::Close) => {
+                        let _ = socket.close(None);
+                        break 'outer "closed by plugin".to_string();
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        break 'outer "handle dropped".to_string();
+                    }
+                }
+            }
+            // incoming (times out periodically -> WouldBlock, which we ignore)
+            match socket.read() {
+                Ok(tungstenite::Message::Text(t)) => {
+                    let _ = tx.send(AppMsg::PluginWsMessage {
+                        slug: slug.clone(),
+                        id: id.clone(),
+                        data: t,
+                    });
+                }
+                Ok(tungstenite::Message::Binary(b)) => {
+                    let _ = tx.send(AppMsg::PluginWsMessage {
+                        slug: slug.clone(),
+                        id: id.clone(),
+                        data: String::from_utf8_lossy(&b).into_owned(),
+                    });
+                }
+                Ok(tungstenite::Message::Ping(p)) => {
+                    let _ = socket.send(tungstenite::Message::Pong(p));
+                }
+                Ok(tungstenite::Message::Close(_)) => {
+                    break 'outer "server closed".to_string();
+                }
+                Ok(_) => {}
+                Err(tungstenite::Error::Io(e))
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(e) => {
+                    break 'outer format!("error: {e}");
+                }
+            }
+        };
+        ws_registry().lock().unwrap().remove(&key);
+        let _ = tx.send(AppMsg::PluginWsClose { slug, id, reason });
+    });
+}
+
+fn ws_send_cmd(slug: &str, id: &str, cmd: WsCmd) -> bool {
+    if let Some(tx) = ws_registry().lock().unwrap().get(&ws_key(slug, id)) {
+        tx.send(cmd).is_ok()
+    } else {
+        false
     }
 }
 
@@ -2303,6 +2642,35 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
+    // segoe ui pixel width of a string, so a plugin can lay text out precisely
+    hebnix.set(
+        "measure_text",
+        lua.create_function(|_, (s, size, bold): (String, f32, Option<bool>)| {
+            Ok(crate::overlay::measure_text(&s, size, bold.unwrap_or(false)))
+        })?,
+    )?;
+
+    // palette from one of the plugin's own asset images, for theming ui off it
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "image_palette",
+            lua.create_function(move |lua, rel: String| {
+                let Ok(path) = asset_path(&host.dir, &rel) else {
+                    return Ok(LuaValue::Nil);
+                };
+                let Some(palette) = image_palette(&path) else {
+                    return Ok(LuaValue::Nil);
+                };
+                let t = lua.create_table()?;
+                for (k, v) in palette {
+                    t.set(k, v)?;
+                }
+                Ok(LuaValue::Table(t))
+            })?,
+        )?;
+    }
+
     // JSON Data Handling
     hebnix.set(
         "json_decode",
@@ -2320,6 +2688,198 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             serde_json::to_string(&json).map_err(mlua::Error::external)
         })?,
     )?;
+
+    // read a local file, byte-safe. only under a root from [permissions]
+    // read_roots in the manifest, else nil
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "read_file",
+            lua.create_function(move |lua, path: String| {
+                let Ok(canon) = std::path::Path::new(&path).canonicalize() else {
+                    return Ok(None);
+                };
+                if host.read_roots.iter().any(|root| canon.starts_with(root)) {
+                    match std::fs::read(&canon) {
+                        Ok(bytes) => Ok(Some(lua.create_string(&bytes)?)),
+                        Err(_) => Ok(None),
+                    }
+                } else {
+                    Ok(None)
+                }
+            })?,
+        )?;
+    }
+
+    // write bytes to a file under this plugin's own assets/ folder, creating
+    // parent dirs. no path escapes out of the plugin dir
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "write_asset",
+            lua.create_function(move |_, (rel, data): (String, mlua::String)| {
+                Ok(write_asset(&host.dir, &rel, data.as_bytes().as_ref()))
+            })?,
+        )?;
+    }
+
+    // remove every file inside assets/<rel>, the folder itself stays
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "clear_asset_dir",
+            lua.create_function(move |_, rel: String| Ok(clear_asset_dir(&host.dir, &rel)))?,
+        )?;
+    }
+
+    hebnix.set(
+        "p256_sign",
+        lua.create_function(|lua, (key, msg): (mlua::String, mlua::String)| {
+            match p256_sign(key.as_bytes().as_ref(), msg.as_bytes().as_ref()) {
+                Some(sig) => Ok(Some(lua.create_string(&sig)?)),
+                None => Ok(None),
+            }
+        })?,
+    )?;
+
+    // public key as an uncompressed point for a PKCS#8 P-256 key. slice
+    // [2..34] / [34..66] in lua for the JWK x / y coords
+    hebnix.set(
+        "p256_public",
+        lua.create_function(|lua, key: mlua::String| {
+            match p256_public(key.as_bytes().as_ref()) {
+                Some(pt) => Ok(Some(lua.create_string(&pt)?)),
+                None => Ok(None),
+            }
+        })?,
+    )?;
+
+    // true if a process whose exe name contains name (case-insensitive) is
+    // running, e.g. hebnix.process_running("Spotify.exe"). toolhelp snapshot,
+    // cache the result in on_tick instead of polling every frame
+    hebnix.set(
+        "process_running",
+        lua.create_function(|_, name: String| {
+            Ok(hebnix_sdk::eos::memory::find_process(&name).is_some())
+        })?,
+    )?;
+
+    // http put, result lands in this plugin's on_http_response(req_id, status, body)
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "http_put_async",
+            lua.create_function(
+                move |_,
+                      (req_id, url, body, headers): (
+                    String,
+                    String,
+                    String,
+                    Option<std::collections::HashMap<String, String>>,
+                )| {
+                    let thread_tx = host.tx.clone();
+                    let slug = host.slug.clone();
+                    std::thread::spawn(move || {
+                        let mut req = http_client().put(&url).body(body);
+                        if let Some(hdrs) = headers {
+                            for (k, v) in hdrs {
+                                req = req.header(k, v);
+                            }
+                        }
+                        let (status, body) = send_req(req);
+                        let _ = thread_tx.send(AppMsg::PluginHttpRes {
+                            slug,
+                            req_id,
+                            status,
+                            body,
+                        });
+                    });
+                    Ok(())
+                },
+            )?,
+        )?;
+    }
+
+    // generic http request, any method, returns headers too. result lands in
+    // on_http_result(req_id, status, body, headers_json). body may be nil
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "http_request_async",
+            lua.create_function(
+                move |_,
+                      (req_id, method, url, body, headers): (
+                    String,
+                    String,
+                    String,
+                    Option<String>,
+                    Option<std::collections::HashMap<String, String>>,
+                )| {
+                    let thread_tx = host.tx.clone();
+                    let slug = host.slug.clone();
+                    std::thread::spawn(move || {
+                        let client = http_client();
+                        let mut req = match method.to_ascii_uppercase().as_str() {
+                            "PUT" => client.put(&url),
+                            "POST" => client.post(&url),
+                            "DELETE" => client.delete(&url),
+                            "PATCH" => client.patch(&url),
+                            _ => client.get(&url),
+                        };
+                        if let Some(b) = body {
+                            req = req.body(b);
+                        }
+                        if let Some(hdrs) = headers {
+                            for (k, v) in hdrs {
+                                req = req.header(k, v);
+                            }
+                        }
+                        let (status, body, hdrs) = send_req_full(req);
+                        let _ = thread_tx.send(AppMsg::PluginHttpResult {
+                            slug,
+                            req_id,
+                            status,
+                            body,
+                            headers: hdrs,
+                        });
+                    });
+                    Ok(())
+                },
+            )?,
+        )?;
+    }
+
+    // websocket connect, events land in this plugin's on_ws_open(id),
+    // on_ws_message(id, data) and on_ws_close(id, reason)
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "ws_connect_async",
+            lua.create_function(move |_, (id, url): (String, String)| {
+                ws_connect(host.tx.clone(), host.slug.clone(), id, url);
+                Ok(())
+            })?,
+        )?;
+    }
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "ws_send",
+            lua.create_function(move |_, (id, text): (String, String)| {
+                Ok(ws_send_cmd(&host.slug, &id, WsCmd::Send(text)))
+            })?,
+        )?;
+    }
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "ws_close",
+            lua.create_function(move |_, id: String| {
+                ws_send_cmd(&host.slug, &id, WsCmd::Close);
+                Ok(())
+            })?,
+        )?;
+    }
 
     // Data Processing (Base64 + Zlib)
     hebnix.set(
@@ -2761,6 +3321,25 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         )?,
     )?;
 
+    // draw.gradient(x, y, w, h, {color=, color2=, radius=0, angle=135})
+    draw.set(
+        "gradient",
+        lua.create_function(|_, (x, y, w, h, opts): (f32, f32, f32, f32, Option<Table>)| {
+            let c1 = opt_rgba(&opts, "color", WHITE);
+            overlay::gradient(
+                x,
+                y,
+                w,
+                h,
+                c1,
+                opt_rgba(&opts, "color2", c1),
+                opt_f32(&opts, "radius", 0.0),
+                opt_f32(&opts, "angle", 135.0),
+            );
+            Ok(())
+        })?,
+    )?;
+
     // draw.circle(x, y, radius, {color=, width=, filled=false})
     draw.set(
         "circle",
@@ -2777,7 +3356,8 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         })?,
     )?;
 
-    // draw.text(x, y, "string", {color=, size=14, halign="left"|"center"|"right"})
+    // draw.text(x, y, "string", {color=, size=14, halign="left"|"center"|"right",
+    //           font="rl-body"|"rl-body-bold"|"rl-header"|"rl-header-thin"|"rl-digits"})
     draw.set(
         "text",
         lua.create_function(|_, (x, y, s, opts): (f32, f32, String, Option<Table>)| {
@@ -2785,6 +3365,15 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                 .as_ref()
                 .and_then(|t| t.get::<String>("halign").ok())
                 .unwrap_or_default();
+            let font = opts
+                .as_ref()
+                .and_then(|t| t.get::<String>("font").ok())
+                .unwrap_or_default();
+            // clip_x + clip_w give a fixed window, used for marquee scrolling
+            let clip = match (opt_num(&opts, "clip_x"), opt_num(&opts, "clip_w")) {
+                (Some(cx), Some(cw)) => Some((cx, cw)),
+                _ => None,
+            };
             overlay::text(
                 x,
                 y,
@@ -2792,6 +3381,9 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                 opt_rgba(&opts, "color", WHITE),
                 opt_f32(&opts, "size", 14.0),
                 &halign,
+                &font,
+                opt_bool(&opts, "bold", false),
+                clip,
             );
             Ok(())
         })?,
@@ -2833,6 +3425,7 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                     w,
                     h,
                     opt_f32(&opts, "opacity", 1.0),
+                    opt_f32(&opts, "radius", 0.0),
                 );
                 Ok(())
             },

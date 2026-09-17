@@ -18,11 +18,12 @@ set CLEAN=0
 if "%~1"=="" goto end_parse_args
 if /I "%~1"=="--help" goto show_help
 if /I "%~1"=="-h" goto show_help
-if /I "%~1"=="clean" set CLEAN=1 & shift & goto parse_args
-if /I "%~1"=="bridge" set TARGET=bridge & shift & goto parse_args
-if /I "%~1"=="build" set TARGET=build & shift & goto parse_args
-if /I "%~1"=="package" set TARGET=package & shift & goto parse_args
-if /I "%~1"=="--skip-deps" set SKIP_DEPS=1 & shift & goto parse_args
+REM quoted set, otherwise the value keeps the space before the & and nothing matches
+if /I "%~1"=="clean" set "CLEAN=1" & shift & goto parse_args
+if /I "%~1"=="bridge" set "TARGET=bridge" & shift & goto parse_args
+if /I "%~1"=="build" set "TARGET=build" & shift & goto parse_args
+if /I "%~1"=="package" set "TARGET=package" & shift & goto parse_args
+if /I "%~1"=="--skip-deps" set "SKIP_DEPS=1" & shift & goto parse_args
 echo Unknown argument: %~1
 goto show_help
 :end_parse_args
@@ -83,7 +84,7 @@ if errorlevel 1 exit /b 1
 echo.
 echo [5/5] Build complete!
 echo.
-echo   Main executable: %HEBNIX_RS_DIR%\target\release\hebnix-app.exe
+echo   Main executable: %HEBNIX_RS_DIR%\target\release\hebnix.exe
 echo   Lite executable: %HEBNIX_RS_DIR%\target\release\hebnix-lite.exe
 echo   Bridge executable: %RLAPI_BRIDGE_DIR%\dist\rlapi-bridge.exe
 echo.
@@ -110,7 +111,7 @@ call :build_rust
 if errorlevel 1 exit /b 1
 echo.
 echo [5/5] Build complete!
-echo   Main executable: %HEBNIX_RS_DIR%\target\release\hebnix-app.exe
+echo   Main executable: %HEBNIX_RS_DIR%\target\release\hebnix.exe
 echo   Lite executable: %HEBNIX_RS_DIR%\target\release\hebnix-lite.exe
 goto end
 
@@ -178,24 +179,6 @@ echo   [OK] %~2 found
 exit /b 0
 
 :install_deps
-REM Check curl-impersonate
-if not exist "%VENDOR_DIR%\curl-impersonate\curl-impersonate.exe" (
-    echo   Installing curl-impersonate...
-    call :download_curl_impersonate
-    if errorlevel 1 exit /b 1
-) else (
-    echo   [OK] curl-impersonate already installed
-)
-
-REM Check cacert.pem
-if not exist "%VENDOR_DIR%\curl-impersonate\cacert.pem" (
-    echo   Installing cacert.pem...
-    call :download_cacert
-    if errorlevel 1 exit /b 1
-) else (
-    echo   [OK] cacert.pem already installed
-)
-
 REM Check steam_api64.dll
 if not exist "%VENDOR_DIR%\steam_api64.dll" (
     if %CI_BUILD%==1 (
@@ -218,47 +201,6 @@ if not exist "%VENDOR_DIR%\steam_api64.dll" (
 )
 exit /b 0
 
-:download_curl_impersonate
-if not exist "%VENDOR_DIR%" mkdir "%VENDOR_DIR%"
-echo   Downloading curl-impersonate v1.5.6...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://github.com/lexiforest/curl-impersonate/releases/download/v1.5.6/libcurl-impersonate-v1.5.6.x86_64-win32.tar.gz' -OutFile '%VENDOR_DIR%\curl-impersonate.tar.gz' }"
-if errorlevel 1 (
-    echo ERROR: Failed to download curl-impersonate
-    exit /b 1
-)
-echo   Verifying SHA256...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $hash = (Get-FileHash '%VENDOR_DIR%\curl-impersonate.tar.gz' -Algorithm SHA256).Hash; if ($hash -ne '0b4e5552a818190dc1fd8bc89a4e78ea45df5546c69af8e935c791621bed66f5') { Write-Error 'SHA256 mismatch'; exit 1 } }"
-if errorlevel 1 (
-    echo ERROR: SHA256 verification failed for curl-impersonate
-    exit /b 1
-)
-echo   Extracting...
-tar -xzf "%VENDOR_DIR%\curl-impersonate.tar.gz" -C "%VENDOR_DIR%"
-if errorlevel 1 (
-    echo ERROR: Failed to extract curl-impersonate
-    exit /b 1
-)
-del "%VENDOR_DIR%\curl-impersonate.tar.gz"
-echo   [OK] curl-impersonate installed
-exit /b 0
-
-:download_cacert
-if not exist "%VENDOR_DIR%\curl-impersonate" mkdir "%VENDOR_DIR%\curl-impersonate"
-echo   Downloading cacert.pem...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri 'https://curl.se/ca/cacert-2026-05-14.pem' -OutFile '%VENDOR_DIR%\curl-impersonate\cacert.pem' }"
-if errorlevel 1 (
-    echo ERROR: Failed to download cacert.pem
-    exit /b 1
-)
-echo   Verifying SHA256...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $hash = (Get-FileHash '%VENDOR_DIR%\curl-impersonate\cacert.pem' -Algorithm SHA256).Hash; if ($hash -ne '86a1f3366afac7c6f8ae9f3c779ac221129328c43f0ab2b8817eb2f362a5025c') { Write-Error 'SHA256 mismatch'; exit 1 } }"
-if errorlevel 1 (
-    echo ERROR: SHA256 verification failed for cacert.pem
-    exit /b 1
-)
-echo   [OK] cacert.pem installed
-exit /b 0
-
 :build_bridge
 pushd "%RLAPI_BRIDGE_DIR%"
 call build.bat
@@ -273,7 +215,7 @@ exit /b 0
 :build_rust
 pushd "%HEBNIX_RS_DIR%"
 echo   Building hebnix-app (release)...
-cargo build --release --bin hebnix-app
+cargo build --release --bin hebnix
 if errorlevel 1 (
     popd
     echo ERROR: hebnix-app build failed

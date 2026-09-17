@@ -124,6 +124,27 @@ pub enum AppMsg {
         status: u16,
         body: String,
     },
+    PluginHttpResult {
+        slug: String,
+        req_id: String,
+        status: u16,
+        body: Vec<u8>,
+        headers: String,
+    },
+    PluginWsOpen {
+        slug: String,
+        id: String,
+    },
+    PluginWsMessage {
+        slug: String,
+        id: String,
+        data: String,
+    },
+    PluginWsClose {
+        slug: String,
+        id: String,
+        reason: String,
+    },
     AppUpdateFetched {
         result: Result<Option<crate::update::UpdateInfo>, String>,
     },

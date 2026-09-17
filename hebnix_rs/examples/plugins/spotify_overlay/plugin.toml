@@ -1,0 +1,8 @@
+name = "Spotify Overlay"
+author = "nixvio64"
+version = "1.0.0"
+entry = "main.lua"
+
+
+[permissions]
+read_roots = ["%LOCALAPPDATA%/Spotify", "%APPDATA%/Spotify"]

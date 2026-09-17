@@ -3,13 +3,13 @@ build release + assemble a clean dist/ with only what ships. nothing from
 target/ (no deps/, build/, .ilk, .d...).
 
 dist/ =
-  hebnix-app.exe
+  hebnix.exe
   hebnix-lite.exe
 
 Support programs are embedded in both executables and extracted under
 %AppData%\Hebnix at runtime.
 
-pdb (target/release/hebnix_app.pdb, big) is not shipped by default. keep it
+pdb (target/release/hebnix.pdb, big) is not shipped by default. keep it
 archived per release so you can symbolicate a user's crash.txt later. -WithPdb
 bundles it in dist/ instead (readable crashes on their machine, way bigger dl).
 #>
@@ -26,13 +26,13 @@ $steamDll   = Join-Path $root 'vendor\steam_api64.dll'
 Write-Host 'building release...' -ForegroundColor Cyan
 Push-Location $root
 try {
-    Get-Process hebnix-app -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process hebnix -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     # cargo writes progress to stderr, which under ErrorActionPreference=Stop
     # would abort the script even on success. relax it for the build, then
     # check the real exit code.
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    cargo build --release --bin hebnix-app
+    cargo build --release --bin hebnix
     $code = $LASTEXITCODE
     $ErrorActionPreference = $prev
     if ($code -ne 0) { throw "cargo build failed ($code)" }
@@ -57,12 +57,12 @@ if (Test-Path $distDir) { Remove-Item $distDir -Recurse -Force }
 New-Item -ItemType Directory -Path $distDir | Out-Null
 
 $files = @(
-    (Join-Path $releaseDir 'hebnix-app.exe'),
-    (Join-Path $releaseDir 'hebnix-lite.exe')
+    (Join-Path $releaseDir 'hebnix.exe'),
+    (Join-Path $releaseDir 'hebnix-lite.exe'),
+    $steamDll,
+    $bridgeExe
 )
-# rust names the exe hebnix-app.exe but the pdb hebnix_app.pdb (underscore),
-# and that underscore name is what's baked into the exe, so ship it as-is.
-if ($WithPdb) { $files += (Join-Path $releaseDir 'hebnix_app.pdb') }
+if ($WithPdb) { $files += (Join-Path $releaseDir 'hebnix.pdb') }
 
 foreach ($f in $files) {
     if (-not (Test-Path $f)) { throw "build output missing: $f" }
@@ -74,7 +74,7 @@ Write-Host "`ndist/ ready: $distDir" -ForegroundColor Green
 Get-ChildItem $distDir | Select-Object Name, @{N='Size';E={"{0:N0} KB" -f ($_.Length/1KB)}} | Format-Table -AutoSize
 
 if (-not $WithPdb) {
-    $pdb = Join-Path $releaseDir 'hebnix_app.pdb'
+    $pdb = Join-Path $releaseDir 'hebnix.pdb'
     Write-Host "no pdb shipped. archive this per release to read crash.txt later:" -ForegroundColor Yellow
     Write-Host "  $pdb"
 }

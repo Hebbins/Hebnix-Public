@@ -12,12 +12,6 @@ VENDOR_DIR=$(HEBNIX_RS_DIR)\vendor
 DIST_DIR=$(HEBNIX_RS_DIR)\dist
 TARGET_DIR=$(HEBNIX_RS_DIR)\target\$(CONFIGURATION)
 
-# Third-party component URLs and checksums
-CURL_IMPERSONATE_URL=https://github.com/lexiforest/curl-impersonate/releases/download/v1.5.6/libcurl-impersonate-v1.5.6.x86_64-win32.tar.gz
-CURL_IMPERSONATE_SHA256=0b4e5552a818190dc1fd8bc89a4e78ea45df5546c69af8e935c791621bed66f5
-CACERT_URL=https://curl.se/ca/cacert-2026-05-14.pem
-CACERT_SHA256=86a1f3366afac7c6f8ae9f3c779ac221129328c43f0ab2b8817eb2f362a5025c
-
 .PHONY: all build bridge install-deps clean package check-rust check-go help
 
 # Default target
@@ -49,47 +43,7 @@ check-go:
 	@echo Go toolchain found
 
 # Install third-party dependencies
-install-deps: check-deps-curl install-deps-cacert install-deps-steam
-
-# Check if curl-impersonate is already installed
-check-deps-curl:
-	@if not exist "$(VENDOR_DIR)\curl-impersonate\curl-impersonate.exe" (echo Installing curl-impersonate... && $(MAKE) /F Makefile.win install-deps-curl-force) else (echo curl-impersonate already installed)
-
-# Force install curl-impersonate
-install-deps-curl-force:
-	@echo Downloading curl-impersonate v1.5.6...
-	@if not exist "$(VENDOR_DIR)" mkdir "$(VENDOR_DIR)"
-	@powershell -NoProfile -ExecutionPolicy Bypass -Command "& { \
-		$$ProgressPreference = 'SilentlyContinue'; \
-		Invoke-WebRequest -Uri '$(CURL_IMPERSONATE_URL)' -OutFile '$(VENDOR_DIR)\curl-impersonate.tar.gz'; \
-		$$hash = (Get-FileHash '$(VENDOR_DIR)\curl-impersonate.tar.gz' -Algorithm SHA256).Hash; \
-		if ($$hash -ne '$(CURL_IMPERSONATE_SHA256)') { \
-			Write-Error 'SHA256 mismatch for curl-impersonate'; \
-			exit 1; \
-		}; \
-		Write-Host 'Extracting curl-impersonate...'; \
-		tar -xzf '$(VENDOR_DIR)\curl-impersonate.tar.gz' -C '$(VENDOR_DIR)'; \
-		Remove-Item '$(VENDOR_DIR)\curl-impersonate.tar.gz'; \
-	}"
-	@echo curl-impersonate installed successfully
-
-# Install cacert.pem
-install-deps-cacert:
-	@if not exist "$(VENDOR_DIR)\curl-impersonate\cacert.pem" (echo Installing cacert.pem... && $(MAKE) /F Makefile.win install-deps-cacert-force) else (echo cacert.pem already installed)
-
-install-deps-cacert-force:
-	@echo Downloading cacert.pem...
-	@if not exist "$(VENDOR_DIR)\curl-impersonate" mkdir "$(VENDOR_DIR)\curl-impersonate"
-	@powershell -NoProfile -ExecutionPolicy Bypass -Command "& { \
-		$$ProgressPreference = 'SilentlyContinue'; \
-		Invoke-WebRequest -Uri '$(CACERT_URL)' -OutFile '$(VENDOR_DIR)\curl-impersonate\cacert.pem'; \
-		$$hash = (Get-FileHash '$(VENDOR_DIR)\curl-impersonate\cacert.pem' -Algorithm SHA256).Hash; \
-		if ($$hash -ne '$(CACERT_SHA256)') { \
-			Write-Error 'SHA256 mismatch for cacert.pem'; \
-			exit 1; \
-		}; \
-	}"
-	@echo cacert.pem installed successfully
+install-deps: install-deps-steam
 
 # Check for steam_api64.dll
 install-deps-steam:
@@ -111,7 +65,7 @@ bridge: check-go
 # Build Rust components
 build: check-rust
 	@echo Building Hebnix Rust components ($(CONFIGURATION))...
-	@cd $(HEBNIX_RS_DIR) && cargo build --release --bin hebnix-app
+	@cd $(HEBNIX_RS_DIR) && cargo build --release --bin hebnix
 	@cd $(HEBNIX_RS_DIR) && cargo build --release --bin hebnix-lite --features lite
 	@echo Rust build completed successfully
 
@@ -132,6 +86,4 @@ clean:
 
 # Clean everything including third-party dependencies
 clean-all: clean
-	@echo Cleaning third-party dependencies...
-	@if exist "$(VENDOR_DIR)\curl-impersonate" rmdir /S /Q "$(VENDOR_DIR)\curl-impersonate"
 	@echo Full clean completed

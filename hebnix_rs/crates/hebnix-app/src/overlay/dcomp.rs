@@ -12,15 +12,18 @@
 
 use windows::Win32::Foundation::{E_FAIL, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D_RECT_F, D2D_SIZE_U, D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED,
-    D2D1_FIGURE_END_CLOSED, D2D1_PIXEL_FORMAT,
+    D2D_RECT_F, D2D_SIZE_U, D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F,
+    D2D1_FIGURE_BEGIN_FILLED, D2D1_FIGURE_END_CLOSED, D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT,
 };
 use windows::Win32::Graphics::Direct2D::{
-    D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1_BITMAP_OPTIONS_NONE, D2D1_BITMAP_OPTIONS_TARGET,
-    D2D1_BITMAP_PROPERTIES1, D2D1_DEVICE_CONTEXT_OPTIONS_NONE, D2D1_DRAW_TEXT_OPTIONS_NONE,
-    D2D1_ELLIPSE, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_INTERPOLATION_MODE_LINEAR,
+    D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1_BITMAP_OPTIONS_NONE,
+    D2D1_BITMAP_OPTIONS_TARGET, D2D1_BITMAP_PROPERTIES1, D2D1_BUFFER_PRECISION_8BPC_UNORM,
+    D2D1_COLOR_INTERPOLATION_MODE_STRAIGHT, D2D1_COLOR_SPACE_SRGB,
+    D2D1_DEVICE_CONTEXT_OPTIONS_NONE, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE,
+    D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_EXTEND_MODE_CLAMP, D2D1_INTERPOLATION_MODE_LINEAR,
+    D2D1_LAYER_OPTIONS1_NONE, D2D1_LAYER_PARAMETERS1, D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES,
     D2D1_ROUNDED_RECT, D2D1CreateFactory, ID2D1Bitmap1, ID2D1DeviceContext, ID2D1Factory1,
-    ID2D1SolidColorBrush,
+    ID2D1Geometry, ID2D1SolidColorBrush,
 };
 use windows::Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP};
 use windows::Win32::Graphics::Direct3D11::{
@@ -31,10 +34,13 @@ use windows::Win32::Graphics::DirectComposition::{
 };
 use windows::Win32::Graphics::DirectWrite::{
     DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
-    DWRITE_FONT_WEIGHT_NORMAL, DWRITE_MEASURING_MODE_NATURAL, DWRITE_TEXT_ALIGNMENT_CENTER,
-    DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_TEXT_ALIGNMENT_TRAILING, DWriteCreateFactory,
-    IDWriteFactory,
+    DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_MEASURING_MODE_NATURAL,
+    DWRITE_TEXT_ALIGNMENT_CENTER,
+    DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_TEXT_ALIGNMENT_TRAILING, DWRITE_TEXT_METRICS,
+    DWriteCreateFactory, IDWriteFactory, IDWriteFontCollection,
 };
+#[cfg(not(feature = "lite"))]
+use windows::Win32::Graphics::DirectWrite::IDWriteFactory5;
 use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_ALPHA_MODE_PREMULTIPLIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC,
 };
@@ -101,6 +107,86 @@ fn load_d2d_bitmap(ctx: &ID2D1DeviceContext, path: &str) -> Option<ID2D1Bitmap1>
             &props,
         )
         .ok()
+    }
+}
+
+/// rl's faces as a private directwrite collection built once from the ttfs rl_font rebuilds. None if rl isn't installed or dwrite5 is missing, falls back to segoe 
+fn rl_collection(factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
+    thread_local! {
+        static CACHE: std::cell::RefCell<Option<(u64, Option<IDWriteFontCollection>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
+    // rebuild when the faces change, rl_path is detected after startup so the
+    let generation = rl_generation();
+    CACHE.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if slot.as_ref().map(|(built_for, _)| *built_for) != Some(generation) {
+            let built = build_rl_collection(factory);
+            match &built {
+                Some(c) => tracing::info!("rl font collection ready, {} families", unsafe {
+                    c.GetFontFamilyCount()
+                }),
+                None => tracing::warn!("rl font collection unavailable, overlay text stays on segoe"),
+            }
+            *slot = Some((generation, built));
+        }
+        slot.as_ref().and_then(|(_, c)| c.clone())
+    })
+}
+
+// lite ships without the patcher that rebuilds these
+#[cfg(feature = "lite")]
+fn rl_face(_font: &str) -> Option<&'static str> {
+    None
+}
+
+#[cfg(feature = "lite")]
+fn rl_generation() -> u64 {
+    0
+}
+
+#[cfg(not(feature = "lite"))]
+fn rl_generation() -> u64 {
+    crate::patcher::rl_font::generation()
+}
+
+#[cfg(not(feature = "lite"))]
+fn rl_face(font: &str) -> Option<&'static str> {
+    crate::patcher::rl_font::face_for(font)
+}
+
+#[cfg(feature = "lite")]
+fn build_rl_collection(_factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
+    None
+}
+
+#[cfg(not(feature = "lite"))]
+fn build_rl_collection(factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
+    let fonts = crate::patcher::rl_font::loaded();
+    if fonts.is_empty() {
+        return None;
+    }
+    unsafe {
+        let f5: IDWriteFactory5 = factory.cast().ok()?;
+        let loader = f5.CreateInMemoryFontFileLoader().ok()?;
+        f5.RegisterFontFileLoader(&loader).ok()?;
+        let builder = f5.CreateFontSetBuilder().ok()?;
+        for font in fonts.iter() {
+            // rl_font keeps the bytes for the session, so the reference stays valid
+            let file = loader
+                .CreateInMemoryFontFileReference(
+                    &f5,
+                    font.ttf.as_ptr() as *const core::ffi::c_void,
+                    font.ttf.len() as u32,
+                    None,
+                )
+                .ok()?;
+            builder.AddFontFile(&file).ok()?;
+        }
+        let set = builder.CreateFontSet().ok()?;
+        f5.CreateFontCollectionFromFontSet(&set)
+            .ok()
+            .and_then(|c| c.cast().ok())
     }
 }
 
@@ -181,6 +267,80 @@ impl D2dCanvas {
         }
     }
 
+    // filled rounded rect with a linear gradient from c1 to c2 along angle_deg
+    #[allow(clippy::too_many_arguments)]
+    pub fn gradient(
+        &self,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        c1: Rgba,
+        c2: Rgba,
+        radius: f32,
+        angle_deg: f32,
+    ) {
+        let rect = D2D_RECT_F {
+            left: x,
+            top: y,
+            right: x + w,
+            bottom: y + h,
+        };
+        let rad = angle_deg.to_radians();
+        let (dx, dy) = (rad.cos(), rad.sin());
+        let (cx, cy) = (x + w / 2.0, y + h / 2.0);
+        let half = (w.abs() * dx.abs() + h.abs() * dy.abs()) / 2.0;
+        unsafe {
+            let stops = [
+                D2D1_GRADIENT_STOP {
+                    position: 0.0,
+                    color: color(c1),
+                },
+                D2D1_GRADIENT_STOP {
+                    position: 1.0,
+                    color: color(c2),
+                },
+            ];
+            let Ok(collection) = self.ctx.CreateGradientStopCollection(
+                &stops,
+                D2D1_COLOR_SPACE_SRGB,
+                D2D1_COLOR_SPACE_SRGB,
+                D2D1_BUFFER_PRECISION_8BPC_UNORM,
+                D2D1_EXTEND_MODE_CLAMP,
+                D2D1_COLOR_INTERPOLATION_MODE_STRAIGHT,
+            ) else {
+                return;
+            };
+            let props = D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES {
+                startPoint: Vector2 {
+                    X: cx - dx * half,
+                    Y: cy - dy * half,
+                },
+                endPoint: Vector2 {
+                    X: cx + dx * half,
+                    Y: cy + dy * half,
+                },
+            };
+            let Ok(brush) = self
+                .ctx
+                .CreateLinearGradientBrush(&props, None, &collection)
+            else {
+                return;
+            };
+            let radius = radius.max(0.0).min(w.abs() * 0.5).min(h.abs() * 0.5);
+            if radius > 0.0 {
+                let rounded = D2D1_ROUNDED_RECT {
+                    rect,
+                    radiusX: radius,
+                    radiusY: radius,
+                };
+                self.ctx.FillRoundedRectangle(&rounded, &brush);
+            } else {
+                self.ctx.FillRectangle(&rect, &brush);
+            }
+        }
+    }
+
     pub fn circle(&self, x: f32, y: f32, radius: f32, c: Rgba, width: f32, filled: bool) {
         self.set_color(c);
         let e = D2D1_ELLIPSE {
@@ -226,15 +386,37 @@ impl D2dCanvas {
         }
     }
 
-    pub fn text(&self, x: f32, y: f32, s: &str, c: Rgba, size: f32, halign: &str) {
+    #[allow(clippy::too_many_arguments)]
+    pub fn text(
+        &self,
+        x: f32,
+        y: f32,
+        s: &str,
+        c: Rgba,
+        size: f32,
+        halign: &str,
+        font: &str,
+        bold: bool,
+        clip: Option<(f32, f32)>,
+    ) {
         self.set_color(c);
-        let family: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
+        let rl = rl_face(font).and_then(|face| rl_collection(&self.dwrite).map(|c| (face, c))); // rl id -> rebuilt face, else ui font
+        let (name, collection) = match &rl {
+            Some((face, collection)) => (*face, Some(collection)),
+            None => ("Segoe UI", None),
+        };
+        let family: Vec<u16> = format!("{name}\0").encode_utf16().collect();
         let locale: Vec<u16> = "en-us\0".encode_utf16().collect();
         unsafe {
+            let weight = if bold {
+                DWRITE_FONT_WEIGHT_BOLD
+            } else {
+                DWRITE_FONT_WEIGHT_NORMAL
+            };
             let Ok(format) = self.dwrite.CreateTextFormat(
                 PCWSTR(family.as_ptr()),
-                None,
-                DWRITE_FONT_WEIGHT_NORMAL,
+                collection,
+                weight,
                 DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
                 size.max(6.0),
@@ -267,6 +449,17 @@ impl D2dCanvas {
             } else {
                 layout
             };
+            // clip to a fixed window so a marquee can scroll text under it
+            if let Some((cx, cw)) = clip {
+                let rect = D2D_RECT_F {
+                    left: cx,
+                    top: y - 2000.0,
+                    right: cx + cw,
+                    bottom: y + 2000.0,
+                };
+                self.ctx
+                    .PushAxisAlignedClip(&rect, D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+            }
             self.ctx.DrawText(
                 &wide,
                 &format,
@@ -275,10 +468,13 @@ impl D2dCanvas {
                 D2D1_DRAW_TEXT_OPTIONS_NONE,
                 DWRITE_MEASURING_MODE_NATURAL,
             );
+            if clip.is_some() {
+                self.ctx.PopAxisAlignedClip();
+            }
         }
     }
 
-    pub fn image(&self, path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32) {
+    pub fn image(&self, path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32, radius: f32) {
         let mut cache = self.image_cache.borrow_mut();
         let bitmap = if let Some(bmp) = cache.get(path) {
             Some(bmp.clone())
@@ -298,6 +494,29 @@ impl D2dCanvas {
                 bottom: y + h,
             };
             unsafe {
+                // clip to a rounded rect so the image gets rounded corners
+                let mask = (radius > 0.0)
+                    .then(|| {
+                        let rr = D2D1_ROUNDED_RECT {
+                            rect: dest,
+                            radiusX: radius,
+                            radiusY: radius,
+                        };
+                        self.d2d_factory.CreateRoundedRectangleGeometry(&rr).ok()
+                    })
+                    .flatten();
+                if let Some(ref geo) = mask {
+                    let params = D2D1_LAYER_PARAMETERS1 {
+                        contentBounds: dest,
+                        geometricMask: std::mem::ManuallyDrop::new(geo.cast::<ID2D1Geometry>().ok()),
+                        maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                        maskTransform: identity_matrix(),
+                        opacity: 1.0,
+                        opacityBrush: std::mem::ManuallyDrop::new(None),
+                        layerOptions: D2D1_LAYER_OPTIONS1_NONE,
+                    };
+                    self.ctx.PushLayer(&params, None);
+                }
                 self.ctx.DrawBitmap(
                     &bmp,
                     Some(&dest as *const _),
@@ -306,8 +525,65 @@ impl D2dCanvas {
                     None,
                     None,
                 );
+                if mask.is_some() {
+                    self.ctx.PopLayer();
+                }
             }
         }
+    }
+}
+
+/// segoe ui pixel width of a string, for marquee layout without a live canvas
+pub fn measure_text(s: &str, size: f32, bold: bool) -> f32 {
+    thread_local! {
+        static DWRITE: Option<IDWriteFactory> =
+            unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED).ok() };
+    }
+    DWRITE.with(|f| {
+        let Some(factory) = f.as_ref() else {
+            return 0.0;
+        };
+        unsafe {
+            let family: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
+            let locale: Vec<u16> = "en-us\0".encode_utf16().collect();
+            let weight = if bold {
+                DWRITE_FONT_WEIGHT_BOLD
+            } else {
+                DWRITE_FONT_WEIGHT_NORMAL
+            };
+            let Ok(format) = factory.CreateTextFormat(
+                PCWSTR(family.as_ptr()),
+                None,
+                weight,
+                DWRITE_FONT_STYLE_NORMAL,
+                DWRITE_FONT_STRETCH_NORMAL,
+                size.max(6.0),
+                PCWSTR(locale.as_ptr()),
+            ) else {
+                return 0.0;
+            };
+            let wide: Vec<u16> = s.encode_utf16().collect();
+            let Ok(layout) = factory.CreateTextLayout(&wide, &format, 100_000.0, 100_000.0) else {
+                return 0.0;
+            };
+            let mut m = DWRITE_TEXT_METRICS::default();
+            if layout.GetMetrics(&mut m).is_ok() {
+                m.widthIncludingTrailingWhitespace
+            } else {
+                0.0
+            }
+        }
+    })
+}
+
+fn identity_matrix() -> windows_numerics::Matrix3x2 {
+    windows_numerics::Matrix3x2 {
+        M11: 1.0,
+        M12: 0.0,
+        M21: 0.0,
+        M22: 1.0,
+        M31: 0.0,
+        M32: 0.0,
     }
 }
 
@@ -608,5 +884,40 @@ fn create_window() -> Result<HWND> {
             hinst,
             None,
         )
+    }
+}
+
+#[cfg(all(test, not(feature = "lite")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore]
+    fn rl_collection_builds_and_exposes_its_families() {
+        let rl = std::env::var("HEBNIX_RL_DIR")
+            .unwrap_or_else(|_| r"E:\SteamLibrary\steamapps\common\rocketleague".into());
+        crate::patcher::rl_font::set_install_dir(std::path::Path::new(&rl));
+        let faces = crate::patcher::rl_font::loaded();
+        println!("rebuilt faces: {}", faces.len());
+
+        let factory: IDWriteFactory =
+            unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED).expect("dwrite factory") };
+        let f5 = factory.cast::<IDWriteFactory5>();
+        println!("IDWriteFactory5 available: {}", f5.is_ok());
+
+        let collection = build_rl_collection(&factory).expect("rl collection");
+        unsafe {
+            let count = collection.GetFontFamilyCount();
+            println!("families in collection: {count}");
+            for i in 0..count {
+                let fam = collection.GetFontFamily(i).expect("family");
+                let names = fam.GetFamilyNames().expect("names");
+                let len = names.GetStringLength(0).expect("len") as usize;
+                let mut buf = vec![0u16; len + 1];
+                names.GetString(0, &mut buf).expect("string");
+                println!("  [{i}] {}", String::from_utf16_lossy(&buf[..len]));
+            }
+            assert!(count > 0, "collection has no families");
+        }
     }
 }
