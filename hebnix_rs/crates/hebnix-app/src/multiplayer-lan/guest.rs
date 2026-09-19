@@ -56,6 +56,7 @@ impl GuestSession {
                 if rx.try_recv().is_ok() {
                     break;
                 }
+                let _ = udp.retry_join();
                 if let Some(packet) = tunnel.try_receive() {
                     record_sent_udp(&worker_stats, &packet);
                     let _ = udp.send_packet(&packet);
