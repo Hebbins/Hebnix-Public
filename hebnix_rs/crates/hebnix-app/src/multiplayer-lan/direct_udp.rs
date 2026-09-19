@@ -20,6 +20,8 @@ const DATA_HEADER_BYTES: usize = 16;
 const DATA_CHUNK_BYTES: usize = 1_100;
 const MAX_FRAGMENTS: usize = 8;
 const MAX_PENDING_FRAMES: usize = 512;
+const JOIN_RETRY_BASE: Duration = Duration::from_millis(500);
+const JOIN_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -54,6 +56,8 @@ struct Frame {
 #[derive(Default)]
 pub struct TunnelStats {
     pub connected: AtomicBool,
+    /// guest gave up sending Join without ever getting an Accept
+    pub join_failed: AtomicBool,
     pub sent: AtomicU64,
     pub received: AtomicU64,
     pub delivered: AtomicU64,
@@ -104,6 +108,9 @@ pub struct DirectGuest {
     local_ip: String,
     last_sequence: u64,
     assemblies: HashMap<(SocketAddr, u64), Assembly>,
+    join_attempts: u32,
+    join_started: Instant,
+    next_join: Instant,
 }
 
 struct Assembly {
@@ -144,6 +151,11 @@ impl DirectHost {
     }
     pub fn stats(&self) -> Arc<TunnelStats> {
         self.stats.clone()
+    }
+    /// the tunnel socket, so NAT helpers can query STUN / send keepalives from
+    /// the same public mapping the guests will use
+    pub fn socket(&self) -> &UdpSocket {
+        &self.socket
     }
     pub fn poll(&mut self) -> Result<Option<Vec<u8>>, String> {
         let Some((payload, peer, sequence)) = receive(&self.socket, &self.key)? else {
@@ -260,12 +272,31 @@ impl DirectGuest {
             local_ip: local_ip.into(),
             last_sequence: 0,
             assemblies: HashMap::new(),
+            join_attempts: 0,
+            join_started: Instant::now(),
+            next_join: Instant::now(),
         })
     }
     pub fn stats(&self) -> Arc<TunnelStats> {
         self.stats.clone()
     }
+    /// Resends `Join` with backoff until the host answers, so a lost first
+    /// datagram or a NAT that needs an outbound packet first does not strand
+    /// the guest. Call from the packet pump.
+    pub fn retry_join(&mut self) -> Result<(), String> {
+        if self.stats.connected.load(Ordering::Relaxed) || Instant::now() < self.next_join {
+            return Ok(());
+        }
+        if self.join_started.elapsed() >= JOIN_TIMEOUT {
+            self.stats.join_failed.store(true, Ordering::Relaxed);
+            return Ok(());
+        }
+        self.begin()
+    }
     pub fn begin(&mut self) -> Result<(), String> {
+        self.join_attempts += 1;
+        let backoff = JOIN_RETRY_BASE * self.join_attempts.min(6);
+        self.next_join = Instant::now() + backoff;
         let mut nonce = [0; 16];
         rand::thread_rng().fill_bytes(&mut nonce);
         self.sequence += 1;

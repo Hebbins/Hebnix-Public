@@ -3,6 +3,7 @@ mod firewall;
 mod guest;
 mod hosting;
 mod models;
+mod nat;
 mod room_api;
 mod tap;
 
