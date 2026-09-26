@@ -29,12 +29,21 @@ jobs:
       - name: stage
         run: |
           $release = 'hebnix_rs\target\release'
-          New-Item -ItemType Directory -Force -Path stage\hebnix, stage\hebnix-lite | Out-Null
+          New-Item -ItemType Directory -Force -Path stage\hebnix, stage\hebnix-lite, stage\hebnix-portable, stage\hebnix-lite-portable | Out-Null
 
-          # steam_api64.dll is the eos steam auth, lite has no eos so it ships alone
+          # steam_api64.dll is the eos steam auth, lite has no eos so it ships alone.
+          # portable variants drop a portable.txt so the app keeps data in the exe folder
           Copy-Item "$release\hebnix.exe"      stage\hebnix\
           Copy-Item 'hebnix_rs\vendor\steam_api64.dll' stage\hebnix\
           Copy-Item "$release\hebnix-lite.exe" stage\hebnix-lite\
+
+          Copy-Item "$release\hebnix.exe"      stage\hebnix-portable\
+          Copy-Item 'hebnix_rs\vendor\steam_api64.dll' stage\hebnix-portable\
+          Copy-Item "$release\hebnix-lite.exe" stage\hebnix-lite-portable\
+
+          $marker = 'keep hebnix data in this folder instead of %AppData%\Hebnix'
+          Set-Content stage\hebnix-portable\portable.txt      $marker
+          Set-Content stage\hebnix-lite-portable\portable.txt $marker
 
           Get-ChildItem -Recurse stage | Select-Object FullName, Length
         shell: pwsh
@@ -49,4 +58,16 @@ jobs:
         with:
           name: hebnix-lite-windows
           path: stage/hebnix-lite/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hebnix-portable-windows
+          path: stage/hebnix-portable/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hebnix-lite-portable-windows
+          path: stage/hebnix-lite-portable/
           if-no-files-found: error

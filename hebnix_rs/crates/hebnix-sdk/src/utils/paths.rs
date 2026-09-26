@@ -10,6 +10,7 @@ pub fn base_dir() -> PathBuf {
     let dir = std::env::var_os("HEBNIX_BASE_DIR")
         .filter(|value| !value.is_empty())
         .map(PathBuf::from)
+        .or_else(portable_base_dir)
         .or_else(|| dirs::data_dir().map(|dir| dir.join("Hebnix")))
         .unwrap_or_else(|| std::env::temp_dir().join("Hebnix"));
 
@@ -20,4 +21,9 @@ pub fn base_dir() -> PathBuf {
         );
     }
     dir
+}
+
+fn portable_base_dir() -> Option<PathBuf> {
+    let dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    dir.join("portable.txt").exists().then_some(dir)
 }

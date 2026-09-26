@@ -124,6 +124,7 @@ fn parse_object(
     end: usize,
     object: usize,
     category: &str,
+    prefix: &str,
     output: &mut Vec<ConfigurationValue>,
 ) -> Result<(), SaveError> {
     while offset < end {
@@ -150,6 +151,11 @@ fn parse_object(
             friendly(&name)
         } else {
             format!("{} [{}]", friendly(&name), array_index)
+        };
+        let label = if prefix.is_empty() {
+            label
+        } else {
+            format!("{prefix} / {label}")
         };
         match tag.as_str() {
             "BoolProperty" => {
@@ -209,6 +215,21 @@ fn parse_object(
                             ConfigurationEditorKind::Float,
                             field_offset,
                         );
+                    }
+                } else {
+                    let struct_end = value_offset
+                        .checked_add(length as usize)
+                        .ok_or_else(|| SaveError::Parse("struct length overflow".into()))?;
+                    if struct_offset < struct_end && struct_end <= end {
+                        parse_object(
+                            data,
+                            struct_offset,
+                            struct_end,
+                            object,
+                            category,
+                            &label,
+                            output,
+                        )?;
                     }
                 }
             }
@@ -540,7 +561,7 @@ pub fn list_configuration(path: &Path) -> Result<Vec<ConfigurationValue>, SaveEr
             .map(|(_, pos)| pos.saturating_sub(4))
             .unwrap_or(payload.len());
         if *start < end && end <= payload.len() {
-            let _ = parse_object(payload, *start, end, index, category, &mut values);
+            let _ = parse_object(payload, *start, end, index, category, "", &mut values);
         }
     }
     let mut existing: std::collections::HashSet<(String, String)> = values

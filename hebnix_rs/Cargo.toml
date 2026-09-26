@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/hebnix-sdk", "crates/hebnix-app"]
 
 [workspace.package]
-version = "2.1.8"
+version = "2.1.9"
 edition = "2021"
 authors = ["Hebbins", "nixvio64"]
 

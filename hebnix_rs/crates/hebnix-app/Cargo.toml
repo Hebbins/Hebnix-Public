@@ -1,6 +1,6 @@
 [package]
 name = "hebnix-app"
-version = "0.1.0"
+version = "2.1.9"
 edition = "2024"
 
 [features]

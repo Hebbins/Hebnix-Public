@@ -421,6 +421,7 @@ fn playlist_fallback(id: i64) -> Option<&'static str> {
         44 => "Knockout",
         48 => "Tactical Rumble",
         49 => "Spring Loaded",
+        92 => "Bullet Ball Casual",
         _ => return None,
     })
 }

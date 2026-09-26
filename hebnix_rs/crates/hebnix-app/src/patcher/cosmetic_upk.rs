@@ -12,6 +12,8 @@ const DEFAULT_KEY: [u8; 32] = [
 #[derive(Clone, Copy)]
 struct UpkInfo {
     licensee_version: u16,
+    package_flags: u32,
+    nonce: [u8; 12],
     total_header_size: usize,
     name_count: usize,
     name_offset: usize,
@@ -111,9 +113,17 @@ fn read_i64(data: &[u8], offset: usize) -> Result<i64, String> {
     Ok(i64::from_le_bytes(bytes.try_into().unwrap()))
 }
 
-fn chunk_table_stride(data: &[u8], table: usize, count: usize) -> Result<usize, String> {
+fn chunk_table_stride(
+    data: &[u8],
+    table: usize,
+    count: usize,
+    licensee_version: u16,
+) -> Result<usize, String> {
     let normal = 24usize;
     let padded = 36usize;
+    if licensee_version >= 33 {
+        return Ok(padded);
+    }
     if count >= 2 {
         let first = read_i64(data, table + 4)?;
         let first_size = i64::from(read_i32(data, table + 12)?);
@@ -147,7 +157,7 @@ fn read_info(data: &[u8]) -> Result<UpkInfo, String> {
     // it reads padding zeros and later rewrites name-table bytes as chunk rows.
     let mut summary = SummaryCursor::new(data, 12);
     summary.fstring()?;
-    summary.i32()?; // package flags
+    let package_flags = summary.i32()? as u32;
     for _ in 0..7 {
         summary.i32()?;
     }
@@ -185,6 +195,14 @@ fn read_info(data: &[u8]) -> Result<UpkInfo, String> {
     let compressed_chunk_info_offset =
         usize::try_from(summary.i32()?).map_err(|_| "Negative compressed chunk table offset")?;
     summary.i32()?;
+    let mut nonce = [0u8; 12];
+    if licensee_version >= 33 {
+        nonce.copy_from_slice(
+            data.get(summary.position..summary.position + 12)
+                .ok_or("UPK header nonce is truncated")?,
+        );
+        summary.skip(12)?;
+    }
     if summary.position != name_offset && summary.position.checked_add(12) != Some(name_offset) {
         return Err(format!(
             "UPK summary fields end at {}, but name table starts at {name_offset}",
@@ -193,6 +211,8 @@ fn read_info(data: &[u8]) -> Result<UpkInfo, String> {
     }
     Ok(UpkInfo {
         licensee_version,
+        package_flags,
+        nonce,
         total_header_size,
         name_count,
         name_offset,
@@ -242,7 +262,14 @@ fn encrypted_size(info: UpkInfo) -> Result<(usize, usize), String> {
         info.total_header_size as i64 - info.generation_size as i64 - info.name_offset as i64,
     )
     .map_err(|_| "Invalid encrypted UPK header size")?;
-    Ok((plain, plain.div_ceil(16) * 16))
+    Ok((
+        plain,
+        if info.package_flags & 0x0800 != 0 {
+            plain
+        } else {
+            plain.div_ceil(16) * 16
+        },
+    ))
 }
 
 fn crypt(data: &[u8], key: &[u8; 32], encrypt: bool) -> Result<Vec<u8>, String> {
@@ -259,6 +286,19 @@ fn crypt(data: &[u8], key: &[u8; 32], encrypt: bool) -> Result<Vec<u8>, String> 
         }
     }
     Ok(output)
+}
+
+fn crypt_for_info(
+    data: &[u8],
+    key: &[u8; 32],
+    encrypt: bool,
+    info: UpkInfo,
+) -> Result<Vec<u8>, String> {
+    if info.package_flags & 0x0800 != 0 {
+        crate::patcher::upk_package::crypt_ctr(data, key, &info.nonce)
+    } else {
+        crypt(data, key, encrypt)
+    }
 }
 
 fn keys(base_dir: &Path) -> Vec<[u8; 32]> {
@@ -303,7 +343,7 @@ fn find_key_and_decrypt(
         .get(info.name_offset..info.name_offset + aligned)
         .ok_or("UPK is too small for its encrypted header")?;
     for key in candidates {
-        let decrypted = crypt(encrypted, key, false)?;
+        let decrypted = crypt_for_info(encrypted, key, false, info)?;
         if scan_names(&decrypted, info.name_count).is_ok() {
             return Ok((decrypted, *key, aligned));
         }
@@ -319,7 +359,7 @@ fn replace_name(
 ) -> Result<(Vec<u8>, i32), String> {
     let Some(entry) = scan_names(&data, count)?
         .into_iter()
-        .find(|entry| entry.name.trim_end_matches('\0') == old)
+        .find(|entry| entry.name.trim_end_matches('\0').eq_ignore_ascii_case(old))
     else {
         return Ok((data, 0));
     };
@@ -351,10 +391,13 @@ fn apply_deltas(
         return Ok(());
     }
     let (old_plain, old_aligned) = encrypted_size(info)?;
-    let new_aligned = usize::try_from(old_plain as i64 + delta as i64)
-        .map_err(|_| "Renamed header became negative")?
-        .div_ceil(16)
-        * 16;
+    let new_plain = usize::try_from(old_plain as i64 + delta as i64)
+        .map_err(|_| "Renamed header became negative")?;
+    let new_aligned = if info.package_flags & 0x0800 != 0 {
+        new_plain
+    } else {
+        new_plain.div_ceil(16) * 16
+    };
     let alignment_delta = new_aligned as i64 - old_aligned as i64;
     write_i32(
         raw,
@@ -379,7 +422,7 @@ fn apply_deltas(
             .map_err(|_| "Chunk table offset became negative")?;
         let count = usize::try_from(read_i32(decrypted, table)?)
             .map_err(|_| "Negative compressed chunk count")?;
-        let stride = chunk_table_stride(decrypted, table, count)?;
+        let stride = chunk_table_stride(decrypted, table, count, info.licensee_version)?;
         let mut row = table + 4;
         for _ in 0..count {
             let old = i64::from_le_bytes(
@@ -475,7 +518,7 @@ fn validate_output(
     let encrypted = output
         .get(info.name_offset..info.name_offset + aligned)
         .ok_or("Generated UPK encrypted header is truncated")?;
-    let decrypted = crypt(encrypted, target_key, false)?;
+    let decrypted = crypt_for_info(encrypted, target_key, false, info)?;
     let names = scan_names(&decrypted, info.name_count)?;
     let export_names = exported_name_indexes(&decrypted, info)?;
     let has_target_name = names
@@ -522,7 +565,12 @@ fn validate_output(
         return Err("Generated UPK has an invalid compressed-chunk count".into());
     }
     let mut row = info.compressed_chunk_info_offset + 4;
-    let stride = chunk_table_stride(&decrypted, info.compressed_chunk_info_offset, chunk_count)?;
+    let stride = chunk_table_stride(
+        &decrypted,
+        info.compressed_chunk_info_offset,
+        chunk_count,
+        info.licensee_version,
+    )?;
     let mut valid_chunks = 0usize;
     for index in 0..chunk_count {
         let compressed_offset = usize::try_from(i64::from_le_bytes(
@@ -533,12 +581,30 @@ fn validate_output(
                 .unwrap(),
         ))
         .map_err(|_| format!("Generated UPK chunk {index} has a negative offset"))?;
-        let (_, _, end) = crate::patch_core::upk::decomp_chunk_at(output, compressed_offset)
-            .map_err(|error| {
-                format!("Generated UPK chunk {index} at {compressed_offset} is invalid: {error:?}")
-            })?;
-        if end > output.len() {
-            return Err(format!("Generated UPK chunk {index} extends past the file"));
+        let compressed_size = usize::try_from(read_i32(&decrypted, row + 20)?)
+            .map_err(|_| format!("Generated UPK chunk {index} has a negative size"))?;
+        if info.package_flags & 0x0800 != 0 {
+            let nonce: [u8; 12] = decrypted
+                .get(row + 24..row + 36)
+                .ok_or("Generated UPK chunk nonce is truncated")?
+                .try_into()
+                .unwrap();
+            let compressed = output
+                .get(compressed_offset..compressed_offset + compressed_size)
+                .ok_or_else(|| format!("Generated UPK chunk {index} extends past the file"))?;
+            let decoded = crate::patcher::upk_package::crypt_ctr(compressed, target_key, &nonce)?;
+            crate::patch_core::upk::decomp_chunk_at(&decoded, 0)
+                .map_err(|error| format!("Generated UPK chunk {index} is invalid: {error:?}"))?;
+        } else {
+            let (_, _, end) = crate::patch_core::upk::decomp_chunk_at(output, compressed_offset)
+                .map_err(|error| {
+                    format!(
+                        "Generated UPK chunk {index} at {compressed_offset} is invalid: {error:?}"
+                    )
+                })?;
+            if end > output.len() {
+                return Err(format!("Generated UPK chunk {index} extends past the file"));
+            }
         }
         valid_chunks += 1;
         row += stride;
@@ -598,7 +664,7 @@ pub fn patch_for_target(
         .any(|entry| {
             pairs
                 .iter()
-                .any(|(old, _)| entry.name.trim_end_matches('\0') == old)
+                .any(|(old, _)| entry.name.trim_end_matches('\0').eq_ignore_ascii_case(old))
         })
     {
         return Err(format!(
@@ -628,13 +694,58 @@ pub fn patch_for_target(
     let (old_plain, _) = encrypted_size(info)?;
     let new_plain = usize::try_from(old_plain as i64 + total_delta as i64)
         .map_err(|_| "Renamed UPK header became negative")?;
-    let new_encrypted_size = new_plain.div_ceil(16) * 16;
+    let new_encrypted_size = if info.package_flags & 0x0800 != 0 {
+        new_plain
+    } else {
+        new_plain.div_ceil(16) * 16
+    };
     decrypted.resize(new_encrypted_size, 0);
-    let encrypted = crypt(&decrypted[..new_encrypted_size], &target_key, true)?;
+    let encrypted = crypt_for_info(&decrypted[..new_encrypted_size], &target_key, true, info)?;
     let mut output = Vec::with_capacity(raw.len() - old_encrypted_size + new_encrypted_size);
     output.extend_from_slice(&raw[..info.name_offset]);
     output.extend_from_slice(&encrypted);
     output.extend_from_slice(&raw[info.name_offset + old_encrypted_size..]);
+    if info.package_flags & 0x0800 != 0 && source_key != target_key {
+        let updated_info = read_info(&output)?;
+        let header = crypt_for_info(
+            output
+                .get(updated_info.name_offset..updated_info.name_offset + new_encrypted_size)
+                .ok_or("Generated encrypted header is truncated")?,
+            &target_key,
+            false,
+            updated_info,
+        )?;
+        let count = usize::try_from(read_i32(
+            &header,
+            updated_info.compressed_chunk_info_offset,
+        )?)
+        .map_err(|_| "Negative compressed chunk count")?;
+        let table = updated_info.compressed_chunk_info_offset + 4;
+        let stride = chunk_table_stride(
+            &header,
+            updated_info.compressed_chunk_info_offset,
+            count,
+            updated_info.licensee_version,
+        )?;
+        for index in 0..count {
+            let row = table + index * stride;
+            let offset = usize::try_from(read_i64(&header, row + 12)?)
+                .map_err(|_| "Negative compressed chunk offset")?;
+            let size = usize::try_from(read_i32(&header, row + 20)?)
+                .map_err(|_| "Negative compressed chunk size")?;
+            let nonce: [u8; 12] = header
+                .get(row + 24..row + 36)
+                .ok_or("Compressed chunk nonce is truncated")?
+                .try_into()
+                .unwrap();
+            let chunk = output
+                .get_mut(offset..offset + size)
+                .ok_or("Compressed chunk extends past the file")?;
+            let plain = crate::patcher::upk_package::crypt_ctr(chunk, &source_key, &nonce)?;
+            let encrypted = crate::patcher::upk_package::crypt_ctr(&plain, &target_key, &nonce)?;
+            chunk.copy_from_slice(&encrypted);
+        }
+    }
     validate_output(
         &output,
         &target_key,
@@ -673,4 +784,49 @@ pub fn patch_for_target(
         .map_err(|error| format!("Failed to install {}: {error}", destination.display()));
     let _ = fs::remove_file(&temp_path);
     result.map(|_| ())
+}
+
+#[cfg(test)]
+mod local_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires locally installed Rocket League UPKs"]
+    fn swaps_dev_boost_thumbnail_into_light_trail() {
+        let cooked = Path::new(r"C:\Program Files\Epic Games\rocketleague\TAGame\CookedPCConsole");
+        let source = cooked.join("Boost_AlphaDevReward_T_SF.upk");
+        let target = cooked.join("Boost_LightTrail_T_SF.upk");
+        let destination = std::env::temp_dir().join("Boost_LightTrail_T_SF.upk");
+        let result = patch_for_target(&source, &target, &destination, cooked, None, None);
+        if result.is_ok() {
+            let package = crate::patcher::upk_package::UpkPackage::load(&destination);
+            assert!(
+                package.is_ok(),
+                "generated package failed to load: {:?}",
+                package.err()
+            );
+            let _ = fs::remove_file(&destination);
+        }
+        result.unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires locally installed Rocket League UPKs"]
+    fn swaps_dev_boost_into_light_trail() {
+        let cooked = Path::new(r"C:\Program Files\Epic Games\rocketleague\TAGame\CookedPCConsole");
+        let source = cooked.join("boost_alphadevreward_SF.upk");
+        let target = cooked.join("Boost_LightTrail_SF.upk");
+        let destination = std::env::temp_dir().join("Boost_LightTrail_SF.upk");
+        let result = patch_for_target(&source, &target, &destination, cooked, None, None);
+        if result.is_ok() {
+            let package = crate::patcher::upk_package::UpkPackage::load(&destination);
+            assert!(
+                package.is_ok(),
+                "generated package failed to load: {:?}",
+                package.err()
+            );
+            let _ = fs::remove_file(&destination);
+        }
+        result.unwrap();
+    }
 }

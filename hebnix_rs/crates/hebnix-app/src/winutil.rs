@@ -284,6 +284,21 @@ pub fn kill_rocket_league() -> std::io::Result<()> {
         .map(|_| ())
 }
 
+/// Remove Rocket League's embedded-browser cache, if it exists.
+pub fn clear_rocket_league_web_cache() -> std::io::Result<()> {
+    let user_profile = std::env::var_os("USERPROFILE").ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "USERPROFILE is not set")
+    })?;
+    let web_cache = std::path::PathBuf::from(user_profile)
+        .join(r"Documents\My Games\Rocket League\TAGame\Cache\WebCache");
+
+    match std::fs::remove_dir_all(web_cache) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
 const EPIC_LAUNCH_URI: &str = "com.epicgames.launcher://apps/9773aa1aa54f4f7b80e44bef04986cea%3A530145df28a24424923f5828cc9031a1%3ASugar?action=launch&silent=true";
 
 // The monitor updates SettingsCfg.rl_path from the running process before a

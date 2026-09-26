@@ -5,6 +5,11 @@ The purpose is to consolidate several Rocket League Quality of Life tools into 1
 
 [Website](https://hebnix.com) | [Plugins](https://hebnix.com/plugins) | [Download](https://hebnix.com/download) | [Developer Documentation](https://docs.hebnix.com) | [Discord](https://discord.gg/yr6xXb5wQd)
 
+## Access to our Rank API data
+
+2.2.0 will include an additional method of authentication in accessing our Rank API. Although Hebnix will compile without the key, you will require a key to access it.
+You can get a key by requesting one on our [Discord Server](https://discord.gg/yr6xXb5wQd) and it will be DMed to you. Open a request in the requests channel.
+
 ## Build
 
 Install Rust with the MSVC toolchain, then run:

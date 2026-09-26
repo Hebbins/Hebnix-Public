@@ -51,6 +51,7 @@ pub fn run(parent_pid: u32) {
     if replacement_is_running(parent_pid) {
         return;
     }
+    let _ = crate::winutil::clear_rocket_league_web_cache();
     for _ in 0..3 {
         let _ = crate::winutil::clear_rocket_league_multihome();
         std::thread::sleep(std::time::Duration::from_secs(1));

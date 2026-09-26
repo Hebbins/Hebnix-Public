@@ -11,6 +11,9 @@ local TRACK_V4 = 10
 local TRACK_TYPE = "type.googleapis.com/spotify.metadata.Track"
 local POLL = 5.0
 local PING = 20.0
+local LRC_GET = "https://lrclib.net/api/get"
+local LRC_SEARCH = "https://lrclib.net/api/search"
+local LRC_UA = "hebnix-spotify-overlay (https://github.com/Hebbins)"
 
 local DEFAULT_PALETTE = {
     dominant = "#7a26c8", vibrant = "#ff9de6", light = "#e6c8ff",
@@ -38,6 +41,10 @@ local function reset_state()
         cover_file = nil,
         palette = DEFAULT_PALETTE,
         meta_cache = {},
+        lyrics = nil,
+        lyrics_uri = nil,
+        lyric_i = -1,
+        lyric_t0 = 0,
         now = nil,
     }
 end
@@ -298,6 +305,33 @@ local function img_url(uri)
     return nil
 end
 
+local function parse_lrc(s)
+    local out = {}
+    for line in (s .. "\n"):gmatch("(.-)\n") do
+        local text = line:gsub("%[%d+:%d+%.?%d*%]", ""):gsub("^%s+", ""):gsub("%s+$", "")
+        for mm, ss in line:gmatch("%[(%d+):(%d+%.?%d*)%]") do
+            out[#out + 1] = { t = tonumber(mm) * 60 + tonumber(ss), text = text }
+        end
+    end
+    table.sort(out, function(a, b) return a.t < b.t end)
+    return out
+end
+
+local function request_lyrics()
+    if not hebnix.get_bool("spotify_overlay_lyrics", true) then return end
+    if not S.now or not S.now.track_uri then return end
+    if not S.now.title or not S.now.artist then return end
+    if S.lyrics_uri == S.now.track_uri then return end
+    S.lyrics_uri = S.now.track_uri
+    S.lyrics = nil
+    local q = "?artist_name=" .. urlencode(S.now.artist)
+        .. "&track_name=" .. urlencode(S.now.title)
+        .. "&album_name=" .. urlencode(S.now.album or "")
+        .. "&duration=" .. tostring(math.floor((S.now.duration_ms or 0) / 1000))
+    hebnix.http_request_async("lrc:" .. S.now.track_uri, "GET", LRC_GET .. q, nil,
+        { ["User-Agent"] = LRC_UA })
+end
+
 local function apply_cluster(cl)
     local ps = cl.player_state or {}
     local tr = ps.track or {}
@@ -308,6 +342,8 @@ local function apply_cluster(cl)
         S.last_uri = uri
         hebnix.clear_asset_dir("temp")
         S.cover_file = nil
+        S.lyrics = nil
+        S.lyrics_uri = nil
         local cover = img_url(md.image_xlarge_url or md.image_large_url or md.image_url)
         if cover then
             S.cover_pending = true
@@ -341,7 +377,7 @@ local function apply_cluster(cl)
     else
         local base = pos_at_ts
         if playing and server_ts > 0 then
-            local drift = os.time() * 1000 - server_ts
+            local drift = hebnix.unix_millis() - server_ts
             if drift >= 0 and drift < 3600000 then base = pos_at_ts + drift end
         end
         S.now = {
@@ -364,6 +400,8 @@ local function apply_cluster(cl)
             S.now.album = cached.album
         end
     end
+
+    request_lyrics()
 end
 
 function plugin.on_http_result(id, status, body, headers)
@@ -427,6 +465,37 @@ function plugin.on_http_result(id, status, body, headers)
                     if album and (not S.now.album or #S.now.album == 0) then S.now.album = album end
                     if S.now.track_uri then
                         S.meta_cache[S.now.track_uri] = { artist = artist, album = album }
+                    end
+                    request_lyrics()
+                end
+            end
+        end
+    elseif id:sub(1, 4) == "lrc:" then
+        local uri = id:sub(5)
+        if S.now and S.now.track_uri == uri then
+            local synced
+            if status == 200 and #body > 0 then
+                local ok, j = pcall(hebnix.json_decode, body)
+                if ok and type(j) == "table" then synced = j.syncedLyrics end
+            end
+            if type(synced) == "string" and #synced > 0 then
+                S.lyrics = parse_lrc(synced)
+            elseif S.now.title and S.now.artist then
+                local q = "?track_name=" .. urlencode(S.now.title)
+                    .. "&artist_name=" .. urlencode(S.now.artist)
+                hebnix.http_request_async("lrcs:" .. uri, "GET", LRC_SEARCH .. q, nil,
+                    { ["User-Agent"] = LRC_UA })
+            end
+        end
+    elseif id:sub(1, 5) == "lrcs:" then
+        local uri = id:sub(6)
+        if S.now and S.now.track_uri == uri and status == 200 and #body > 0 then
+            local ok, j = pcall(hebnix.json_decode, body)
+            if ok and type(j) == "table" then
+                for _, item in ipairs(j) do
+                    if type(item.syncedLyrics) == "string" and #item.syncedLyrics > 0 then
+                        S.lyrics = parse_lrc(item.syncedLyrics)
+                        break
                     end
                 end
             end
@@ -593,6 +662,8 @@ function plugin.on_tick()
 end
 
 local CORNERS = { "Bottom Left", "Bottom Right", "Top Left", "Top Right" }
+local LYRIC_ANIMS = { "Slide", "Fade", "Scale", "None" }
+local LYRIC_POS = { "Below card", "Above card" }
 
 local function position_ms()
     if not S.now then return 0 end
@@ -607,6 +678,32 @@ local function fmt_time(ms)
     local s = math.max(0, math.floor((ms or 0) / 1000))
     return string.format("%d:%02d", math.floor(s / 60), s % 60)
 end
+
+local function lyric_index(pos_s)
+    if not S.lyrics or #S.lyrics == 0 then return 0 end
+    local idx = 0
+    for i, l in ipairs(S.lyrics) do
+        if l.t <= pos_s then idx = i else break end
+    end
+    return idx
+end
+
+local function with_alpha(hex, a)
+    a = math.max(0, math.min(255, math.floor(a * 255 + 0.5)))
+    return hex:sub(1, 7) .. string.format("%02x", a)
+end
+
+local function opposite(hex)
+    local r = tonumber(hex:sub(2, 3), 16) or 255
+    local g = tonumber(hex:sub(4, 5), 16) or 255
+    local b = tonumber(hex:sub(6, 7), 16) or 255
+    return string.format("#%02x%02x%02x", 255 - r, 255 - g, 255 - b)
+end
+
+local BORDER_OFF = {
+    { -1, -1 }, { 0, -1 }, { 1, -1 }, { -1, 0 },
+    { 1, 0 }, { -1, 1 }, { 0, 1 }, { 1, 1 },
+}
 
 local function scroll_text(draw, s, x, y, size, color, cl, cw)
     s = s or ""
@@ -636,8 +733,17 @@ function plugin.on_overlay(draw, w, h)
     local panel_h = art
     local prog_h = 5 * s
     local prog_gap = 6 * s
+    local lyrics_on = hebnix.get_bool("spotify_overlay_lyrics", true)
+    local lyr_scale = hebnix.get_number("spotify_overlay_lyrics_scale", 100) / 100
+    local lyr_size = 15 * s * lyr_scale
+    local row_h = lyr_size * 1.45
+    local block_h = lyrics_on and (row_h * 3) or 0
+    local lyr_gap = lyrics_on and (10 * s) or 0
+    local above = lyrics_on
+        and hebnix.get_string("spotify_overlay_lyrics_pos", "Below card") == "Above card"
+    local top_reserve = above and (block_h + lyr_gap) or 0
     local card_w = art + gap + panel_w
-    local card_h = panel_h + prog_gap + prog_h
+    local card_h = panel_h + prog_gap + prog_h + (lyrics_on and (block_h + lyr_gap) or 0)
     local margin = 24 * s
 
     local corner = hebnix.get_string("spotify_overlay_corner", "Bottom Left")
@@ -652,16 +758,18 @@ function plugin.on_overlay(draw, w, h)
         x, y = margin, h - card_h - margin
     end
 
+    local cy0 = y + top_reserve
+
     if hebnix.get_bool("spotify_overlay_show_cover", true) and S.cover_file then
-        draw.image("assets/temp/" .. S.cover_file, x, y, art, art, { opacity = 1.0, radius = 10 * s })
+        draw.image("assets/temp/" .. S.cover_file, x, cy0, art, art, { opacity = 1.0, radius = 10 * s })
     else
-        draw.rect(x, y, art, art, { color = p.dark, filled = true, radius = 10 * s })
-        draw.text(x + art / 2, y + art / 2 - 14 * s, "\u{266A}",
+        draw.rect(x, cy0, art, art, { color = p.dark, filled = true, radius = 10 * s })
+        draw.text(x + art / 2, cy0 + art / 2 - 14 * s, "\u{266A}",
             { color = p.vibrant, size = 34 * s, halign = "center" })
     end
 
     local px = x + art + gap
-    draw.gradient(px, y, panel_w, panel_h,
+    draw.gradient(px, cy0, panel_w, panel_h,
         { color = p.grad1, color2 = p.grad2, radius = 12, angle = 135 })
 
     local pad_x = 18 * s
@@ -669,12 +777,12 @@ function plugin.on_overlay(draw, w, h)
     local cr = px + panel_w - pad_x
     local cw = cr - cl
 
-    scroll_text(draw, S.now.title or "Unknown", cl, y + 18 * s, 21 * s, p.text, cl, cw)
-    scroll_text(draw, S.now.artist or S.now.album or "", cl, y + 47 * s, 15 * s, p.text .. "cc", cl, cw)
+    scroll_text(draw, S.now.title or "Unknown", cl, cy0 + 18 * s, 21 * s, p.text, cl, cw)
+    scroll_text(draw, S.now.artist or S.now.album or "", cl, cy0 + 47 * s, 15 * s, p.text .. "cc", cl, cw)
 
     local dur = S.now.duration_ms or 0
     local pos = position_ms()
-    local row_cy = y + panel_h - 26 * s
+    local row_cy = cy0 + panel_h - 26 * s
     local time_w = 46 * s
     draw.text(cl, row_cy - 8 * s, fmt_time(pos),
         { color = p.text, size = 13 * s, bold = true })
@@ -695,11 +803,62 @@ function plugin.on_overlay(draw, w, h)
         draw.rect(bx, row_cy - bh / 2, bw, bh, { color = p.accent or p.vibrant, filled = true, radius = 2 })
     end
 
-    local by = y + panel_h + prog_gap
+    local by = cy0 + panel_h + prog_gap
     draw.rect(x, by, card_w, prog_h, { color = "#00000073", filled = true, radius = 2 })
     if dur > 0 then
         local frac = math.max(0, math.min(1, pos / dur))
         draw.rect(x, by, card_w * frac, prog_h, { color = p.vibrant, filled = true, radius = 2 })
+    end
+
+    if lyrics_on and S.lyrics and #S.lyrics > 0 then
+        local offset = hebnix.get_number("spotify_overlay_lyrics_offset", 0)
+        local idx = lyric_index((pos + offset) / 1000)
+        if idx ~= S.lyric_i then
+            S.lyric_i = idx
+            S.lyric_t0 = mono()
+        end
+        local base_color = p.text
+        if not hebnix.get_bool("spotify_overlay_lyrics_auto_color", true) then
+            base_color = hebnix.get_string("spotify_overlay_lyrics_color", "#ffffff")
+        end
+        local border = hebnix.get_number("spotify_overlay_lyrics_border", 0) * s
+        local border_color = opposite(base_color)
+        if not hebnix.get_bool("spotify_overlay_lyrics_border_auto", true) then
+            border_color = hebnix.get_string("spotify_overlay_lyrics_border_color", "#000000")
+        end
+        local anim = hebnix.get_string("spotify_overlay_lyrics_anim", "Slide")
+        local p_a = anim == "None" and 1.0 or math.min(1.0, (mono() - S.lyric_t0) / 0.30)
+
+        local region_top = above and y or (by + prog_h + lyr_gap)
+        local cx = x + card_w / 2
+        local cy = region_top + block_h / 2
+        local shift = anim == "Slide" and ((1 - p_a) * row_h) or 0
+
+        local rows = {
+            { i = idx, c = cy - row_h, cur = true },
+            { i = idx + 1, c = cy, cur = false },
+            { i = idx + 2, c = cy + row_h, cur = false },
+        }
+        for _, r in ipairs(rows) do
+            local l = S.lyrics[r.i]
+            if l and l.text and #l.text > 0 then
+                local size = r.cur and lyr_size or (lyr_size * 0.82)
+                local alpha = r.cur and 1.0 or 0.7
+                if r.cur and anim == "Fade" then alpha = 0.35 + 0.65 * p_a end
+                if r.cur and anim == "Scale" then size = lyr_size * (0.7 + 0.3 * p_a) end
+                local ty = r.c - size / 2 + shift
+                if border > 0 then
+                    local bcol = with_alpha(border_color, alpha)
+                    for _, o in ipairs(BORDER_OFF) do
+                        draw.text(cx + o[1] * border, ty + o[2] * border, l.text,
+                            { color = bcol, size = size, halign = "center", bold = r.cur })
+                    end
+                end
+                draw.text(cx, ty, l.text,
+                    { color = with_alpha(base_color, alpha), size = size,
+                        halign = "center", bold = r.cur })
+            end
+        end
     end
 end
 
@@ -721,9 +880,17 @@ function plugin.on_settings(ui)
     ui.combo_box("spotify_overlay_corner", "Position", CORNERS)
     ui.slider("spotify_overlay_scale", "Scale", 60, 160, 100)
     ui.space(6)
-    ui.label("Reads your local Spotify login only (see plugin.toml [permissions]).")
-    ui.label("The card shows over Rocket League while the game is focused.")
-    ui.label("Version 1.0.0")
+    ui.checkbox("spotify_overlay_lyrics", "Show synced lyrics (lrclib.net)", true)
+    ui.combo_box("spotify_overlay_lyrics_anim", "Lyrics animation", LYRIC_ANIMS)
+    ui.combo_box("spotify_overlay_lyrics_pos", "Lyrics position", LYRIC_POS)
+    ui.slider("spotify_overlay_lyrics_scale", "Lyrics scale", 60, 200, 100)
+    ui.slider("spotify_overlay_lyrics_offset", "Lyrics sync (ms)", -1500, 1500, 0)
+    ui.checkbox("spotify_overlay_lyrics_auto_color", "Auto lyrics colour", true)
+    ui.color_picker("spotify_overlay_lyrics_color", "Lyrics colour", "#ffffff")
+    ui.slider("spotify_overlay_lyrics_border", "Lyrics border", 0, 1.5, 0)
+    ui.checkbox("spotify_overlay_lyrics_border_auto", "Auto border colour (opposite)", true)
+    ui.color_picker("spotify_overlay_lyrics_border_color", "Border colour", "#000000")
+    ui.space(6)
 end
 
 return plugin

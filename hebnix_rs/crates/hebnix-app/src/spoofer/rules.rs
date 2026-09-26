@@ -470,6 +470,7 @@ impl Rule for TitleRule {
 
 pub struct RankRule {
     pub spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
+    bridge_enabled: Option<Arc<AtomicBool>>,
     announced: AtomicBool,
 }
 
@@ -477,6 +478,18 @@ impl RankRule {
     pub fn new(spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>) -> Self {
         Self {
             spoofs,
+            bridge_enabled: None,
+            announced: AtomicBool::new(false),
+        }
+    }
+
+    pub fn with_bridge_signal(
+        spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
+        bridge_enabled: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            spoofs,
+            bridge_enabled: Some(bridge_enabled),
             announced: AtomicBool::new(false),
         }
     }

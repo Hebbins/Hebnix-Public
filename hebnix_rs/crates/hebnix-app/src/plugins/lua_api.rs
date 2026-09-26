@@ -409,6 +409,24 @@ fn clear_asset_dir(plugin_dir: &std::path::Path, rel: &str) -> bool {
     ok
 }
 
+fn shell_open(target: &str) -> bool {
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    let verb: Vec<u16> = "open\0".encode_utf16().collect();
+    let file: Vec<u16> = format!("{target}\0").encode_utf16().collect();
+    let hinst = unsafe {
+        ShellExecuteW(
+            None,
+            windows::core::PCWSTR(verb.as_ptr()),
+            windows::core::PCWSTR(file.as_ptr()),
+            windows::core::PCWSTR::null(),
+            windows::core::PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    hinst.0 as usize > 32
+}
+
 // Current-Ui stack
 
 thread_local! {
@@ -1607,6 +1625,17 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
+    // wall clock epoch millis, os.time in lua is whole seconds only
+    hebnix.set(
+        "unix_millis",
+        lua.create_function(|_, ()| {
+            Ok(std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as f64)
+                .unwrap_or(0.0))
+        })?,
+    )?;
+
     // connected pads (Universal Analog Support)
     hebnix.set(
         "controllers",
@@ -2636,11 +2665,36 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     hebnix.set(
         "open_url",
         lua.create_function(|_, url: String| {
-            // Zero-dependency Windows native way to open the default web browser
-            let _ = std::process::Command::new("cmd")
-                .args(["/C", "start", "", &url])
-                .spawn();
-            Ok(())
+            let url = url.trim();
+            // websites only. the shell would open files, folders or exes too, so
+            // gate on http/https and reject anything that could break the call
+            let lower = url.to_ascii_lowercase();
+            let ok = (lower.starts_with("http://") || lower.starts_with("https://"))
+                && !url.contains(['\r', '\n', '\0']);
+            Ok(ok && shell_open(url))
+        })?,
+    )?;
+
+    // reveal a folder in explorer
+    hebnix.set(
+        "open_path",
+        lua.create_function(|_, path: String| {
+            let path = path.trim();
+            if path.is_empty() || path.contains(['\r', '\n', '\0']) {
+                return Ok(false);
+            }
+            let p = std::path::Path::new(path);
+            let dir = if p.is_dir() {
+                p.to_path_buf()
+            } else if p.is_file() {
+                match p.parent() {
+                    Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+                    _ => return Ok(false),
+                }
+            } else {
+                return Ok(false);
+            };
+            Ok(shell_open(&dir.to_string_lossy()))
         })?,
     )?;
 

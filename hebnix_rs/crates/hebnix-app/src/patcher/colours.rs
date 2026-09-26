@@ -561,16 +561,19 @@ fn apply(cooked_pc: &Path, backups_dir: &Path, settings: &ColourSettings) -> Res
     restore_arena_boost_colours(cooked_pc, backups_dir)?;
     let backup = backups_dir.join(BACKUP_NAME);
     let live_bytes = fs::read(&live).map_err(|error| error.to_string())?;
-    if backup.is_file()
+    let stale_backup = backup.is_file()
         && package_guid(&fs::read(&backup).map_err(|error| error.to_string())?)?
-            != package_guid(&live_bytes)?
-    {
-        return Err(
-            "Rocket League was updated and the colour backup belongs to the previous version.              Verify the game files, then remove the stale colour backup before applying again."
-                .into(),
-        );
-    }
-    if !backup.is_file() {
+            != package_guid(&live_bytes)?;
+    if stale_backup {
+        let staged = backups_dir.join("TAGame.upk.bak.tmp");
+        fs::copy(&live, &staged).map_err(|error| {
+            format!("Could not prepare a backup of the updated TAGame.upk: {error}")
+        })?;
+        fs::remove_file(&backup)
+            .map_err(|error| format!("Could not remove the stale colour backup: {error}"))?;
+        fs::rename(&staged, &backup)
+            .map_err(|error| format!("Could not install the updated colour backup: {error}"))?;
+    } else if !backup.is_file() {
         fs::copy(&live, &backup).map_err(|error| {
             format!(
                 "Could not create pristine backup at {}: {error}",

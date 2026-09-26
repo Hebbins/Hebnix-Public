@@ -12,6 +12,9 @@ const MAX_LOGICAL_SIZE: usize = 512 * 1024 * 1024;
 struct Header {
     file_version: u16,
     licensee_version: u16,
+    package_flags: u32,
+    nonce: [u8; 12],
+    last_block_size: usize,
     total_header_size: usize,
     name_count: usize,
     name_offset: usize,
@@ -31,6 +34,7 @@ struct Chunk {
     physical_size: usize,
     block_size: usize,
     table_entry_offset: usize,
+    nonce: Option<[u8; 12]>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -215,7 +219,7 @@ fn read_header(raw: &[u8]) -> Result<Header, String> {
     let licensee_version = r.u16()?;
     let total_header_size = non_negative(r.i32()?, "total header size")?;
     r.skip_fstring()?;
-    r.u32()?;
+    let package_flags = r.u32()?;
     let name_count = non_negative(r.i32()?, "name count")?;
     let name_offset = non_negative(r.i32()?, "name offset")?;
     let export_count = non_negative(r.i32()?, "export count")?;
@@ -250,7 +254,11 @@ fn read_header(raw: &[u8]) -> Result<Header, String> {
     }
     let generation_padding_size = non_negative(r.i32()?, "header gap size")?;
     let chunk_table_offset = non_negative(r.i32()?, "chunk table offset")?;
-    r.i32()?;
+    let last_block_size = non_negative(r.i32()?, "last block size")?;
+    let mut nonce = [0u8; 12];
+    if licensee_version >= 33 {
+        nonce.copy_from_slice(r.take(12)?);
+    }
     if name_count == 0
         || name_count > 1_000_000
         || export_count == 0
@@ -263,6 +271,9 @@ fn read_header(raw: &[u8]) -> Result<Header, String> {
     Ok(Header {
         file_version,
         licensee_version,
+        package_flags,
+        nonce,
+        last_block_size,
         total_header_size,
         name_count,
         name_offset,
@@ -276,6 +287,13 @@ fn read_header(raw: &[u8]) -> Result<Header, String> {
 }
 
 fn encrypted_header_size(h: &Header) -> Result<usize, String> {
+    if h.package_flags & 0x0800 != 0 {
+        return h
+            .total_header_size
+            .checked_sub(h.last_block_size)
+            .and_then(|x| x.checked_sub(h.name_offset))
+            .ok_or_else(|| "Invalid encrypted header bounds".into());
+    }
     let n = h
         .total_header_size
         .checked_sub(h.generation_padding_size)
@@ -325,6 +343,35 @@ fn read_chunk_offset(data: &[u8], offset: usize, i64_offsets: bool) -> Result<us
         non_negative(read_i32(data, offset)?, "chunk offset")
     }
 }
+pub(crate) fn crypt_ctr(data: &[u8], key: &[u8; 32], nonce: &[u8; 12]) -> Result<Vec<u8>, String> {
+    let cipher = Aes256::new(GenericArray::from_slice(key));
+    let mut output = data.to_vec();
+    for (index, block) in output.chunks_mut(16).enumerate() {
+        let counter = u32::try_from(index).map_err(|_| "AES-CTR counter overflow")?;
+        let mut input = GenericArray::default();
+        input[..12].copy_from_slice(nonce);
+        input[12..].copy_from_slice(&counter.to_be_bytes());
+        cipher.encrypt_block(&mut input);
+        for (byte, mask) in block.iter_mut().zip(input.iter()) {
+            *byte ^= *mask;
+        }
+    }
+    Ok(output)
+}
+
+fn crypt_header(
+    data: &[u8],
+    key: &[u8; 32],
+    encrypt: bool,
+    header: &Header,
+) -> Result<Vec<u8>, String> {
+    if header.package_flags & 0x0800 != 0 {
+        crypt_ctr(data, key, &header.nonce)
+    } else {
+        crypt(data, key, encrypt)
+    }
+}
+
 fn parse_chunks(decrypted: &[u8], h: &Header, raw: &[u8]) -> Result<Vec<Chunk>, String> {
     let wide = h.licensee_version >= 22;
     let os = if wide { 8 } else { 4 };
@@ -334,8 +381,12 @@ fn parse_chunks(decrypted: &[u8], h: &Header, raw: &[u8]) -> Result<Vec<Chunk>, 
         return Err(format!("Implausible compressed chunk count: {count}"));
     }
     let first = h.chunk_table_offset + 4;
-    let mut stride = normal_stride;
-    if count >= 2 {
+    let mut stride = if h.licensee_version >= 33 {
+        normal_stride + 12
+    } else {
+        normal_stride
+    };
+    if count >= 2 && h.licensee_version < 33 {
         let u0 = read_chunk_offset(decrypted, first, wide)?;
         let s0 = non_negative(read_i32(decrypted, first + os)?, "chunk size")?;
         if read_chunk_offset(decrypted, first + normal_stride + 12, wide).ok() == Some(u0 + s0) {
@@ -357,18 +408,28 @@ fn parse_chunks(decrypted: &[u8], h: &Header, raw: &[u8]) -> Result<Vec<Chunk>, 
         let cs = non_negative(read_i32(decrypted, entry + os + 4 + os)?, "compressed size")?;
         if us == 0
             || cs == 0
-            || co.checked_add(16).is_none_or(|e| e > raw.len())
-            || read_i32(raw, co).unwrap_or(0) as u32 != UPK_MAGIC
+            || co.checked_add(cs).is_none_or(|e| e > raw.len())
+            || (h.package_flags & 0x0800 == 0 && read_i32(raw, co).unwrap_or(0) as u32 != UPK_MAGIC)
         {
             return Err(format!("Invalid compressed chunk {index}"));
         }
+        let nonce = if h.licensee_version >= 33 {
+            Some(
+                decrypted[entry + normal_stride..entry + normal_stride + 12]
+                    .try_into()
+                    .unwrap(),
+            )
+        } else {
+            None
+        };
         chunks.push(Chunk {
             uncompressed_offset: uo,
             uncompressed_size: us,
             compressed_offset: co,
-            physical_size: 0,
+            physical_size: if h.package_flags & 0x0800 != 0 { cs } else { 0 },
             block_size: 0,
             table_entry_offset: entry,
+            nonce,
         });
     }
     Ok(chunks)
@@ -398,7 +459,7 @@ impl UpkPackage {
             .ok_or("File too small for encrypted header")?;
         let mut selected = None;
         for (_, key) in crate::upk_keys::embedded()? {
-            let Ok(dec) = crypt(encrypted, &key, false) else {
+            let Ok(dec) = crypt_header(encrypted, &key, false, &header) else {
                 continue;
             };
             if !validate_names(&dec, header.name_count) {
@@ -414,11 +475,27 @@ impl UpkPackage {
         let mut decompressed = Vec::with_capacity(chunks.len());
         let mut logical_size = raw.len();
         for (i, chunk) in chunks.iter_mut().enumerate() {
-            let (data, block_size, end) = upk::decomp_chunk_at(&raw, chunk.compressed_offset)
-                .map_err(|e| format!("Failed to decompress UPK chunk {i}: {e:?}"))?;
-            chunk.physical_size = end
-                .checked_sub(chunk.compressed_offset)
-                .ok_or("Chunk boundary underflow")?;
+            let (data, block_size, physical_size) = if header.package_flags & 0x0800 != 0 {
+                let nonce = chunk.nonce.ok_or("Encrypted chunk has no nonce")?;
+                let encrypted = raw
+                    .get(chunk.compressed_offset..chunk.compressed_offset + chunk.physical_size)
+                    .ok_or("Encrypted chunk outside file")?;
+                let decrypted = crypt_ctr(encrypted, &key, &nonce)?;
+                let (data, block_size, _) = upk::decomp_chunk_at(&decrypted, 0)
+                    .map_err(|e| format!("Failed to decompress UPK chunk {i}: {e:?}"))?;
+                (data, block_size, chunk.physical_size)
+            } else {
+                let (data, block_size, end) =
+                    upk::decomp_chunk_at(&raw, chunk.compressed_offset)
+                        .map_err(|e| format!("Failed to decompress UPK chunk {i}: {e:?}"))?;
+                (
+                    data,
+                    block_size,
+                    end.checked_sub(chunk.compressed_offset)
+                        .ok_or("Chunk boundary underflow")?,
+                )
+            };
+            chunk.physical_size = physical_size;
             chunk.block_size = block_size as usize;
             logical_size = logical_size.max(
                 chunk
@@ -646,6 +723,37 @@ impl UpkPackage {
         })();
         parsed.unwrap_or((None, offset, false))
     }
+    /// Read the property stream immediately after UObject's net index. Unlike
+    /// the recovery scanner, this never interprets texture pixels as tags.
+    pub(crate) fn serialized_props(&self, e: &ExportEntry) -> Result<(Vec<Prop>, usize), String> {
+        let raw = self
+            .image
+            .get(e.serial_offset..e.serial_offset.saturating_add(e.serial_size))
+            .ok_or("Truncated export")?;
+        let mut at = 4;
+        let mut props = Vec::new();
+        for _ in 0..4096 {
+            let (prop, next, ended) = self.parse_tag(raw, at);
+            if ended {
+                return Ok((props, next));
+            }
+            props.push(prop.ok_or("Invalid serialized property stream")?);
+            if next <= at {
+                return Err("Property stream did not advance".into());
+            }
+            at = next;
+        }
+        Err("Too many serialized properties".into())
+    }
+
+    pub(crate) fn bulk_offset_width(&self) -> usize {
+        if self.header.licensee_version >= 22 {
+            8
+        } else {
+            4
+        }
+    }
+
     pub fn parse_props(&self, e: &ExportEntry) -> Vec<Prop> {
         let Some(raw) = self
             .image
@@ -799,7 +907,8 @@ impl UpkPackage {
         if self.modified_chunks.is_empty() {
             let mut output = self.raw.clone();
             if self.header_dirty {
-                let encrypted = crypt(&self.decrypted_header, &self.key, true)?;
+                let encrypted =
+                    crypt_header(&self.decrypted_header, &self.key, true, &self.header)?;
                 output
                     [self.header.name_offset..self.header.name_offset + self.encrypted_header_size]
                     .copy_from_slice(&encrypted);
@@ -831,6 +940,15 @@ impl UpkPackage {
                     .get(c.uncompressed_offset..c.uncompressed_offset + span)
                     .ok_or("Logical chunk outside image")?;
                 let packed = pack_chunk(payload, c.block_size)?;
+                let packed = if self.header.package_flags & 0x0800 != 0 {
+                    crypt_ctr(
+                        &packed,
+                        &self.key,
+                        &c.nonce.ok_or("Encrypted chunk has no nonce")?,
+                    )?
+                } else {
+                    packed
+                };
                 sizes[index] = packed.len();
                 output.extend_from_slice(&packed)
             } else {
@@ -858,7 +976,7 @@ impl UpkPackage {
                 write_i32(&mut header, field + 4, sizes[i] as i32)?
             }
         }
-        let encrypted = crypt(&header, &self.key, true)?;
+        let encrypted = crypt_header(&header, &self.key, true, &self.header)?;
         output[self.header.name_offset..self.header.name_offset + self.encrypted_header_size]
             .copy_from_slice(&encrypted);
         Ok(output)
@@ -893,4 +1011,67 @@ fn pack_chunk(payload: &[u8], block_size: usize) -> Result<Vec<u8>, String> {
 
 pub fn strip(name: &str) -> &str {
     name.strip_suffix("_-2").unwrap_or(name)
+}
+
+#[cfg(test)]
+mod local_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "Requires the installed game; set HEBNIX_UPK_DIR"]
+    fn opens_rlupk_key_additions() {
+        let directory = std::path::PathBuf::from(
+            std::env::var_os("HEBNIX_UPK_DIR").expect("Set HEBNIX_UPK_DIR"),
+        );
+        for name in [
+            "hat_DJ_T_SF.upk",
+            "hat_fnlpB_T_SF.upk",
+            "skin_octane_LDJ_T_SF.upk",
+            "wheel_Vindert_T_SF.upk",
+        ] {
+            assert!(
+                !UpkPackage::load(&directory.join(name))
+                    .unwrap()
+                    .names
+                    .is_empty(),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    #[ignore = "Requires the installed game; set HEBNIX_UPK_DIR"]
+    fn opens_full_encrypted_dev_boost() {
+        let directory = std::path::PathBuf::from(
+            std::env::var_os("HEBNIX_UPK_DIR").expect("Set HEBNIX_UPK_DIR"),
+        );
+        for name in [
+            "boost_alphadevreward_SF.upk",
+            "Boost_AlphaDevReward_T_SF.upk",
+        ] {
+            let package = UpkPackage::load(&directory.join(name)).unwrap();
+            assert!(!package.names.is_empty(), "{name}");
+            assert!(package.header.package_flags & 0x0800 != 0, "{name}");
+            assert_eq!(package.repacked().unwrap(), package.raw, "{name}");
+        }
+        let thumbnail = crate::cosmetic_thumbnail::extract_png(
+            &directory.join("Boost_AlphaDevReward_T_SF.upk"),
+            "boosts",
+        )
+        .unwrap();
+        assert!(image::load_from_memory(&thumbnail).is_ok());
+
+        let mut package =
+            UpkPackage::load(&directory.join("Boost_AlphaDevReward_T_SF.upk")).unwrap();
+        let chunk = &package.chunks[0];
+        let offset = chunk.uncompressed_offset + chunk.uncompressed_size / 2;
+        let changed = package.image[offset] ^ 1;
+        package.patch(offset, &[changed]).unwrap();
+        let output =
+            std::env::temp_dir().join(format!("hebnix-dev-boost-{}.upk", std::process::id()));
+        std::fs::write(&output, package.repacked().unwrap()).unwrap();
+        let reloaded = UpkPackage::load(&output);
+        std::fs::remove_file(&output).unwrap();
+        assert_eq!(reloaded.unwrap().image[offset], changed);
+    }
 }

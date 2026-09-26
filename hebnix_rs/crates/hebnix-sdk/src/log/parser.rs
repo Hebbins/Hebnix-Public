@@ -33,6 +33,7 @@ re!(re_username, r"DevOnline: Logged in as '([^']+)'");
 re!(re_steam_id, r"DevOnline: Steam ID: (\d+)");
 re!(re_epic_username, r#"(?i)-epicusername=(?:"([^"]+)"|(\S+))"#);
 re!(re_epic_id, r"(?i)-epicuserid=([0-9a-f]+)");
+re!(re_eos_id, r"Connect login result 'EOS_Success' for player '([0-9a-fA-F]{32})'");
 re!(
     re_primary_id,
     r"Online_X\.UniqueNetIDToString\([^)]*PlayerID\)=\(([^|()]+)\|([^|()]+)\|(\d+)\)"
@@ -176,6 +177,11 @@ pub fn parse_launch_log(log_path: Option<&Path>, verify: bool, lang: &str) -> Lo
     }
     if let Some(c) = find_last(re_epic_id(), &text) {
         session.epic_id = Some(c[1].to_string());
+    }
+    if session.epic_id.is_none() {
+        if let Some(c) = find_last(re_eos_id(), &text) {
+            session.epic_id = Some(c[1].to_string());
+        }
     }
     if let Some(c) = find_last(re_primary_id(), &text) {
         session.primary_id = Some(format!("{}|{}|{}", &c[1], &c[2], &c[3]));
