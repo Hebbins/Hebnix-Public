@@ -34,7 +34,10 @@ use crate::messages::AppMsg;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 const SERVICE_NAME: &str = "HebnixTailscale";
-const SERVICE_PIPE: &str = r"\\.\pipe\ProtectedPrefix\Administrators\HebnixTailscale\tailscaled";
+// tailscaled ignores --socket when it runs as a windows service and always
+// listens on the default pipe, so the cli has to talk to that one. this means
+// it can't run next to a normal tailscale install.
+const SERVICE_PIPE: &str = r"\\.\pipe\ProtectedPrefix\Administrators\Tailscale\tailscaled";
 const SERVICE_START_TIMEOUT: Duration = Duration::from_secs(10);
 const PEER_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
@@ -65,21 +68,31 @@ pub struct PeerInfo {
     pub online: bool,
 }
 
+// tailscale sends null for empty lists/maps (e.g. "Peer": null with no peers
+// yet), and serde's default only covers a missing field, so treat null as empty
+fn null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
+}
+
 #[derive(Deserialize, Default)]
 struct RawStatus {
-    #[serde(rename = "BackendState", default)]
+    #[serde(rename = "BackendState", default, deserialize_with = "null_as_default")]
     backend_state: String,
-    #[serde(rename = "TailscaleIPs", default)]
+    #[serde(rename = "TailscaleIPs", default, deserialize_with = "null_as_default")]
     tailscale_ips: Vec<String>,
-    #[serde(rename = "Peer", default)]
+    #[serde(rename = "Peer", default, deserialize_with = "null_as_default")]
     peer: HashMap<String, RawPeer>,
 }
 
 #[derive(Deserialize)]
 struct RawPeer {
-    #[serde(rename = "HostName", default)]
+    #[serde(rename = "HostName", default, deserialize_with = "null_as_default")]
     host_name: String,
-    #[serde(rename = "TailscaleIPs", default)]
+    #[serde(rename = "TailscaleIPs", default, deserialize_with = "null_as_default")]
     tailscale_ips: Vec<String>,
     #[serde(rename = "Online", default)]
     online: bool,
@@ -396,6 +409,15 @@ fn run_tailscale(cli: &Path, args: &[&str]) -> Result<String, String> {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn status_json_with_null_peer_and_ips_parses() {
+        let json = r#"{"BackendState":"Running","TailscaleIPs":null,"Peer":null}"#;
+        let status: RawStatus = serde_json::from_str(json).unwrap();
+        assert_eq!(status.backend_state, "Running");
+        assert!(status.tailscale_ips.is_empty());
+        assert!(status.peer.is_empty());
+    }
 
     // Drives the real bundled tailscaled/tailscale binaries through
     // spawn -> status -> shutdown. Ignored by default because it needs
