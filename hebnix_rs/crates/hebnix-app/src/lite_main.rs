@@ -6,6 +6,7 @@ mod epic_connection;
 mod discord_presence;
 mod dpi_fix;
 mod hotkey;
+mod hosts_file;
 mod lite_app;
 #[path = "lite_messages.rs"]
 mod messages;

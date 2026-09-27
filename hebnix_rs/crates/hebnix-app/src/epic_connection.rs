@@ -32,10 +32,7 @@ impl RepairState {
         self.completion = Some(rx);
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            while hebnix_sdk::process::is_rocket_league_running() {
-                std::thread::sleep(Duration::from_millis(500));
-            }
-            let result = repair();
+            let result = close_rocket_league().and_then(|()| repair());
             let _ = tx.send(result);
             ctx.request_repaint();
         });
@@ -53,7 +50,7 @@ impl RepairState {
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label("Rocket League needs to quit before fixing the Epic connection. Continue when it closes?");
+                    ui.label("Rocket League must close to repair the Epic connection. Close it now?");
                     ui.horizontal(|ui| {
                         if ui.button("Yes").clicked() {
                             self.run(ctx);
@@ -65,7 +62,7 @@ impl RepairState {
                 });
         }
         if let Some(result) = &self.result {
-            let title = if result.is_ok() { "Spoofer Cleared" } else { "Fix Epic Connection" };
+            let title = if result.is_ok() { "Epic Connection Repaired" } else { "Fix Epic Connection" };
             let mut close = false;
             egui::Window::new(title)
                 .collapsible(false)
@@ -73,9 +70,9 @@ impl RepairState {
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     if let Err(error) = result {
-                        ui.label(format!("Could not clear the spoofer: {error}"));
+                        ui.label(format!("Could not repair the Epic connection: {error}"));
                     } else {
-                        ui.label("Spoofer Cleared");
+                        ui.label("Epic Connection Repaired");
                     }
                     if ui.button("OK").clicked() {
                         close = true;
@@ -89,30 +86,9 @@ impl RepairState {
 }
 
 fn repair() -> Result<(), String> {
-    let system_root = std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into());
-    let path = std::path::PathBuf::from(system_root).join(r"System32\drivers\etc\hosts");
-    let content = std::fs::read_to_string(&path)
-        .map_err(|error| format!("Could not read hosts file: {error}"))?;
-    let kept: Vec<&str> = content.lines()
-        .filter(|line| !line.contains("#hebnix") && !line.contains("# hebnix spoofer"))
-        .collect();
-    if kept.len() != content.lines().count() {
-        let mut output = kept.join("\r\n");
-        if !output.is_empty() {
-            output.push_str("\r\n");
-        }
-        std::fs::write(&path, output)
-            .map_err(|error| format!("Could not update hosts file: {error}. Try running Hebnix as administrator."))?;
-    }
-    let user_profile = std::env::var_os("USERPROFILE")
-        .ok_or_else(|| "USERPROFILE is not set".to_string())?;
-    let web_cache = std::path::PathBuf::from(user_profile)
-        .join(r"Documents\My Games\Rocket League\TAGame\Cache\WebCache");
-    match std::fs::remove_dir_all(web_cache) {
-        Ok(()) => {}
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => return Err(format!("Could not clear Rocket League WebCache: {error}")),
-    }
+    crate::hosts_file::clear().map_err(|error| format!("Could not clear Hebnix hosts redirects: {error}"))?;
+    crate::winutil::clear_rocket_league_web_cache()
+        .map_err(|error| format!("Could not clear Rocket League WebCache: {error}"))?;
     use std::os::windows::process::CommandExt;
     let status = std::process::Command::new("ipconfig")
         .arg("/flushdns")
@@ -123,4 +99,19 @@ fn repair() -> Result<(), String> {
         return Err(format!("DNS flush exited with {status}"));
     }
     Ok(())
+}
+
+fn close_rocket_league() -> Result<(), String> {
+    if !hebnix_sdk::process::is_rocket_league_running() {
+        return Ok(());
+    }
+    crate::winutil::kill_rocket_league()
+        .map_err(|error| format!("Could not close Rocket League: {error}"))?;
+    for _ in 0..60 {
+        if !hebnix_sdk::process::is_rocket_league_running() {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(500));
+    }
+    Err("Rocket League did not close within 30 seconds".into())
 }

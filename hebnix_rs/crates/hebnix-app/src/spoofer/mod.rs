@@ -27,7 +27,9 @@ use crate::spoofer::socket::SocketProxy;
 pub const PROXY_HOST: &str = "127.0.0.1";
 pub const PROXY_PORT: u16 = 8080;
 pub const MAX_NAME_LENGTH: usize = 32;
-const REDIRECT_HOSTS: [&str; 3] = ["api.epicgames.dev", "api.rlpp.psynet.gg", TITLE_HOST];
+// Intercept config for title and rank routing, and Epic API for name/friends.
+// PsyNet RPC is reached through config when rank spoofing is enabled.
+const REDIRECT_HOSTS: [&str; 2] = ["api.epicgames.dev", TITLE_HOST];
 
 const INET_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
 
@@ -330,6 +332,7 @@ impl SpooferManager {
                 Arc::clone(&self.spoofed_ranks),
                 self.tx.clone(),
                 self.base_dir.join("rank_spoofer_frames.log"),
+                &self.base_dir,
             )?);
         }
         Ok(())
@@ -363,14 +366,18 @@ impl SpooferManager {
 
     pub fn start_http(&self) -> Result<(), String> {
         if self.http_active.load(Ordering::Relaxed) {
-            return Ok(());
+            return self.reconcile_hosts();
         }
         self.http_active.store(true, Ordering::Relaxed);
         if let Err(error) = self.ensure_reverse_proxy() {
             self.http_active.store(false, Ordering::Relaxed);
             return Err(error);
         }
-        self.start_skill_bridge()?;
+        if let Err(error) = self.start_skill_bridge() {
+            self.http_active.store(false, Ordering::Relaxed);
+            self.stop_reverse_if_unused();
+            return Err(error);
+        }
         Ok(())
     }
 
@@ -405,14 +412,18 @@ impl SpooferManager {
 
     pub fn start_socket(&self) -> Result<(), String> {
         if self.socket_active.load(Ordering::Relaxed) {
-            return Ok(());
+            return self.reconcile_hosts();
         }
         self.socket_active.store(true, Ordering::Relaxed);
         if let Err(error) = self.ensure_reverse_proxy() {
             self.socket_active.store(false, Ordering::Relaxed);
             return Err(error);
         }
-        self.start_skill_bridge()?;
+        if let Err(error) = self.start_skill_bridge() {
+            self.socket_active.store(false, Ordering::Relaxed);
+            self.stop_reverse_if_unused();
+            return Err(error);
+        }
         Ok(())
     }
 
@@ -460,7 +471,7 @@ impl SpooferManager {
             .lock()
             .map_err(|_| "reverse proxy lock poisoned")?;
         if slot.is_some() {
-            return Ok(());
+            return hosts::set_redirects(&REDIRECT_HOSTS);
         }
         let ca = Arc::new(ca::ensure(&self.base_dir)?);
         if !ca::is_current_installed(&self.base_dir) {
@@ -476,6 +487,7 @@ impl SpooferManager {
         for host in REDIRECT_HOSTS {
             real_ips.insert(host.to_string(), dns::resolve_a(host)?);
         }
+        real_ips.insert("api.rlpp.psynet.gg".to_string(), dns::resolve_a("api.rlpp.psynet.gg")?);
         let rules: Arc<Vec<Box<dyn Rule>>> = Arc::new(vec![
             Box::new(NameRule::new(Arc::clone(&self.spoofed_name))),
             Box::new(crate::spoofer::rules::FriendsRule::new(
@@ -487,9 +499,8 @@ impl SpooferManager {
                 self.base_dir.join("owned_products.json"),
             )),
             Box::new(TitleRule::new(Arc::clone(&self.title_settings))),
-            Box::new(crate::spoofer::rules::RankRule::with_bridge_signal(
+            Box::new(crate::spoofer::rules::RankRule::new(
                 Arc::clone(&self.spoofed_ranks),
-                Arc::clone(&self.item_spawner_enabled),
             )),
         ]);
         self.ensure_crl(&ca);
@@ -502,11 +513,24 @@ impl SpooferManager {
         Ok(())
     }
 
+    /// Reconcile hosts with the shared proxy's actual runtime state.
+    pub fn reconcile_hosts(&self) -> Result<(), String> {
+        if self.http_running() || self.socket_running() {
+            hosts::set_redirects(&REDIRECT_HOSTS)
+        } else {
+            hosts::clear()
+        }
+    }
+
     fn stop_reverse_if_unused(&self) {
         if self.http_active.load(Ordering::Relaxed) || self.socket_active.load(Ordering::Relaxed) {
             return;
         }
-        let _ = hosts::clear();
+        if let Err(error) = hosts::clear() {
+            let _ = self.tx.send(AppMsg::Log(format!(
+                "[Spoofer] Could not remove hosts redirects: {error}"
+            )));
+        }
         if let Ok(mut slot) = self.reverse_proxy.lock() {
             if let Some(proxy) = slot.take() {
                 proxy.stop();
@@ -521,7 +545,12 @@ impl SpooferManager {
         self.stop_socket();
         self.stop_http();
         // Clear a redirect even if the socket failed to start or its state was lost.
-        let _ = hosts::clear();
+        if let Err(error) = hosts::clear() {
+            tracing::error!("Could not remove Hebnix hosts redirects on shutdown: {error}");
+            let _ = self.tx.send(AppMsg::Log(format!(
+                "[Spoofer] Could not remove hosts redirects on shutdown: {error}"
+            )));
+        }
         hosts::flush_dns();
     }
 }

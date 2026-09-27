@@ -34,10 +34,6 @@ pub trait Rule: Send + Sync {
     fn strip_request_headers(&self) -> &[&str] {
         &[]
     }
-    /// Optionally forward a matched request to a different upstream host.
-    fn upstream_host(&self, _host: &str, _path: &str) -> Option<&'static str> {
-        None
-    }
     /// true if it changed anything
     fn rewrite(&self, body: &mut Body) -> bool;
     /// one console line the first time it fires, None after. it repeats a lot.
@@ -470,7 +466,6 @@ impl Rule for TitleRule {
 
 pub struct RankRule {
     pub spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
-    bridge_enabled: Option<Arc<AtomicBool>>,
     announced: AtomicBool,
 }
 
@@ -478,28 +473,16 @@ impl RankRule {
     pub fn new(spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>) -> Self {
         Self {
             spoofs,
-            bridge_enabled: None,
             announced: AtomicBool::new(false),
         }
     }
 
-    pub fn with_bridge_signal(
-        spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
-        bridge_enabled: Arc<AtomicBool>,
-    ) -> Self {
-        Self {
-            spoofs,
-            bridge_enabled: Some(bridge_enabled),
-            announced: AtomicBool::new(false),
-        }
-    }
+
 }
 
 impl Rule for RankRule {
     fn matches_host(&self, host: &str) -> bool {
-        // Only the HTTP PsyNet RPC response contains PerConURL.  Never MITM
-        // ws.rlpp.psynet.gg: that is a long-lived websocket and must be
-        // tunnelled until the PerCon URL points it at the local bridge.
+        // Inspect PsyNet HTTP responses while leaving the game WebSocket alone.
         host.eq_ignore_ascii_case("api.rlpp.psynet.gg")
             || host.eq_ignore_ascii_case("config.psynet.gg")
     }
@@ -508,48 +491,30 @@ impl Rule for RankRule {
         &["if-none-match", "if-modified-since"]
     }
 
-    fn upstream_host(&self, host: &str, path: &str) -> Option<&'static str> {
-        (host.eq_ignore_ascii_case("config.psynet.gg")
-            && (path.contains("/rpc/") || path.contains("/Services")))
-        .then_some("api.rlpp.psynet.gg")
-    }
-
     fn rewrite(&self, body: &mut Body) -> bool {
         let body_str = match std::str::from_utf8(&body.bytes) {
             Ok(s) => s,
             Err(_) => return false,
         };
 
-        // C# first rewrites the auth/config payload so its PsyNet RPC points
-        // at config.psynet.gg. The next config request is then funnelled to
-        // api.rlpp.psynet.gg by `upstream_host` above.
+        let spoofs = self.spoofs.lock().unwrap().clone();
+        if spoofs.is_empty() {
+            return false;
+        }
+        // Send game RPC through the intercepted config host, then route those
+        // paths to the real API backend in proxy.rs.
         if body_str.contains("api.rlpp.psynet.gg") {
             let rewritten = body_str
-                .replace(
-                    "https:\\/\\/api.rlpp.psynet.gg\\/rpc",
-                    "https:\\/\\/config.psynet.gg\\/rpc",
-                )
-                .replace(
-                    "https:\\/\\/api.rlpp.psynet.gg\\/Services",
-                    "https:\\/\\/config.psynet.gg\\/Services",
-                )
-                .replace(
-                    "https://api.rlpp.psynet.gg/rpc",
-                    "https://config.psynet.gg/rpc",
-                )
-                .replace(
-                    "https://api.rlpp.psynet.gg/Services",
-                    "https://config.psynet.gg/Services",
-                );
+                .replace("https:\\/\\/api.rlpp.psynet.gg\\/rpc", "https:\\/\\/config.psynet.gg\\/rpc")
+                .replace("https://api.rlpp.psynet.gg/rpc", "https://config.psynet.gg/rpc")
+                .replace("https://api.rlpp.psynet.gg/Services", "https://config.psynet.gg/Services");
             if rewritten != body_str {
                 let bytes = rewritten.into_bytes();
-                body.set_headers
-                    .push(("Psysignature".into(), config_psysignature(&bytes)));
+                body.set_headers.push(("Psysignature".into(), psysignature(&bytes)));
                 body.bytes = bytes;
                 return true;
             }
         }
-
         if !body_str.contains("\"Skills\"") && !body_str.contains("\"PerConURL") {
             return false;
         }
@@ -569,42 +534,25 @@ impl Rule for RankRule {
         };
 
         let mut modified = false;
-        let spoofs = self.spoofs.lock().unwrap().clone();
-
         fn rewrite_connection_urls(value: &mut serde_json::Value) -> bool {
-            let mut modified = false;
             match value {
-                serde_json::Value::Object(object) => {
-                    for (key, value) in object {
-                        let replacement = match key.as_str() {
-                            "PerConURL" => {
-                                Some("ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player")
-                            }
-                            "PerConURLv2" => Some("ws://127.0.0.1:8025/ws/gc2"),
-                            _ => None,
-                        };
-                        if let Some(replacement) = replacement {
-                            if value.as_str() != Some(replacement) {
-                                *value = serde_json::Value::String(replacement.to_string());
-                                modified = true;
-                            }
-                        } else {
-                            modified |= rewrite_connection_urls(value);
-                        }
-                    }
-                }
-                serde_json::Value::Array(array) => {
-                    for value in array {
-                        modified |= rewrite_connection_urls(value);
-                    }
-                }
-                _ => {}
+                serde_json::Value::Object(object) => object.iter_mut().fold(false, |changed, (key, value)| {
+                    let replacement = match key.as_str() {
+                        "PerConURL" => Some("ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player"),
+                        "PerConURLv2" => Some("ws://127.0.0.1:8025/ws/gc2"),
+                        _ => None,
+                    };
+                    if let Some(url) = replacement {
+                        let was_different = value.as_str() != Some(url);
+                        if was_different { *value = serde_json::Value::String(url.into()); }
+                        changed || was_different
+                    } else { changed | rewrite_connection_urls(value) }
+                }),
+                serde_json::Value::Array(array) => array.iter_mut().fold(false, |changed, value| changed | rewrite_connection_urls(value)),
+                _ => false,
             }
-            modified
         }
-
-        let connection_urls_modified = rewrite_connection_urls(&mut val);
-        modified |= connection_urls_modified;
+        modified |= rewrite_connection_urls(&mut val);
 
         if let Some(result) = val.get_mut("Result").and_then(|v| v.as_object_mut()) {
             if let Some(skills) = result.get_mut("Skills").and_then(|v| v.as_array_mut()) {
@@ -634,9 +582,7 @@ impl Rule for RankRule {
             Err(_) => return false,
         };
 
-        // The C# relay signs every forwarded PsyNet RPC result, including a
-        // PerConURL-only rewrite. Otherwise Rocket League rejects the changed
-        // response because the original PsySig no longer matches its body.
+        // Re-sign a changed PsyNet RPC result so Rocket League accepts it.
         let psy_time = envelope
             .and_then(|(head, _, line_sep)| {
                 head.split(line_sep).find_map(|line| {
@@ -681,16 +627,6 @@ impl Rule for RankRule {
     }
 }
 
-fn config_psysignature(body: &[u8]) -> String {
-    use base64::Engine;
-    use hmac::{Hmac, Mac};
-    use sha2::Sha256;
-    let mut mac = <Hmac<Sha256>>::new_from_slice(b"cqhyz50f3c3j2pxhwo6b1kypxikah0wh")
-        .expect("HMAC accepts this key");
-    mac.update(body);
-    base64::engine::general_purpose::STANDARD.encode(mac.finalize().into_bytes())
-}
-
 pub(crate) fn psy_response_signature(psy_time: &str, body: &[u8]) -> String {
     use base64::Engine;
     use hmac::{Hmac, Mac};
@@ -731,46 +667,35 @@ mod tests {
     }
 
     #[test]
-    fn rank_rule_routes_live_skill_connection_through_bridge() {
+    fn rank_rule_routes_percon_to_local_bridge() {
         let rule = RankRule::new(Arc::new(Mutex::new(HashMap::from([(10, (22, 95.0))]))));
-        let mut body = Body::new(
-            "application/json",
-            br#"{"Result":{"PerConURL":"wss://ws.rlpp.psynet.gg/ws/gc","PerConURLv2":"wss://ws.rlpp.psynet.gg/ws/gc2"}}"#.to_vec(),
-        );
+        let original = br#"{"Result":{"PerConURL":"wss://ws.rlpp.psynet.gg/ws/gc","PerConURLv2":"wss://ws.rlpp.psynet.gg/ws/gc2"}}"#.to_vec();
+        let mut body = Body::new("application/json", original);
         assert!(rule.rewrite(&mut body));
         let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
-        assert_eq!(
-            value["Result"]["PerConURL"],
-            "ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player"
-        );
+        assert_eq!(value["Result"]["PerConURL"], "ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player");
         assert_eq!(value["Result"]["PerConURLv2"], "ws://127.0.0.1:8025/ws/gc2");
-        assert!(
-            body.set_headers
-                .iter()
-                .any(|(name, value)| name == "PsySig" && !value.is_empty())
-        );
     }
 
     #[test]
-    fn rank_rule_routes_config_funnel_and_signs_config_payload() {
+    fn rank_rule_routes_psynet_api_through_config() {
         let rule = RankRule::new(Arc::new(Mutex::new(HashMap::from([(10, (22, 95.0))]))));
-        assert_eq!(
-            rule.upstream_host("config.psynet.gg", "/rpc/Player/GetPlayerSkills"),
-            Some("api.rlpp.psynet.gg")
-        );
-        let mut body = Body::new(
-            "application/json",
-            br#"{"PsyNetUrl":"https://api.rlpp.psynet.gg/rpc"}"#.to_vec(),
-        );
+        let mut body = Body::new("application/json", br#"{"PsyNetUrl":"https://api.rlpp.psynet.gg/rpc"}"#.to_vec());
         assert!(rule.rewrite(&mut body));
-        assert!(String::from_utf8_lossy(&body.bytes).contains("config.psynet.gg/rpc"));
-        assert!(
-            body.set_headers
-                .iter()
-                .any(|(name, _)| name == "Psysignature")
-        );
+        let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(value["PsyNetUrl"], "https://config.psynet.gg/rpc");
+        assert!(body.set_headers.iter().any(|(name, _)| name == "Psysignature"));
     }
 
+    #[test]
+    fn rank_rule_keeps_psynet_api_url() {
+        let rule = RankRule::new(Arc::new(Mutex::new(HashMap::new())));
+        let original = br#"{"PsyNetUrl":"https://api.rlpp.psynet.gg/rpc"}"#.to_vec();
+        let mut body = Body::new("application/json", original.clone());
+        assert!(!rule.rewrite(&mut body));
+        assert_eq!(body.bytes, original);
+        assert!(body.set_headers.is_empty());
+    }
     #[test]
     fn ranked_heatseeker_uses_the_live_skills_playlist() {
         let rule = RankRule::new(Arc::new(Mutex::new(HashMap::from([(63, (22, 95.0))]))));
@@ -797,12 +722,13 @@ mod tests {
         let rule = TitleRule::new(settings);
         let mut body = Body::new(
             "application/json",
-            br#"{"PlayerTitleConfig":{"Titles":[{"ID":"First","Text":"One"},{"ID":"Second","Text":"Two"}],"Categories":[]}}"#.to_vec(),
+            br#"{"PsyNetUrl":"https://api.rlpp.psynet.gg/rpc","PlayerTitleConfig":{"Titles":[{"ID":"First","Text":"One"},{"ID":"Second","Text":"Two"}],"Categories":[]}}"#.to_vec(),
         );
         assert!(rule.rewrite(&mut body));
         let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
         assert_eq!(value["PlayerTitleConfig"]["Titles"][0]["Text"], "One");
         assert_eq!(value["PlayerTitleConfig"]["Titles"][1]["Text"], "Hebnix");
+        assert_eq!(value["PsyNetUrl"], "https://api.rlpp.psynet.gg/rpc");
         assert_eq!(
             value["PlayerTitleConfig"]["Categories"][0]["GlowColor"],
             "12ABEF"
