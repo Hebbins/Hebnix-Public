@@ -12,8 +12,18 @@ infrastructure and a small backend endpoint.
 ## 1. Run headscale (self-hosted Tailscale coordination server)
 
 Standard self-hosted [headscale](https://headscale.net/), no special
-Hebnix-specific config beyond the usual `server_url`/`listen_addr`/DERP/DNS
-settings in its `config.yaml`.
+Hebnix-specific config beyond the usual `server_url`/`listen_addr`/DERP
+settings in its `config.yaml` -- except one:
+
+**Set `dns.magic_dns: false`.** Confirmed this the hard way: with MagicDNS
+on, tailscaled writes a Windows NRPT (Name Resolution Policy Table) rule
+pointing DNS at the tailnet, and if that rule is ever left behind (a crash,
+an unclean shutdown, anything that skips `tailscale down` on the way out),
+Windows keeps trying to resolve *all* DNS through a server that's no longer
+there -- breaking DNS system-wide on that PC, not just for Hebnix. Workshop
+multiplayer doesn't need MagicDNS at all (players connect by raw tailnet
+IP), so turning it off server-side removes the risk entirely rather than
+relying on every client to clean up perfectly on exit.
 
 ## 2. Reverse proxy: must support raw duplex HTTP, not just request/response
 
@@ -40,10 +50,14 @@ request-then-response HTTP call.
   tonight) if TLS isn't wanted for the coordination endpoint specifically --
   but a reverse proxy with real TLS is the normal production setup.
 
-## 3. Room API: mint a pre-auth key per player, per room
+## 3. Room API: mint a pre-auth key, that's it
 
-The client calls `?request=tsnet/authkey` (see `RoomClient::request_tsnet_authkey`
-in `crates/hebnix-app/src/multiplayer-lan/room_api.rs`) expecting back:
+There's no room/PIN system on the client any more -- Hebnix's own UI for
+Workshop multiplayer is down to a single "Connect" button, no host/join
+choice, no room to create or join. The client's only remaining call to the
+room API is `?request=tsnet/authkey` (see `RoomClient::request_tsnet_authkey`
+in `crates/hebnix-app/src/multiplayer-lan/room_api.rs`), just to get onto
+the tailnet at all:
 
 ```json
 { "auth_key": "...", "control_url": "https://api.hebnix.com", "expires_at": "..." }
@@ -60,16 +74,27 @@ headscale preauthkeys create --user <pool-user> --ephemeral --reusable=false --e
 
 (via headscale's gRPC/HTTP API from the room-api backend, not shelling out to
 the CLI in production, but that's the equivalent operation). A single
-headscale "user" to pool all Workshop room nodes under is fine -- Hebnix's
-own client-side ACLs/policy isn't a concern yet at this stage.
+headscale "user" to pool every Workshop player under is fine -- Hebnix's own
+client-side ACLs/policy isn't a concern yet at this stage. The client
+currently sends an empty `pin` and a hardcoded `role: "peer"` in the
+request body -- neither means anything server-side any more, they're
+leftover from when there was a room concept; safe to just ignore both
+fields and hand back a key regardless of what's in them.
 
-## 4. Room API: `tailnet_ip` field
+## 4. Peer discovery doesn't need the room API at all
 
-Once a player's node registers and shows up in `headscale nodes list`, the
-room API's room/player records need a `tailnet_ip` field so other players in
-the room can read out the address to pass to Rocket League's `-multihome`.
-No specific mechanism prescribed here -- whatever's natural for however the
-room API already polls/pushes player state.
+This used to need the room API to track who's in a room and expose everyone's
+`tailnet_ip` to each other. That's gone -- once a player's node is on the
+tailnet, every other connected player's Hebnix client already sees them
+directly from `tailscale status --json` (which is how the beacon relay finds
+who to relay to). The room API genuinely doesn't need to know or store
+anything about individual players or sessions any more -- minting auth keys
+is the whole job.
+
+The room/player endpoints (`multiplayer/create`, `join`, `leave`, `player`,
+`update`, `close`) are all still defined client-side in `room_api.rs` but
+nothing calls them any more -- dead code kept around rather than ripped out
+mid-rework. None of them need a server implementation.
 
 ---
 
@@ -82,3 +107,13 @@ real, upstream `tailscaled` daemon + `tailscale` CLI (see
 which turned out to be a hard requirement for Rocket League's `-multihome`
 to work. This doesn't change anything about what the server needs to do;
 it's the same headscale protocol either way.
+
+Getting the actual game discovery working (Rocket League's LAN browser
+showing a game across the tunnel) was entirely a client-side problem, not
+a server one -- Rocket League's own LAN discovery broadcast can't cross a
+WireGuard tunnel by design, so Hebnix runs a small relay on each player's
+machine that captures that broadcast (via WinDivert) and re-sends it
+directly to whoever else is on the tailnet. None of this touches the
+server at all; it's mentioned here only so it's not a surprise that "the
+tailnet connects fine but the game doesn't show up" was never a server-side
+bug to chase.
