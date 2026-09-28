@@ -4,7 +4,8 @@ use std::process::Command;
 
 const RULE_PREFIX: &str = "Hebnix Workshop LAN";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-const LAN_PORTS: &str = "7777-7778,14000-14010";
+const LAN_PORTS: &str = "7777-7778,14000-14010,14777";
+const DISCOVERY_PORTS: &str = "14000-14010,14777";
 const PROFILES: &str = "private,public";
 
 /// Tailscale doesn't guarantee a fixed outbound port the way the old
@@ -17,25 +18,25 @@ pub fn ensure_sidecar_rule(executable: &Path) -> Result<(), String> {
 }
 
 /// lets Hebnix's own beacon-relay socket (see beacon.rs) send/receive on
-/// Rocket League's LAN port -- separate from the rule below, which is
-/// scoped to RocketLeague.exe rather than Hebnix's own binary.
+/// Rocket League's LAN discovery ports -- separate from the rule below,
+/// which is scoped to RocketLeague.exe rather than Hebnix's own binary.
 pub fn ensure_beacon_relay_rule(executable: &Path) -> Result<(), String> {
-    let port = super::RL_LAN_PORT.to_string();
-    let inbound = format!("{RULE_PREFIX} v3 beacon relay inbound UDP {port}");
+    let ports = DISCOVERY_PORTS;
+    let inbound = format!("{RULE_PREFIX} v3 beacon relay inbound UDP {ports}");
     ensure_udp_rule(
         &inbound,
         executable,
         "in",
-        Some(&format!("localport={port}")),
+        Some(&format!("localport={ports}")),
         None,
         None,
     )?;
-    let outbound = format!("{RULE_PREFIX} v3 beacon relay outbound UDP {port}");
+    let outbound = format!("{RULE_PREFIX} v3 beacon relay outbound UDP {ports}");
     ensure_udp_rule(
         &outbound,
         executable,
         "out",
-        Some(&format!("localport={port}")),
+        Some(&format!("localport={ports}")),
         None,
         None,
     )

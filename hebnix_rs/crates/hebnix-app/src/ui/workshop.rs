@@ -15,10 +15,8 @@ use sha2::{Digest, Sha256};
 
 use crate::messages::AppMsg;
 use crate::multiplayer_lan::{
-    CreateRoomRequest, GuestSession, HostSession, JoinRoomRequest, JoinedRoom, MapDescriptor,
-    ROOM_API_BASE_URL, RL_LAN_PORT, RoomClient, TSNET_CONTROL_URL, TsnetSidecarHandle,
-    UpdatePlayerRequest, ensure_beacon_relay_rule, ensure_rocket_league_lan_rule,
-    ensure_sidecar_rule,
+    HostSession, RL_LAN_PORT, RoomClient, TSNET_CONTROL_URL, TsnetSidecarHandle,
+    ensure_beacon_relay_rule, ensure_rocket_league_lan_rule, ensure_sidecar_rule,
 };
 mod background_changer;
 use background_changer::BackgroundChangerState;
@@ -58,41 +56,6 @@ fn rocket_league_executable(rl_path: &str) -> Result<PathBuf, String> {
         .into_iter()
         .find(|path| path.is_file())
         .ok_or_else(|| "Could not find RocketLeague.exe in the configured game folder.".to_string())
-}
-
-fn multiplayer_player_identity(player_token: String, tailnet_ip: String) -> UpdatePlayerRequest {
-    let info = hebnix_sdk::log::parse_launch_log(None, false, "INT");
-    let detected_platform = hebnix_sdk::process::find_rocket_league()
-        .map(|process| process.platform.as_str().to_string());
-    let platform = detected_platform
-        .or(info.session.platform.clone())
-        .unwrap_or_else(|| "Unknown".to_string());
-    let platform_id = info
-        .session
-        .primary_id
-        .or(info.session.steam_id)
-        .or(info.session.epic_id)
-        .unwrap_or_else(|| format!("{}-{}", platform, std::process::id()));
-    let display_name = info
-        .session
-        .username
-        .filter(|name| !name.trim().is_empty())
-        .unwrap_or_else(|| {
-            std::env::var("USERNAME").unwrap_or_else(|_| "Hebnix Player".to_string())
-        });
-    UpdatePlayerRequest {
-        player_token,
-        platform_id,
-        platform,
-        display_name,
-        tailnet_ip,
-    }
-}
-
-fn multiplayer_join_request() -> JoinRoomRequest {
-    JoinRoomRequest {
-        player_token: multiplayer_client_token(),
-    }
 }
 
 fn multiplayer_client_token() -> String {
@@ -467,24 +430,14 @@ enum WorkshopView {
     Multiplayer,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum MultiplayerMode {
-    Host,
-    Join,
-}
-
 struct MultiplayerState {
     wizard_started: bool,
-    mode: MultiplayerMode,
     host_name: String,
-    join_pin: String,
     identity_update_in_flight: bool,
     identity_updated: bool,
-    hosted: Option<HostSession>,
-    joined: Option<GuestSession>,
-    /// guest: the room joined during launch_multiplayer, waiting for the
-    /// "Join by PIN" button to actually start the GuestSession
-    pending_join: Option<JoinedRoom>,
+    /// one relay session regardless of whether this peer ends up hosting or
+    /// joining inside Rocket League's own UI - see hosting.rs
+    relay: Option<HostSession>,
     status: String,
     setup_progress: Option<String>,
     saved_host: Option<SavedHost>,
@@ -528,15 +481,11 @@ impl Default for MultiplayerState {
     fn default() -> Self {
         Self {
             wizard_started: false,
-            mode: MultiplayerMode::Host,
             host_name: "Hebnix Workshop".to_string(),
-            join_pin: String::new(),
             identity_update_in_flight: false,
             identity_updated: false,
-            hosted: None,
-            joined: None,
-            pending_join: None,
-            status: "Choose a downloaded map to host, or enter a four-digit pin to join."
+            relay: None,
+            status: "Connect, then host or join inside Rocket League's own LAN match screen."
                 .to_string(),
             setup_progress: None,
             saved_host: None,
@@ -697,7 +646,7 @@ impl WorkshopState {
                 WorkshopView::BackgroundChanger,
                 "Background Changer",
             );
-            // ui.selectable_value(&mut self.view, WorkshopView::Multiplayer, "Multiplayer");
+            ui.selectable_value(&mut self.view, WorkshopView::Multiplayer, "Multiplayer");
         });
         ui.separator();
         if self.view == WorkshopView::Multiplayer {
@@ -883,6 +832,12 @@ impl WorkshopState {
         }
     }
 
+    /// One flow, not two: Rocket League's own UI is where someone picks
+    /// Host or Join, not Hebnix's. Every peer runs the identical relay
+    /// (confirmed by packet capture that joining broadcasts too, not just
+    /// hosting - see hosting.rs), so there's nothing left for Hebnix to
+    /// ask about up front. Connect, start Rocket League, the relay starts
+    /// itself the moment the game's actually up - no separate button.
     fn render_multiplayer(
         &mut self,
         ui: &mut egui::Ui,
@@ -894,55 +849,28 @@ impl WorkshopState {
             ui.add_space(56.0);
             ui.vertical_centered(|ui| {
                 ui.heading("Workshop Multiplayer");
-                ui.label("Choose how you want to connect.");
+                ui.label(
+                    "Connects you to the private Workshop network. Host or join \
+                     from inside Rocket League's own LAN match screen once it's up.",
+                );
                 ui.add_space(18.0);
-                ui.horizontal(|ui| {
-                    let width = 140.0;
-                    if ui
-                        .add_sized([width, 38.0], egui::Button::new("Host"))
-                        .clicked()
-                    {
-                        self.multiplayer.mode = MultiplayerMode::Host;
-                        self.multiplayer.wizard_started = true;
-                        self.start_tailnet(tx, ctx);
-                    }
-                    if ui
-                        .add_sized([width, 38.0], egui::Button::new("Join"))
-                        .clicked()
-                    {
-                        self.multiplayer.mode = MultiplayerMode::Join;
-                        self.multiplayer.wizard_started = true;
-                        self.start_tailnet(tx, ctx);
-                    }
-                });
+                if ui
+                    .add_sized([160.0, 38.0], egui::Button::new("Connect"))
+                    .clicked()
+                {
+                    self.multiplayer.wizard_started = true;
+                    self.start_tailnet(tx, ctx);
+                }
             });
             return;
         }
-        let mut host = false;
+        let mut start_relay = false;
         let mut stop = false;
-        let mut join = false;
         let mut launch = false;
         let mut close_game = false;
         let is_admin = crate::spoofer::is_admin();
         let setup_in_progress = self.multiplayer.setup_progress.is_some();
         let tailnet_ready = self.multiplayer.tailnet_ip.is_some();
-        let wizard_ready = tailnet_ready && self.multiplayer.rl_open && self.multiplayer.launch_ready;
-
-        if self.multiplayer.mode == MultiplayerMode::Host
-            && self.multiplayer.saved_host.is_some()
-            && !self.multiplayer.saved_host_checked
-            && !self.multiplayer.saved_host_checking
-        {
-            self.multiplayer.saved_host_checking = true;
-            let pin = self.multiplayer.saved_host.as_ref().unwrap().pin.clone();
-            let tx = tx.clone();
-            let repaint = ctx.clone();
-            std::thread::spawn(move || {
-                let result = RoomClient::new(ROOM_API_BASE_URL).get_room(&pin);
-                let _ = tx.send(AppMsg::WorkshopHostSessionCheck { result });
-                repaint.request_repaint();
-            });
-        }
 
         if !is_admin {
             ui.colored_label(
@@ -951,58 +879,22 @@ impl WorkshopState {
             );
         }
         ui.horizontal(|ui| {
-            if self.multiplayer.hosted.is_none()
-                && self.multiplayer.joined.is_none()
-                && ui.button("Back").clicked()
-            {
+            if self.multiplayer.relay.is_none() && ui.button("Back").clicked() {
                 self.multiplayer.wizard_started = false;
                 return;
             }
-            ui.strong(match self.multiplayer.mode {
-                MultiplayerMode::Host => "Hosting a Workshop LAN match",
-                MultiplayerMode::Join => "Joining a Workshop LAN match",
-            });
+            ui.strong("Workshop Multiplayer");
         });
         ui.group(|ui| {
-            ui.strong("Workshop Multiplayer setup");
-            if self.multiplayer.saved_host_checking {
-                ui.small("Checking the previous hosting session...");
-            } else if let Some(saved) = &self.multiplayer.saved_host {
-                ui.small(format!(
-                    "Previous hosting PIN {} is still available.",
-                    saved.pin
-                ));
-            }
-            if self.multiplayer.mode == MultiplayerMode::Join {
-                ui.label("Step 1: Enter the host PIN.");
-                let response = ui.add(
-                    egui::TextEdit::singleline(&mut self.multiplayer.join_pin)
-                        .hint_text("Four-digit PIN")
-                        .desired_width(130.0),
-                );
-                if response.changed() {
-                    self.multiplayer
-                        .join_pin
-                        .retain(|character| character.is_ascii_digit());
-                    self.multiplayer.join_pin.truncate(4);
-                }
-            }
+            ui.strong("Setup");
             if !tailnet_ready {
                 ui.label("Connecting to the private Workshop network...");
             } else if !self.multiplayer.rl_open {
-                let pin_ready = self.multiplayer.mode != MultiplayerMode::Join
-                    || self.multiplayer.join_pin.len() == 4;
-                ui.label(match self.multiplayer.mode {
-                    MultiplayerMode::Host => "Step 1: Start Rocket League on the Workshop network.",
-                    MultiplayerMode::Join => "Step 2: Join and start Rocket League on the Workshop network.",
-                });
+                ui.label("Step 1: Start Rocket League on the Workshop network.");
                 if ui
                     .add_enabled(
-                        !setup_in_progress && is_admin && pin_ready,
-                        egui::Button::new(match self.multiplayer.mode {
-                            MultiplayerMode::Host => "Start Rocket League",
-                            MultiplayerMode::Join => "Join & start Rocket League",
-                        }),
+                        !setup_in_progress && is_admin,
+                        egui::Button::new("Start Rocket League"),
                     )
                     .clicked()
                 {
@@ -1010,14 +902,7 @@ impl WorkshopState {
                 }
             } else if !self.multiplayer.launch_ready {
                 if self.waiting_for_multihome_check() {
-                    ui.label(match self.multiplayer.mode {
-                        MultiplayerMode::Host => {
-                            "Step 1: Waiting for Rocket League to apply the Workshop address."
-                        }
-                        MultiplayerMode::Join => {
-                            "Step 2: Waiting for Rocket League to apply the Workshop address."
-                        }
-                    });
+                    ui.label("Step 1: Waiting for Rocket League to apply the Workshop address.");
                     ui.small("Checking the Rocket League launch command... ");
                 } else {
                     ui.label(
@@ -1030,115 +915,44 @@ impl WorkshopState {
                         close_game = true;
                     }
                 }
+            } else if self.multiplayer.relay.is_none() {
+                ui.label("Starting the Workshop relay...");
+                if !setup_in_progress {
+                    start_relay = true;
+                }
             } else {
-                ui.label("Rocket League is ready on the Workshop network.");
-                match self.multiplayer.mode {
-                    MultiplayerMode::Host => match &self.multiplayer.detected_map {
-                        Some(name) => {
-                            ui.label(format!("Step 2: Detected LAN Match on map {name}."));
-                            if self.multiplayer.hosted.is_none()
-                                && ui
-                                    .add_enabled(
-                                        !setup_in_progress,
-                                        egui::Button::new("Create PIN"),
-                                    )
-                                    .clicked()
-                            {
-                                host = true;
-                            }
-                        }
-                        None => {
-                            ui.label("Step 2: Waiting for LAN Match.");
-                        }
-                    },
-                    MultiplayerMode::Join => {
-                        if self.multiplayer.joined.is_none()
-                            && ui
-                                .add_enabled(
-                                    is_admin && !setup_in_progress,
-                                    egui::Button::new("Join by PIN"),
-                                )
-                                .clicked()
-                        {
-                            join = true;
-                        }
-                    }
+                ui.label(
+                    "Ready. Host or join from Rocket League's own LAN match screen \
+                     - make sure both sides have the same Workshop map installed.",
+                );
+                if let Some(name) = &self.multiplayer.detected_map {
+                    ui.small(format!("Detected LAN match on map {name}."));
                 }
             }
         });
-        ui.columns(2, |columns| {
-            if self.multiplayer.mode == MultiplayerMode::Host {
-                columns[0].group(|ui| {
-                    ui.heading("Host workshop map");
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.multiplayer.host_name)
-                            .hint_text("Host name"),
-                    );
-                    if let Some(session) = &self.multiplayer.hosted {
-                        ui.add_space(8.0);
-                        ui.strong(format!("Hosting PIN: {}", session.credentials.pin));
-                        ui.label("This session refreshes every five minutes.");
-                        ui.small(format!(
-                            "Tunnel: {} · sent {} · received {}",
-                            if session.stats.connected.load(Ordering::Relaxed) {
-                                "peer connected"
-                            } else {
-                                "waiting for peer"
-                            },
-                            session.stats.sent.load(Ordering::Relaxed),
-                            session.stats.received.load(Ordering::Relaxed),
-                        ));
-                        if let Ok(flow) = session.stats.last_beacon_relayed.lock() {
-                            if !flow.is_empty() {
-                                ui.small(format!("Latest: {flow}"));
-                            }
-                        }
-                        if ui.button("Stop hosting").clicked() {
-                            stop = true;
-                        }
+        if let Some(session) = &self.multiplayer.relay {
+            ui.group(|ui| {
+                ui.strong("Relaying to the Workshop network.");
+                ui.small(format!(
+                    "Tunnel: {} · sent {} · received {}",
+                    if session.stats.connected.load(Ordering::Relaxed) {
+                        "peer connected"
+                    } else {
+                        "waiting for peer"
+                    },
+                    session.stats.sent.load(Ordering::Relaxed),
+                    session.stats.received.load(Ordering::Relaxed),
+                ));
+                if let Ok(flow) = session.stats.last_beacon_relayed.lock() {
+                    if !flow.is_empty() {
+                        ui.small(format!("Latest: {flow}"));
                     }
-                });
-            }
-            if self.multiplayer.mode == MultiplayerMode::Join {
-                columns[0].group(|ui| {
-                    ui.heading("Join workshop map");
-                    if let Some(session) = &self.multiplayer.joined {
-                        let room = &session.joined.room;
-                        ui.add_space(8.0);
-                        ui.strong(&room.host_name);
-                        ui.label(format!("Map: {}", room.map.name));
-                        ui.label("Install the matching Workshop map before connecting.");
-                        ui.small(format!(
-                            "Tunnel: {} · sent {} · received {}",
-                            if session.stats.connected.load(Ordering::Relaxed) {
-                                "host connected"
-                            } else if session.stats.join_failed.load(Ordering::Relaxed) {
-                                "could not reach host"
-                            } else {
-                                "waiting for host"
-                            },
-                            session.stats.sent.load(Ordering::Relaxed),
-                            session.stats.received.load(Ordering::Relaxed),
-                        ));
-                        if let Ok(flow) = session.stats.last_beacon_relayed.lock() {
-                            if !flow.is_empty() {
-                                ui.small(format!("Latest: {flow}"));
-                            }
-                        }
-                        if ui.button("Leave").clicked() {
-                            if let Some(mut session) = self.multiplayer.joined.take() {
-                                let _ = session.leave();
-                            }
-                            self.multiplayer.pending_join = None;
-                            let _ = crate::winutil::clear_rocket_league_multihome();
-                            self.multiplayer.status = "Left session.".to_string();
-                        }
-                    } else if self.multiplayer.pending_join.is_none() {
-                        ui.small("Complete the setup steps above before joining.");
-                    }
-                });
-            }
-        });
+                }
+                if ui.button("Disconnect").clicked() {
+                    stop = true;
+                }
+            });
+        }
         ui.add_space(10.0);
         ui.label(&self.multiplayer.status);
         if let Some(progress) = &self.multiplayer.setup_progress {
@@ -1158,32 +972,22 @@ impl WorkshopState {
         }
 
         if stop {
-            if let Some(mut session) = self.multiplayer.hosted.take() {
+            if let Some(mut session) = self.multiplayer.relay.take() {
                 self.multiplayer.status = match session.stop() {
-                    Ok(()) => "Hosting stopped and session closed.".to_string(),
-                    Err(error) => format!(
-                        "Hosting stopped locally, but the API could not close the session: {error}"
-                    ),
+                    Ok(()) => "Disconnected.".to_string(),
+                    Err(error) => format!("Disconnected, but cleanup failed: {error}"),
                 };
             }
-            self.clear_host_state();
             let _ = crate::winutil::clear_rocket_league_multihome();
         }
-        if host {
+        if start_relay {
             if !is_admin {
-                self.multiplayer.status = "Run Hebnix as administrator before hosting.".to_string();
+                self.multiplayer.status =
+                    "Run Hebnix as administrator to start the relay.".to_string();
             } else {
-                self.start_hosting(rl_path, tx, ctx);
+                self.start_relay(rl_path, tx, ctx);
             }
         }
-        if join {
-            if !is_admin {
-                self.multiplayer.status = "Run Hebnix as administrator before joining.".to_string();
-            } else {
-                self.join_multiplayer(tx, ctx);
-            }
-        }
-        let _ = wizard_ready;
     }
 
     /// Spawns (or reuses) the tsnet sidecar and brings the tailnet up. This
@@ -1196,11 +1000,6 @@ impl WorkshopState {
         }
         self.multiplayer.tailnet_requested = true;
         self.multiplayer.status = "Setting up the private Workshop network...".to_string();
-        let role = match self.multiplayer.mode {
-            MultiplayerMode::Host => "host",
-            MultiplayerMode::Join => "guest",
-        }
-        .to_string();
         let tx = tx.clone();
         let repaint = ctx.clone();
         std::thread::spawn(move || {
@@ -1214,7 +1013,9 @@ impl WorkshopState {
                     .join("multiplayer-lan")
                     .join("tsnet-state");
                 let handle = TsnetSidecarHandle::spawn(exe_dir, &state_dir, tx.clone())?;
-                let key = RoomClient::new(TSNET_CONTROL_URL).request_tsnet_authkey(&role, "")?;
+                // "host"/"guest" no longer means anything to Hebnix's own
+                // relay (see hosting.rs) - every peer is the same
+                let key = RoomClient::new(TSNET_CONTROL_URL).request_tsnet_authkey("peer", "")?;
                 let token = multiplayer_client_token();
                 let hostname = format!("hebnix-{}", &token[..token.len().min(8)]);
                 handle.request_up(key.auth_key, hostname, key.control_url)?;
@@ -1258,20 +1059,6 @@ impl WorkshopState {
         tx: &Sender<AppMsg>,
         ctx: &eframe::egui::Context,
     ) {
-        let executable = match std::env::current_exe() {
-            Ok(path) => path,
-            Err(error) => {
-                self.multiplayer.status = format!("Could not locate Hebnix: {error}");
-                return;
-            }
-        };
-        let rocket_league = match rocket_league_executable(rl_path) {
-            Ok(path) => path,
-            Err(error) => {
-                self.multiplayer.status = error;
-                return;
-            }
-        };
         let Some(tailnet_ip) = self.multiplayer.tailnet_ip.clone() else {
             self.multiplayer.status = "The Workshop network is not ready yet.".to_string();
             return;
@@ -1281,31 +1068,14 @@ impl WorkshopState {
             Some("Starting Rocket League on the Workshop network...".to_string());
         let rl_path = rl_path.to_string();
         let rl_launch = self.rl_launch.clone();
-        let mode = self.multiplayer.mode;
-        let pin = self.multiplayer.join_pin.clone();
         let tx = tx.clone();
         let repaint = ctx.clone();
         std::thread::spawn(move || {
-            let result = (|| -> Result<Option<JoinedRoom>, String> {
-                let client = RoomClient::new(ROOM_API_BASE_URL);
-                let joined = if mode == MultiplayerMode::Join {
-                    let joined = client.join_room(&pin, &multiplayer_join_request())?;
-                    let identity =
-                        multiplayer_player_identity(multiplayer_client_token(), tailnet_ip.clone());
-                    let _ = client.update_player(&joined.room.pin, &identity);
-                    ensure_rocket_league_lan_rule(&rocket_league, &joined.room.endpoint.host)?;
-                    Some(joined)
-                } else {
-                    None
-                };
-                let _ = &executable;
-                crate::winutil::restart_rocket_league_multihome(
-                    &rl_launch,
-                    Path::new(&rl_path),
-                    &tailnet_ip,
-                )?;
-                Ok(joined)
-            })();
+            let result = crate::winutil::restart_rocket_league_multihome(
+                &rl_launch,
+                Path::new(&rl_path),
+                &tailnet_ip,
+            );
             let _ = tx.send(AppMsg::WorkshopMultiplayerLaunched { result });
             repaint.request_repaint();
         });
@@ -1315,11 +1085,10 @@ impl WorkshopState {
         self.multiplayer.setup_progress = Some(status);
     }
 
-    pub fn finish_multiplayer_launch(&mut self, result: Result<Option<JoinedRoom>, String>) {
+    pub fn finish_multiplayer_launch(&mut self, result: Result<(), String>) {
         self.multiplayer.setup_progress = None;
         match result {
-            Ok(joined) => {
-                self.multiplayer.pending_join = joined;
+            Ok(()) => {
                 self.multiplayer.status =
                     "Rocket League is starting on the Workshop network.".to_string();
             }
@@ -1330,50 +1099,11 @@ impl WorkshopState {
         }
     }
 
-    fn join_multiplayer(&mut self, tx: &Sender<AppMsg>, ctx: &eframe::egui::Context) {
-        let Some(joined) = self.multiplayer.pending_join.clone() else {
-            self.multiplayer.status = "Join & start Rocket League first.".to_string();
-            return;
-        };
-        let Some(sidecar) = self.multiplayer.sidecar.clone() else {
-            self.multiplayer.status = "The Workshop network is not ready.".to_string();
-            return;
-        };
-        self.multiplayer.setup_progress = Some("Joining the Workshop LAN session...".to_string());
-        let identity = multiplayer_join_request();
-        let tx = tx.clone();
-        let repaint = ctx.clone();
-        std::thread::spawn(move || {
-            let result = GuestSession::start(joined, identity, sidecar);
-            let _ = tx.send(AppMsg::WorkshopGuestJoined { result });
-            repaint.request_repaint();
-        });
-    }
-
-    fn start_hosting(&mut self, rl_path: &str, tx: &Sender<AppMsg>, ctx: &eframe::egui::Context) {
-        let Some(target) = self.multiplayer.detected_target.clone() else {
-            self.multiplayer.status =
-                "Start the LAN match first, then wait for Stats API to report its Workshop map."
-                    .to_string();
-            return;
-        };
-        let active = self.manager.active_maps();
-        let Some((_, map)) = active
-            .into_iter()
-            .find(|(active_target, _)| *active_target == target)
-        else {
-            self.multiplayer.status =
-                "The detected Workshop map is no longer installed.".to_string();
-            return;
-        };
-        let map_id = id_of(&map);
-        let hash = match self.map_hash(&map_id) {
-            Ok(hash) => hash,
-            Err(error) => {
-                self.multiplayer.status = error;
-                return;
-            }
-        };
+    /// starts the one relay every peer runs, regardless of whether this
+    /// machine ends up hosting or joining inside Rocket League - see
+    /// hosting.rs. Triggered automatically once Rocket League is up on the
+    /// Workshop network, not by a separate host/join button.
+    fn start_relay(&mut self, rl_path: &str, tx: &Sender<AppMsg>, ctx: &eframe::egui::Context) {
         let Some(tailnet_ip) = self.multiplayer.tailnet_ip.clone() else {
             self.multiplayer.status = "The Workshop network is not ready.".to_string();
             return;
@@ -1381,17 +1111,6 @@ impl WorkshopState {
         let Some(sidecar) = self.multiplayer.sidecar.clone() else {
             self.multiplayer.status = "The Workshop network is not ready.".to_string();
             return;
-        };
-        let request = CreateRoomRequest {
-            host_name: self.multiplayer.host_name.trim().to_string(),
-            port: RL_LAN_PORT,
-            map: MapDescriptor {
-                id: map_id.clone(),
-                name: str_of(&map, "name", &target).to_string(),
-                sha256: hash,
-                download_url: format!("https://api.hebnix.com/download/map/{map_id}"),
-            },
-            protocol_version: 2,
         };
         let executable = match std::env::current_exe() {
             Ok(path) => path,
@@ -1407,25 +1126,19 @@ impl WorkshopState {
                 return;
             }
         };
-        let previous_host = self.multiplayer.saved_host.clone();
-        self.multiplayer.setup_progress = Some("Creating Workshop LAN session...".to_string());
+        self.multiplayer.setup_progress = Some("Starting the Workshop LAN relay...".to_string());
         let tx = tx.clone();
         let repaint = ctx.clone();
         std::thread::spawn(move || {
             let result = (|| {
                 ensure_beacon_relay_rule(&executable)?;
-                // the exact guest tailnet address isn't known until they
-                // join, so this is scoped to headscale's default CGNAT
-                // range rather than a single IP -- narrow this once the
-                // room API can report joined players' addresses up front.
-                ensure_rocket_league_lan_rule(&rocket_league, "100.64.0.0/10")?;
-                let client = RoomClient::new(ROOM_API_BASE_URL);
-                if let Some(previous) = previous_host {
-                    let _ = client.close_room(&previous.pin, &previous.host_secret);
-                }
-                HostSession::start(client, request, sidecar, tailnet_ip)
+                // which peer(s) will actually connect isn't known up front
+                // any more (no room to report joined players' addresses),
+                // so this opens the whole tailnet range rather than one IP
+                ensure_rocket_league_lan_rule(&rocket_league, "10.242.77.0/24")?;
+                HostSession::start(sidecar, tailnet_ip, tx.clone())
             })();
-            let _ = tx.send(AppMsg::WorkshopHostStarted { result });
+            let _ = tx.send(AppMsg::WorkshopRelayStarted { result });
             repaint.request_repaint();
         });
     }
@@ -1484,31 +1197,12 @@ impl WorkshopState {
             && self.multiplayer.multihome_check_attempts < MULTIHOME_CHECK_MAX_ATTEMPTS
     }
 
-    pub fn update_workshop_map_from_stats(&mut self, arena: &str, tx: &Sender<AppMsg>) {
+    pub fn update_workshop_map_from_stats(&mut self, arena: &str, _tx: &Sender<AppMsg>) {
         if !self.multiplayer.wizard_started || arena.trim().is_empty() {
             return;
         }
-        if self.multiplayer.mode == MultiplayerMode::Join
-            && self.multiplayer.joined.is_some()
-            && !self.multiplayer.identity_updated
-            && !self.multiplayer.identity_update_in_flight
-        {
-            let session = self.multiplayer.joined.as_ref().unwrap();
-            let pin = session.joined.room.pin.clone();
-            let token = session.joined.leave_token.clone();
-            let tailnet_ip = self.multiplayer.tailnet_ip.clone().unwrap_or_default();
-            self.multiplayer.identity_update_in_flight = true;
-            let tx = tx.clone();
-            std::thread::spawn(move || {
-                let request = multiplayer_player_identity(token, tailnet_ip);
-                let result = RoomClient::new(ROOM_API_BASE_URL).update_player(&pin, &request);
-                let _ = tx.send(AppMsg::WorkshopPlayerUpdated { result });
-            });
-            return;
-        }
-        if self.multiplayer.mode != MultiplayerMode::Host {
-            return;
-        }
+        // informational only now (shown once the relay's up) - starting the
+        // relay itself no longer needs to know the map, host or guest
         let arena = arena.trim_end_matches(".upk");
         if let Some((target, map)) = self.manager.active_maps().into_iter().find(|(target, _)| {
             target_filename(target)
@@ -1520,33 +1214,17 @@ impl WorkshopState {
         }
     }
 
-    pub fn finish_hosting(&mut self, result: Result<HostSession, String>) {
-        self.multiplayer.setup_progress = None;
-        match result {
-            Ok(session) => {
-                self.multiplayer.status = format!("Hosting session {}.", session.credentials.pin);
-                self.multiplayer.saved_host = Some(SavedHost {
-                    pin: session.credentials.pin.clone(),
-                    host_secret: session.credentials.host_secret.clone(),
-                });
-                self.multiplayer.saved_host_checked = true;
-                self.save_host_state();
-                self.multiplayer.hosted = Some(session);
-            }
-            Err(error) => self.multiplayer.status = format!("Could not create session: {error}"),
-        }
-    }
-
-    pub fn finish_joining(&mut self, result: Result<GuestSession, String>) {
+    pub fn finish_relay_started(&mut self, result: Result<HostSession, String>) {
         self.multiplayer.setup_progress = None;
         match result {
             Ok(session) => {
                 self.multiplayer.identity_updated = false;
                 self.multiplayer.identity_update_in_flight = false;
-                self.multiplayer.status = format!("Joined session {}.", session.joined.room.pin);
-                self.multiplayer.joined = Some(session);
+                self.multiplayer.status =
+                    "Relaying - host or join from Rocket League's own LAN match screen.".to_string();
+                self.multiplayer.relay = Some(session);
             }
-            Err(error) => self.multiplayer.status = format!("Could not join session: {error}"),
+            Err(error) => self.multiplayer.status = format!("Could not start the relay: {error}"),
         }
     }
 
@@ -1790,8 +1468,7 @@ impl WorkshopState {
             // this is Hebnix's own close-then-relaunch, not a real exit
             return;
         }
-        let has_session = self.multiplayer.hosted.is_some() || self.multiplayer.joined.is_some();
-        if !has_session || self.multiplayer.shutdown_deadline.is_some() {
+        if self.multiplayer.relay.is_none() || self.multiplayer.shutdown_deadline.is_some() {
             return;
         }
         self.multiplayer.shutdown_deadline =
@@ -1815,10 +1492,7 @@ impl WorkshopState {
             return;
         }
         self.multiplayer.shutdown_deadline = None;
-        let hosted = self.multiplayer.hosted.take();
-        let joined = self.multiplayer.joined.take();
-        self.clear_host_state();
-        self.multiplayer.pending_join = None;
+        let relay = self.multiplayer.relay.take();
         self.multiplayer.status =
             "Workshop multiplayer stopped because Rocket League closed.".to_string();
 
@@ -1828,11 +1502,8 @@ impl WorkshopState {
         std::thread::Builder::new()
             .name("workshop-shutdown".into())
             .spawn(move || {
-                if let Some(mut session) = hosted {
+                if let Some(mut session) = relay {
                     let _ = session.stop();
-                }
-                if let Some(mut session) = joined {
-                    let _ = session.leave();
                 }
                 let _ = crate::winutil::clear_rocket_league_multihome();
                 let _ = crate::multiplayer_lan::cleanup_system_state();
@@ -1846,14 +1517,10 @@ impl WorkshopState {
     }
 
     pub fn suspend_multiplayer(&mut self) {
-        if let Some(session) = self.multiplayer.hosted.as_mut() {
+        if let Some(session) = self.multiplayer.relay.as_mut() {
             session.suspend();
         }
-        self.multiplayer.hosted = None;
-        if let Some(session) = self.multiplayer.joined.as_mut() {
-            session.stop();
-        }
-        self.multiplayer.joined = None;
+        self.multiplayer.relay = None;
         self.multiplayer.sidecar = None;
         if !hebnix_sdk::process::is_rocket_league_running() {
             let _ = crate::winutil::clear_rocket_league_multihome();

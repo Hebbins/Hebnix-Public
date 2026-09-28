@@ -52,3 +52,20 @@ that's easier.
   running headless/server-style instead.
 - Both were confirmed by directly tracing `tailscaled`'s own log output
   against a real self-hosted headscale test server before this rewrite.
+
+## Patched build (runs next to a normal Tailscale install)
+
+`tailscaled.exe` ignores `--socket` when it runs as a Windows service, and a
+stock build always uses the pipe `...\Administrators\Tailscale\tailscaled`,
+the adapter name `Tailscale` and one fixed adapter GUID. That collides with a
+normal Tailscale install. The binaries here are built from
+`tailscale.com` v1.102.4 with four small changes so they use their own names:
+
+- `paths/paths.go`: windows `DefaultTailscaledSocket()` pipe -> `...\Administrators\HebnixTailscale\tailscaled`
+- `net/tstun/tun_windows.go`: `WintunTunnelType` -> `HebnixTailscale`, and a different `WintunStaticRequestedGUID`
+- `cmd/tailscaled/tailscaled.go`: windows `defaultTunName()` -> `HebnixTailscale`
+- `cmd/tailscaled/tailscaled_windows.go`: `serviceName` -> `HebnixTailscale`
+
+To rebuild, copy the module out of the go mod cache, apply those four edits,
+add `replace tailscale.com => ./that-copy` to a copy of `go.mod`, and run the
+`go build` commands above. `tsnet_sidecar.rs` `SERVICE_PIPE` must match the pipe.

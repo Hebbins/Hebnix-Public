@@ -34,10 +34,11 @@ use crate::messages::AppMsg;
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 const SERVICE_NAME: &str = "HebnixTailscale";
-// tailscaled ignores --socket when it runs as a windows service and always
-// listens on the default pipe, so the cli has to talk to that one. this means
-// it can't run next to a normal tailscale install.
-const SERVICE_PIPE: &str = r"\\.\pipe\ProtectedPrefix\Administrators\Tailscale\tailscaled";
+// tailscaled ignores --socket when it runs as a windows service and uses its
+// built-in default pipe. the bundled tailscaled/tailscale are built with that
+// default (and the adapter name/guid) changed to HebnixTailscale, so this
+// matches it and doesn't collide with a normal tailscale install.
+const SERVICE_PIPE: &str = r"\\.\pipe\ProtectedPrefix\Administrators\HebnixTailscale\tailscaled";
 const SERVICE_START_TIMEOUT: Duration = Duration::from_secs(10);
 const PEER_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
@@ -94,6 +95,13 @@ struct RawPeer {
     host_name: String,
     #[serde(rename = "TailscaleIPs", default, deserialize_with = "null_as_default")]
     tailscale_ips: Vec<String>,
+    // confirmed live (2026-09-28): a peer's own `TailscaleIPs` here can be
+    // v6-only - `AllowedIPs` (CIDR routes, e.g. "10.242.77.2/32") is what
+    // actually has the v4 address reliably for every peer. `TailscaleIPs`
+    // still works fine for *self* (the node's own status always lists v4
+    // first there), just not for peers.
+    #[serde(rename = "AllowedIPs", default, deserialize_with = "null_as_default")]
+    allowed_ips: Vec<String>,
     #[serde(rename = "Online", default)]
     online: bool,
 }
@@ -154,6 +162,14 @@ impl TsnetSidecarHandle {
         Ok(())
     }
 
+    /// Blocking fetch of the current tailnet peer list, for a background
+    /// worker thread (e.g. the beacon relay) that needs a fresh list on its
+    /// own cadence rather than an async AppMsg round trip.
+    pub fn peers_now(&self) -> Result<Vec<PeerInfo>, String> {
+        let status = fetch_status(&self.tailscale_cli)?;
+        Ok(status.peer.into_values().map(peer_info).collect())
+    }
+
     pub fn request_status(&self) -> Result<(), String> {
         let cli = self.tailscale_cli.clone();
         let tx = self.tx.clone();
@@ -161,7 +177,7 @@ impl TsnetSidecarHandle {
             Ok(status) => {
                 let _ = tx.send(AppMsg::TsnetStatus {
                     state: TsState::parse(&status.backend_state),
-                    tailnet_ip: status.tailscale_ips.into_iter().next(),
+                    tailnet_ip: pick_ipv4(status.tailscale_ips),
                     peers: status.peer.into_values().map(peer_info).collect(),
                 });
             }
@@ -230,10 +246,36 @@ impl Drop for TsnetSidecarHandle {
 
 fn peer_info(peer: RawPeer) -> PeerInfo {
     PeerInfo {
-        tailnet_ip: peer.tailscale_ips.into_iter().next().unwrap_or_default(),
+        tailnet_ip: peer_ipv4(&peer.allowed_ips, peer.tailscale_ips).unwrap_or_default(),
         hostname: peer.host_name,
         online: peer.online,
     }
+}
+
+/// picks the v4 address out of a *node's own* `TailscaleIPs` - reliably v4
+/// first there (confirmed live). Not used for peers any more, see
+/// `peer_ipv4` below for why.
+fn pick_ipv4(ips: Vec<String>) -> Option<String> {
+    ips.iter()
+        .find(|ip| ip.parse::<std::net::Ipv4Addr>().is_ok())
+        .cloned()
+        .or_else(|| ips.into_iter().next())
+}
+
+/// A *peer's* `TailscaleIPs` field isn't reliable for this at all -
+/// confirmed live that it can be v6-only (`["fd7a:115c:a1e0::2"]`, no v4
+/// entry present whatsoever), even though the same peer's `AllowedIPs`
+/// always has the v4 route (`"10.242.77.2/32"`). So for peers, read the v4
+/// address out of `AllowedIPs` instead, and only fall back to
+/// `TailscaleIPs` if that's somehow also missing it.
+fn peer_ipv4(allowed_ips: &[String], tailscale_ips: Vec<String>) -> Option<String> {
+    allowed_ips
+        .iter()
+        .find_map(|route| {
+            let address = route.split('/').next().unwrap_or(route);
+            address.parse::<std::net::Ipv4Addr>().is_ok().then(|| address.to_string())
+        })
+        .or_else(|| pick_ipv4(tailscale_ips))
 }
 
 fn bring_up(cli: &Path, auth_key: &str, hostname: &str, control_url: &str) -> Result<String, String> {
@@ -250,14 +292,17 @@ fn bring_up(cli: &Path, auth_key: &str, hostname: &str, control_url: &str) -> Re
             // without --unattended the tailnet drops the instant this
             // process exits. See sidecar/README.md.
             "--unattended",
+            // this multiplayer network doesn't need MagicDNS (players use
+            // raw tailnet IPs), and letting tailscaled manage Windows DNS
+            // at all - even with magic_dns off server-side - is what wrote
+            // the stale DNS policy rule that broke DNS system-wide earlier
+            // (see dns_cleanup.rs). never let it touch DNS in the first place.
+            "--accept-dns=false",
             "--timeout=30s",
         ],
     )?;
     let status = fetch_status(cli)?;
-    status
-        .tailscale_ips
-        .into_iter()
-        .next()
+    pick_ipv4(status.tailscale_ips)
         .ok_or_else(|| "connected, but the multiplayer network did not assign an address".to_string())
 }
 
@@ -279,7 +324,7 @@ fn spawn_peer_poller(cli: PathBuf, tx: Sender<AppMsg>, stop: Arc<AtomicBool>) {
             };
             let mut seen = std::collections::HashSet::new();
             for peer in status.peer.into_values() {
-                let Some(ip) = peer.tailscale_ips.into_iter().next() else {
+                let Some(ip) = peer_ipv4(&peer.allowed_ips, peer.tailscale_ips) else {
                     continue;
                 };
                 seen.insert(ip.clone());

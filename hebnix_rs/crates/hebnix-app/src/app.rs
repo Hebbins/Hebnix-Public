@@ -25,7 +25,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.9";
+pub const APP_VERSION: &str = "2.1.12";
 
 pub const DEFAULT_WIDTH: f32 = 1250.0;
 pub const DEFAULT_HEIGHT: f32 = 700.0;
@@ -582,6 +582,24 @@ impl HebnixApp {
                 }
             })
             .ok();
+
+        // one-shot check for a stale Tailscale DNS policy rule left behind by
+        // a crashed/force-killed multiplayer session (see dns_cleanup.rs) --
+        // registry + a short socket probe, so it goes on its own thread
+        // rather than blocking startup.
+        {
+            let tx = tx.clone();
+            let ctx = cc.egui_ctx.clone();
+            std::thread::Builder::new()
+                .name("dns-policy-check".into())
+                .spawn(move || {
+                    crate::multiplayer_lan::clean_stale_nrpt_rule(|msg| {
+                        let _ = tx.send(AppMsg::Log(msg.to_string()));
+                        ctx.request_repaint();
+                    });
+                })
+                .ok();
+        }
 
         let stats = Arc::new(StatsClient::new("127.0.0.1", 49123));
         let (stats_tx, stats_rx) = crossbeam_channel::unbounded();
@@ -1358,6 +1376,16 @@ impl HebnixApp {
         self.monitor.stop();
         self.discord_presence.stop();
         self.tray = None;
+        // std::process::exit() terminates immediately without running Rust
+        // destructors, so `impl Drop for HebnixApp` (which would otherwise
+        // clean up the WinDivert capture handle and bring the tailnet down)
+        // never runs on this path. Windows does force-close the process's
+        // handles on exit regardless, but that's exactly what left the
+        // WinDivert driver in a corrupted, file-locked state before - it
+        // needs the cooperative shutdown (WinDivertShutdown then close) to
+        // unload cleanly, not just have its handle yanked. Do that
+        // explicitly here rather than relying on process teardown to do it.
+        self.workshop.suspend_multiplayer();
         std::process::exit(0);
     }
 
@@ -1702,11 +1730,8 @@ impl HebnixApp {
                 AppMsg::WorkshopMultiplayerLaunched { result } => {
                     self.workshop.finish_multiplayer_launch(result);
                 }
-                AppMsg::WorkshopHostStarted { result } => {
-                    self.workshop.finish_hosting(result);
-                }
-                AppMsg::WorkshopGuestJoined { result } => {
-                    self.workshop.finish_joining(result);
+                AppMsg::WorkshopRelayStarted { result } => {
+                    self.workshop.finish_relay_started(result);
                 }
                 AppMsg::WorkshopPlayerUpdated { result } => {
                     self.workshop.finish_player_update(result);
@@ -4308,6 +4333,7 @@ impl HebnixApp {
             self.save_config();
             if spoofer::spawn_elevated_relaunch() {
                 self.spoofer_mgr.shutdown();
+                self.workshop.suspend_multiplayer();
                 std::process::exit(0);
             }
             self.spoofer_master = false;
@@ -4353,6 +4379,7 @@ impl HebnixApp {
             self.colour_admin_prompt_open = false;
             if spoofer::spawn_elevated_relaunch() {
                 self.spoofer_mgr.shutdown();
+                self.workshop.suspend_multiplayer();
                 std::process::exit(0);
             }
             self.console

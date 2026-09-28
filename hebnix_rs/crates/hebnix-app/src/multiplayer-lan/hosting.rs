@@ -2,24 +2,23 @@ use std::net::SocketAddr;
 use std::sync::{
     Arc,
     atomic::Ordering,
-    mpsc::{self, Sender},
+    mpsc::{self, Sender as StdSender},
 };
 use std::thread::{self, JoinHandle};
 
+use crossbeam_channel::Sender;
+
+use crate::messages::AppMsg;
 use super::beacon::BeaconRelay;
-use super::{
-    CreateRoomRequest, PACKET_PUMP_INTERVAL, RoomClient, RoomCredentials, SESSION_HEARTBEAT_INTERVAL,
-    TsnetSidecarHandle, TunnelStats,
-};
+use super::{PACKET_PUMP_INTERVAL, PEER_REFRESH_INTERVAL, TsnetSidecarHandle, TunnelStats};
 
 pub struct HostSession {
-    pub credentials: RoomCredentials,
     pub stats: Arc<TunnelStats>,
-    client: RoomClient,
-    stop_sender: Sender<()>,
+    stop_sender: StdSender<()>,
     worker: Option<JoinHandle<()>>,
     // kept alive only so the tailnet connection stays up for as long as
-    // hosting does; nothing here reads from it directly
+    // hosting does; also polled by the worker thread below for the live
+    // peer list the relay sends to
     _sidecar: Arc<TsnetSidecarHandle>,
 }
 
@@ -33,70 +32,109 @@ impl std::fmt::Debug for HostSession {
 
 impl HostSession {
     /// `host_tailnet_ip` is this machine's own address on the tailnet
-    /// (learned from the sidecar before this is called); `request.port` is
-    /// only informational now (see models.rs::HostEndpoint) since guests no
-    /// longer connect to a Hebnix-owned tunnel port at all -- Rocket League
-    /// itself talks directly to peers once `-multihome` is set.
+    /// (learned from the sidecar before this is called). No room/PIN needed
+    /// any more -- the relay just forwards to every peer currently on the
+    /// tailnet (polled from the sidecar on the same cadence a room heartbeat
+    /// used to run on), and Rocket League's own native LAN browser plus its
+    /// own match password are what a guest actually uses to find and join.
     pub fn start(
-        client: RoomClient,
-        request: CreateRoomRequest,
         sidecar: Arc<TsnetSidecarHandle>,
         host_tailnet_ip: String,
+        tx: Sender<AppMsg>,
     ) -> Result<Self, String> {
         let host_octets = parse_ipv4(&host_tailnet_ip)?;
-        let relay = BeaconRelay::bind()?;
-        let (room, credentials) = client.create_room(&request)?;
+        let host_ip: std::net::IpAddr = host_tailnet_ip
+            .parse()
+            .map_err(|_| format!("invalid tailnet address: {host_tailnet_ip}"))?;
+        let relay = BeaconRelay::bind(host_ip)?;
         let stats = Arc::new(TunnelStats::default());
         let (stop_sender, stop_receiver) = mpsc::channel();
-        let refresh_client = client.clone();
-        let pin = credentials.pin.clone();
-        let host_secret = credentials.host_secret.clone();
         let worker_stats = stats.clone();
+        let worker_sidecar = sidecar.clone();
+        let _ = tx.send(AppMsg::Log(format!(
+            "[Core] Beacon relay bound to {host_ip}, watching UDP {:?}",
+            super::RL_DISCOVERY_PORTS
+        )));
         let worker = thread::spawn(move || {
-            let mut next_heartbeat = std::time::Instant::now() + SESSION_HEARTBEAT_INTERVAL;
-            // learned from the room's player list on each heartbeat; the
-            // host has no other way to find out a guest's tailnet address
-            let mut guest_addresses: Vec<SocketAddr> = Vec::new();
+            // refreshed from the tailnet's own peer list, not a room -
+            // relaying to everyone currently connected is the point. Just
+            // the IPs -- the destination port varies per packet, matching
+            // whichever discovery port it was captured on (see beacon.rs).
+            // Fetched once immediately rather than waiting for the first
+            // PEER_REFRESH_INTERVAL tick, so an already-connected peer isn't
+            // missed by beacons captured right at session start.
+            let mut guest_ips: Vec<std::net::IpAddr> = worker_sidecar
+                .peers_now()
+                .map(|peers| {
+                    peers
+                        .into_iter()
+                        .filter(|peer| peer.online)
+                        .filter_map(|peer| peer.tailnet_ip.parse().ok())
+                        .collect()
+                })
+                .unwrap_or_default();
+            worker_stats.connected.store(!guest_ips.is_empty(), Ordering::Relaxed);
+            let mut next_refresh = std::time::Instant::now() + PEER_REFRESH_INTERVAL;
             loop {
                 if stop_receiver.try_recv().is_ok() {
+                    // unblocks the beacon capture thread's WinDivert read
+                    // directly, without touching the WinDivert service - see
+                    // RawCapture's doc comment in beacon.rs
+                    relay.stop_capture();
                     break;
                 }
-                if let Some((payload, _source)) = relay.try_receive() {
+                if let Some((payload, source, port)) = relay.try_receive() {
+                    let _ = tx.send(AppMsg::Log(format!(
+                        "[Core] Beacon relay captured {} bytes on UDP {port} from {source} - {} known peer(s) to relay to",
+                        payload.len(),
+                        guest_ips.len()
+                    )));
                     let rewritten = rewrite_lan_beacon_payload(payload, host_octets);
-                    for &guest in &guest_addresses {
-                        if relay.send_to(&rewritten, guest).is_ok() {
-                            worker_stats.sent.fetch_add(1, Ordering::Relaxed);
-                            if let Ok(mut value) = worker_stats.last_beacon_relayed.lock() {
-                                *value = format!("beacon → {guest}");
+                    for &guest_ip in &guest_ips {
+                        // don't echo the beacon back to whoever it came from
+                        // -- WinDivert's sniff filter matches both directions
+                        // (ip.SrcAddr OR ip.DstAddr == this host), so a
+                        // packet this relay just *sent* to a peer shows up
+                        // again as a "captured" packet from that peer's
+                        // address once it lands on the wire, and would
+                        // otherwise get bounced straight back to them
+                        if guest_ip == source.ip() {
+                            continue;
+                        }
+                        let guest = SocketAddr::new(guest_ip, port);
+                        match relay.send_to(&rewritten, guest) {
+                            Ok(()) => {
+                                worker_stats.sent.fetch_add(1, Ordering::Relaxed);
+                                if let Ok(mut value) = worker_stats.last_beacon_relayed.lock() {
+                                    *value = format!("beacon → {guest}");
+                                }
+                            }
+                            Err(error) => {
+                                let _ = tx.send(AppMsg::Log(format!(
+                                    "[Core] Beacon relay failed to send to {guest}: {error}"
+                                )));
                             }
                         }
                     }
                 }
-                if std::time::Instant::now() >= next_heartbeat {
-                    if let Ok(room) = refresh_client.heartbeat(&pin, &host_secret) {
-                        guest_addresses = room
-                            .players
-                            .iter()
-                            .filter_map(|player| {
-                                format!("{}:{}", player.tailnet_ip, super::RL_LAN_PORT)
-                                    .parse()
-                                    .ok()
-                            })
+                if std::time::Instant::now() >= next_refresh {
+                    if let Ok(peers) = worker_sidecar.peers_now() {
+                        guest_ips = peers
+                            .into_iter()
+                            .filter(|peer| peer.online)
+                            .filter_map(|peer| peer.tailnet_ip.parse().ok())
                             .collect();
                         worker_stats
                             .connected
-                            .store(!guest_addresses.is_empty(), Ordering::Relaxed);
+                            .store(!guest_ips.is_empty(), Ordering::Relaxed);
                     }
-                    next_heartbeat += SESSION_HEARTBEAT_INTERVAL;
+                    next_refresh += PEER_REFRESH_INTERVAL;
                 }
                 thread::sleep(PACKET_PUMP_INTERVAL);
             }
         });
-        let _ = room; // room details already folded into `credentials`/heartbeat above
         Ok(Self {
-            credentials,
             stats,
-            client,
             stop_sender,
             worker: Some(worker),
             _sidecar: sidecar,
@@ -104,6 +142,17 @@ impl HostSession {
     }
 
     pub fn suspend(&mut self) {
+        // the worker thread calls relay.stop_capture() itself once it sees
+        // this, which cancels the beacon capture thread's blocked WinDivert
+        // read directly (see RawCapture in beacon.rs) and drops the handle,
+        // releasing the lock on WinDivert64.sys/WinDivert.dll so a later
+        // build can overwrite them. The WinDivert *service* itself is never
+        // stopped or uninstalled here any more - that used to be how the
+        // capture thread's read got unblocked (stopping the service
+        // cancelled the pending call as a side effect), but repeated
+        // start/stop cycles left it in a corrupted state (disabled, marked
+        // for deletion, stuck stop-pending). It's left alone now, same as
+        // HebnixTailscale is deliberately left running.
         let _ = self.stop_sender.send(());
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
@@ -112,8 +161,7 @@ impl HostSession {
 
     pub fn stop(&mut self) -> Result<(), String> {
         self.suspend();
-        self.client
-            .close_room(&self.credentials.pin, &self.credentials.host_secret)
+        Ok(())
     }
 }
 

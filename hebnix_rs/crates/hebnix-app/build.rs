@@ -188,6 +188,14 @@ fn copy_runtime_binaries() {
             "wintun.dll",
             "wintun.dll missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
         ),
+        (
+            "WinDivert.dll",
+            "WinDivert.dll missing from hebnix_rs/sidecar/ - the beacon capture (multiplayer-lan/beacon.rs) needs it next to the exe. Official release: https://github.com/basil00/WinDivert/releases",
+        ),
+        (
+            "WinDivert64.sys",
+            "WinDivert64.sys missing from hebnix_rs/sidecar/ - the signed driver WinDivert.dll loads, same source as WinDivert.dll above",
+        ),
     ] {
         copy_file(&sidecar_dir.join(file_name), &profile_dir, missing_hint);
     }

@@ -55,13 +55,12 @@ pub enum AppMsg {
     // result of launching Rocket League with the tailnet multihome address
     // (and, for a guest, joining the room first)
     WorkshopMultiplayerLaunched {
-        result: Result<Option<crate::multiplayer_lan::JoinedRoom>, String>,
+        result: Result<(), String>,
     },
-    WorkshopHostStarted {
+    // fires whether this peer ended up hosting or joining inside Rocket
+    // League - the relay itself doesn't care which, see hosting.rs
+    WorkshopRelayStarted {
         result: Result<crate::multiplayer_lan::HostSession, String>,
-    },
-    WorkshopGuestJoined {
-        result: Result<crate::multiplayer_lan::GuestSession, String>,
     },
     WorkshopPlayerUpdated {
         result: Result<(), String>,
