@@ -219,7 +219,7 @@ impl TsnetSidecarHandle {
         let start = std::time::Instant::now();
         while start.elapsed() < timeout {
             match query_state() {
-                Ok(state) if state.contains("RUNNING") => {}
+                Ok(state) if state_is_running(&state) => {}
                 _ => return true,
             }
             std::thread::sleep(Duration::from_millis(200));
@@ -366,7 +366,9 @@ fn ensure_service(tailscaled_exe: &Path, state_dir: &Path) -> Result<(), String>
         "DisplayName=",
         "Hebnix Tailscale",
     ]) {
-        if !error.contains("already exists") {
+        // sc.exe's message is translated on non-English Windows, but the
+        // error number (1073, service already exists) is always there
+        if !error.contains("1073") && !error.contains("already exists") {
             return Err(format!("could not install the multiplayer network service: {error}"));
         }
         // Already installed from a previous run -- keep its binPath current
@@ -374,7 +376,7 @@ fn ensure_service(tailscaled_exe: &Path, state_dir: &Path) -> Result<(), String>
         let _ = run_sc(&["config", SERVICE_NAME, "binPath=", &bin_path]);
     }
 
-    if !query_state()?.contains("RUNNING") {
+    if !state_is_running(&query_state()?) {
         run_sc(&["start", SERVICE_NAME])
             .map_err(|error| format!("could not start the multiplayer network service: {error}"))?;
         wait_for_running(SERVICE_START_TIMEOUT)
@@ -384,10 +386,34 @@ fn ensure_service(tailscaled_exe: &Path, state_dir: &Path) -> Result<(), String>
     Ok(())
 }
 
+/// the state number from `sc query` output (4 = running). the number is used
+/// rather than the word RUNNING, and the label in front of it is never
+/// looked at, so this works on any Windows display language.
+fn service_state_code(text: &str) -> Option<u8> {
+    text.lines().find_map(|line| {
+        let value = line.split_once(':')?.1.trim_start();
+        let digits: String = value.chars().take_while(char::is_ascii_digit).collect();
+        // the state is a single digit; the TYPE line above it is 10/20/...
+        // and the exit codes below it are 0 in a healthy service
+        if digits.len() == 1 {
+            digits.parse::<u8>().ok().filter(|code| (1..=7).contains(code))
+        } else {
+            None
+        }
+    })
+}
+
+fn state_is_running(text: &str) -> bool {
+    match service_state_code(text) {
+        Some(code) => code == 4,
+        None => text.contains("RUNNING"),
+    }
+}
+
 fn wait_for_running(timeout: Duration) -> Result<(), String> {
     let start = std::time::Instant::now();
     while start.elapsed() < timeout {
-        if query_state()?.contains("RUNNING") {
+        if state_is_running(&query_state()?) {
             return Ok(());
         }
         std::thread::sleep(Duration::from_millis(200));
@@ -454,6 +480,24 @@ fn run_tailscale(cli: &Path, args: &[&str]) -> Result<String, String> {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    const RUNNING: &str = "SERVICE_NAME: HebnixTailscale\n        TYPE               : 10  WIN32_OWN_PROCESS\n        STATE              : 4  RUNNING\n                                (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN)\n        WIN32_EXIT_CODE    : 0  (0x0)\n        SERVICE_EXIT_CODE  : 0  (0x0)\n";
+
+    #[test]
+    fn the_service_state_is_read_from_its_number() {
+        assert_eq!(service_state_code(RUNNING), Some(4));
+        assert!(state_is_running(RUNNING));
+        // translated labels and a stopped service
+        let spanish = RUNNING.replace("TYPE  ", "TIPO  ").replace("STATE ", "ESTADO");
+        assert!(state_is_running(&spanish));
+        let stopped = RUNNING.replace("4  RUNNING", "1  STOPPED");
+        assert_eq!(service_state_code(&stopped), Some(1));
+        assert!(!state_is_running(&stopped));
+        // a missing service prints an error, not a state
+        let missing = "[SC] EnumQueryServicesStatus:OpenService FAILED 1060:\n\nThe specified service does not exist.";
+        assert_eq!(service_state_code(missing), None);
+        assert!(!state_is_running(missing));
+    }
 
     #[test]
     fn status_json_with_null_peer_and_ips_parses() {
