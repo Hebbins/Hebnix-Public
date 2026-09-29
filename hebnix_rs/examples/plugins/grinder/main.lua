@@ -3,18 +3,10 @@ local plugin = {}
 local ENDPOINT = "https://req.hebnix.com/grinder"
 local MODES = { "2v2", "3v3", "rumble", "hoops", "snowday", "dropshot", "heatseeker" }
 local FILTER_MODES = { "All", "2v2", "3v3", "rumble", "hoops", "snowday", "dropshot", "heatseeker" }
-local MODE_PLAYLIST = { ["2v2"] = 11, ["3v3"] = 13, rumble = 28, hoops = 27, dropshot = 29, snowday = 30 }
+local MODE_PLAYLIST = { ["2v2"] = 11, ["3v3"] = 13, rumble = 28, hoops = 27, dropshot = 29, snowday = 30, heatseeker = 63 }
 local REGIONS = { "NA", "EU", "OCE", "SAM", "ME", "ASIA", "AF", "IN" }
 local FILTER_REGIONS = { "All", "NA", "EU", "OCE", "SAM", "ME", "ASIA", "AF", "IN" }
 local PLAT_LABEL = { steam = "Steam", epic = "Epic", unknown = "PC" }
-local DEMO = {
-    { display_name = "Zwapo", platform = "steam", mode = "2v2", region = "eu", rank_tier = 16, rank_div = 2, rank_mmr = 1180, note = "mic, chill" },
-    { display_name = "Nyx", platform = "epic", mode = "3v3", region = "na", rank_tier = 19, rank_div = 1, rank_mmr = 1420, note = "grinding to ssl" },
-    { display_name = "kai.rl", platform = "steam", mode = "2v2", region = "eu", rank_tier = 13, rank_div = 3, rank_mmr = 1015, note = "" },
-    { display_name = "Voltage", platform = "epic", mode = "hoops", region = "oce", rank_tier = 11, rank_div = 0, rank_mmr = 880, note = "just for fun" },
-    { display_name = "mochi", platform = "steam", mode = "rumble", region = "na", rank_tier = 8, rank_div = 1, rank_mmr = 640, note = "casual" },
-    { display_name = "Prime", platform = "epic", mode = "3v3", region = "eu", rank_tier = 22, rank_div = 0, rank_mmr = 1710, note = "lf duo" },
-}
 
 local S = {
     session_id = nil,
@@ -343,7 +335,6 @@ function plugin.on_window(ui)
     ui.combo_box("grinder_filter_region", "Region", FILTER_REGIONS)
     ui.combo_box("grinder_min_rank", "Min rank", opts)
     ui.combo_box("grinder_max_rank", "Max rank", opts)
-    ui.checkbox("grinder_demo", "Show demo players (preview only)")
 
     local sig = table.concat({
         tostring(hebnix.get_bool("grinder_available", false)),
@@ -371,9 +362,6 @@ function plugin.on_window(ui)
         myname_l = mn and mn:lower() or nil
     end
     local list = {}
-    if hebnix.get_bool("grinder_demo", false) then
-        for _, p in ipairs(DEMO) do list[#list + 1] = p end
-    end
     for _, p in ipairs(S.players) do
         if not (myname_l and tostring(p.display_name or ""):lower() == myname_l) then
             list[#list + 1] = p
