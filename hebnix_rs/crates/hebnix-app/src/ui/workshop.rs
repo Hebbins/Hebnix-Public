@@ -979,6 +979,20 @@ impl WorkshopState {
                 };
             }
             let _ = crate::winutil::clear_rocket_league_multihome();
+            // this used to only stop the relay/beacon capture and leave the
+            // tailnet connection itself running until the whole app closed
+            // (self.multiplayer.sidecar was only ever cleared from
+            // suspend_multiplayer, never here) -- so the tailscale virtual
+            // adapter stayed up for the rest of the Hebnix session after
+            // every disconnect, sitting alongside the real network adapter.
+            // Confirmed live this causes real, ongoing internet flakiness
+            // for other things (Rocket League's own EOS login kept dropping
+            // and retrying) even with no -multihome argument left pointing
+            // at it, purely from the extra adapter still being there.
+            // Dropping the sidecar here runs its Drop impl, which brings
+            // the tailnet down and stops the HebnixTailscale service.
+            self.multiplayer.sidecar = None;
+            let _ = crate::multiplayer_lan::cleanup_system_state();
         }
         if start_relay {
             if !is_admin {
