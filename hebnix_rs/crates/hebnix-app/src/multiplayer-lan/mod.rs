@@ -3,6 +3,7 @@ mod direct_udp;
 mod dns_cleanup;
 mod firewall;
 mod hosting;
+mod map_sync;
 mod models;
 mod room_api;
 mod tsnet_sidecar;
@@ -11,11 +12,18 @@ use std::time::Duration;
 
 pub use dns_cleanup::clean_stale_nrpt_rule;
 pub use direct_udp::TunnelStats;
-pub use firewall::{ensure_beacon_relay_rule, ensure_rocket_league_lan_rule, ensure_sidecar_rule};
+pub use firewall::{
+    ensure_beacon_relay_rule, ensure_map_sync_rule, ensure_rocket_league_lan_rule,
+    ensure_sidecar_rule,
+};
 // "host" and "join" only mean something inside Rocket League's own UI now -
 // every peer runs the same relay (see hosting.rs), so there's just the one
 // session type
 pub use hosting::HostSession;
+pub use map_sync::{
+    LocalInfo, MAP_SYNC_PORT, MAX_MAP_BYTES, MapFileProvider, MapProvider, SlotMap,
+    TransferProgress, fetch_map_file, hash_file, is_local_map_id, local_map_id, valid_map_id,
+};
 pub use models::{
     CreateRoomRequest, JoinRoomRequest, JoinedRoom, LeaveRoomRequest, MapDescriptor, Room,
     RoomCredentials, TsnetAuthKey, UpdatePlayerRequest,

@@ -7,6 +7,8 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const LAN_PORTS: &str = "7777-7778,14000-14010,14777";
 const DISCOVERY_PORTS: &str = "14000-14010,14777";
 const PROFILES: &str = "private,public";
+/// the whole tailnet, same range the Rocket League rule below is scoped to
+pub const TAILNET_SUBNET: &str = "10.242.77.0/24";
 
 /// Tailscale doesn't guarantee a fixed outbound port the way the old
 /// UPnP/STUN tunnel did, so this is scoped by executable (tailscaled.exe)
@@ -40,6 +42,35 @@ pub fn ensure_beacon_relay_rule(executable: &Path) -> Result<(), String> {
         None,
         None,
     )
+}
+
+/// lets peers reach Hebnix's map sync listener (see map_sync.rs) -- TCP,
+/// tailnet only
+pub fn ensure_map_sync_rule(executable: &Path) -> Result<(), String> {
+    let port = super::map_sync::MAP_SYNC_PORT;
+    let inbound = format!("{RULE_PREFIX} v3 map sync inbound TCP {port}");
+    ensure_rule(
+        &inbound,
+        "TCP",
+        executable,
+        "in",
+        Some(&format!("localport={port}")),
+        None,
+        Some(TAILNET_SUBNET),
+    )?;
+    if outbound_is_blocked()? {
+        let outbound = format!("{RULE_PREFIX} v3 map sync outbound TCP {port}");
+        ensure_rule(
+            &outbound,
+            "TCP",
+            executable,
+            "out",
+            Some(&format!("remoteport={port}")),
+            None,
+            Some(TAILNET_SUBNET),
+        )?;
+    }
+    Ok(())
 }
 
 pub fn ensure_rocket_league_lan_rule(executable: &Path, remote_ip: &str) -> Result<(), String> {
@@ -91,6 +122,18 @@ fn ensure_udp_rule(
     remote_port: Option<&str>,
     remote_ip: Option<&str>,
 ) -> Result<(), String> {
+    ensure_rule(name, "UDP", executable, direction, local_port, remote_port, remote_ip)
+}
+
+fn ensure_rule(
+    name: &str,
+    protocol: &str,
+    executable: &Path,
+    direction: &str,
+    local_port: Option<&str>,
+    remote_port: Option<&str>,
+    remote_ip: Option<&str>,
+) -> Result<(), String> {
     if rule_exists(name)? {
         return Ok(());
     }
@@ -105,7 +148,7 @@ fn ensure_udp_rule(
         format!("name={name}"),
         format!("dir={direction}"),
         "action=allow".to_string(),
-        "protocol=UDP".to_string(),
+        format!("protocol={protocol}"),
         format!("program={program}"),
         format!("profile={PROFILES}"),
         "enable=yes".to_string(),

@@ -2,9 +2,10 @@
 //! over the rocket labs placeholders.
 
 use std::collections::{HashMap, HashSet};
+use std::net::IpAddr;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -15,11 +16,19 @@ use sha2::{Digest, Sha256};
 
 use crate::messages::AppMsg;
 use crate::multiplayer_lan::{
-    HostSession, RL_LAN_PORT, RoomClient, TSNET_CONTROL_URL, TsnetSidecarHandle,
-    ensure_beacon_relay_rule, ensure_rocket_league_lan_rule, ensure_sidecar_rule,
+    HostSession, LocalInfo, MAP_SYNC_PORT, MAX_MAP_BYTES, MapFileProvider, MapProvider, RL_LAN_PORT,
+    RoomClient, SlotMap, TSNET_CONTROL_URL, TransferProgress, TsnetSidecarHandle,
+    ensure_beacon_relay_rule, ensure_map_sync_rule, ensure_rocket_league_lan_rule,
+    ensure_sidecar_rule, fetch_map_file, is_local_map_id, valid_map_id,
 };
 mod background_changer;
+mod local_import;
+mod steam_download;
 use background_changer::BackgroundChangerState;
+use steam_download::SteamDownloader;
+use local_import::{
+    ImportWizard, LocalMap, is_local_entry, load_local_maps, record_received_map, remove_local_map,
+};
 
 const MULTIHOME_CHECK_MAX_ATTEMPTS: u8 = 30;
 const MULTIHOME_CHECK_INTERVAL: Duration = Duration::from_secs(2);
@@ -109,6 +118,7 @@ fn rocket_league_multihome_address() -> Option<String> {
     })
 }
 
+pub const WORKSHOP_COLLECTION_URL: &str = "https://xplodingeggo.github.io/RLWorkshopCollection";
 pub const WORKSHOP_PLUGIN_ID: &str = "workshop_map_loader";
 pub const WORKSHOP_MODS_DIR_NAME: &str = "mods";
 pub const REMOTE_FILES_BASE: &str = "https://hebnix.com";
@@ -428,6 +438,7 @@ enum WorkshopView {
     Browse,
     BackgroundChanger,
     Multiplayer,
+    Import,
 }
 
 struct MultiplayerState {
@@ -446,6 +457,13 @@ struct MultiplayerState {
     saved_host_checking: bool,
     detected_target: Option<String>,
     detected_map: Option<String>,
+    /// set while a peer's map is being downloaded + installed in the background
+    map_install_busy: Arc<AtomicBool>,
+    map_install_result: Arc<Mutex<String>>,
+    /// progress of a map being downloaded from a peer
+    map_transfer: Arc<TransferProgress>,
+    /// maps received from a peer, waiting to be added to the catalog
+    received_maps: Arc<Mutex<Vec<LocalMap>>>,
 
     // tsnet sidecar / tailnet state
     sidecar: Option<Arc<TsnetSidecarHandle>>,
@@ -494,6 +512,10 @@ impl Default for MultiplayerState {
             saved_host_checking: false,
             detected_target: None,
             detected_map: None,
+            map_install_busy: Arc::new(AtomicBool::new(false)),
+            map_install_result: Arc::new(Mutex::new(String::new())),
+            map_transfer: Arc::new(TransferProgress::default()),
+            received_maps: Arc::new(Mutex::new(Vec::new())),
             sidecar: None,
             tailnet_requested: false,
             tailnet_ip: None,
@@ -523,6 +545,8 @@ pub struct WorkshopState {
     pub confirm_delete: Option<Value>,
     view: WorkshopView,
     background_changer: BackgroundChangerState,
+    import_wizard: ImportWizard,
+    steam_downloader: SteamDownloader,
     multiplayer: MultiplayerState,
     rl_launch: crate::config::RlLaunchCfg,
 }
@@ -551,6 +575,8 @@ impl WorkshopState {
             confirm_delete: None,
             view: WorkshopView::Browse,
             background_changer: BackgroundChangerState::default(),
+            import_wizard: ImportWizard::default(),
+            steam_downloader: SteamDownloader::default(),
             multiplayer,
             rl_launch: crate::config::RlLaunchCfg::default(),
         }
@@ -558,6 +584,35 @@ impl WorkshopState {
 
     pub fn finish_background_changer(&mut self, result: Result<String, String>) -> String {
         self.background_changer.finish(result)
+    }
+
+    /// installs a freshly fetched cdn catalog, keeping the maps the player
+    /// imported themselves
+    pub fn set_catalog(&mut self, items: Vec<Value>) {
+        self.catalog = items;
+        self.merge_local_maps();
+        self.execute_search(true);
+    }
+
+    /// adds imported maps missing from the catalog (also what keeps them
+    /// visible when the cdn can't be reached)
+    pub fn merge_local_maps(&mut self) {
+        let known: HashSet<String> = self.catalog.iter().map(id_of).collect();
+        let missing: Vec<Value> = load_local_maps(&self.manager.runtime_dir)
+            .iter()
+            .filter(|map| !known.contains(&map.id))
+            .map(LocalMap::to_catalog_entry)
+            .collect();
+        if !missing.is_empty() {
+            self.catalog.extend(missing);
+            self.execute_search(false);
+        }
+    }
+
+    fn add_local_map(&mut self, map: LocalMap) {
+        self.catalog.retain(|entry| id_of(entry) != map.id);
+        self.catalog.push(map.to_catalog_entry());
+        self.execute_search(false);
     }
 
     pub fn total_pages(&self) -> usize {
@@ -646,9 +701,30 @@ impl WorkshopState {
                 WorkshopView::BackgroundChanger,
                 "Background Changer",
             );
+            ui.selectable_value(&mut self.view, WorkshopView::Import, "Import Map");
             ui.selectable_value(&mut self.view, WorkshopView::Multiplayer, "Multiplayer");
         });
         ui.separator();
+        if self.view == WorkshopView::Import {
+            let imported =
+                self.import_wizard
+                    .render(ui, &self.manager.cache_dir, &self.manager.runtime_dir);
+            if let Some(map) = imported {
+                self.add_local_map(map);
+            }
+            ui.add_space(12.0);
+            ui.separator();
+            ui.add_space(8.0);
+            let downloaded = self.steam_downloader.render(
+                ui,
+                &self.manager.cache_dir,
+                &self.manager.runtime_dir,
+            );
+            if let Some(map) = downloaded {
+                self.add_local_map(map);
+            }
+            return;
+        }
         if self.view == WorkshopView::Multiplayer {
             self.render_multiplayer(ui, rl_path, tx, &ctx);
             return;
@@ -677,6 +753,16 @@ impl WorkshopState {
             {
                 self.execute_search(true);
             }
+            ui.menu_button("?", |ui| {
+                ui.set_max_width(280.0);
+                ui.label(
+                    "Can't find the map you want? To download a map from the Steam \
+                     Workshop, use this website, then add it with the Import Map tab:",
+                );
+                ui.hyperlink_to(WORKSHOP_COLLECTION_URL, WORKSHOP_COLLECTION_URL);
+            })
+            .response
+            .on_hover_text("Can't find a map?");
 
             ui.strong("Map To Replace:");
             let mut target_changed = false;
@@ -806,13 +892,34 @@ impl WorkshopState {
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ui.ctx(), |ui| {
-                    ui.label(format!(
-                        "Are you sure you want to delete '{name}' from your downloaded cache?"
-                    ));
+                    if is_local_entry(&map_data) {
+                        ui.label(format!(
+                            "Remove the imported map '{name}'? Its file and image are deleted, \
+                             and you'd have to import it again."
+                        ));
+                    } else {
+                        ui.label(format!(
+                            "Are you sure you want to delete '{name}' from your downloaded cache?"
+                        ));
+                    }
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
                         if ui.button("Yes").clicked() {
-                            let ok = self.manager.delete_from_cache(&id_of(&map_data));
+                            let id = id_of(&map_data);
+                            let ok = if is_local_entry(&map_data) {
+                                let removed = remove_local_map(
+                                    &self.manager.cache_dir,
+                                    &self.manager.runtime_dir,
+                                    &id,
+                                )
+                                .is_ok();
+                                if removed {
+                                    self.catalog.retain(|entry| id_of(entry) != id);
+                                }
+                                removed
+                            } else {
+                                self.manager.delete_from_cache(&id)
+                            };
                             if !ok {
                                 let _ = tx.send(AppMsg::Log(
                                     "[Workshop] Failed to delete file. Ensure the game is closed or the file isn't in use.".to_string(),
@@ -868,6 +975,7 @@ impl WorkshopState {
         let mut stop = false;
         let mut launch = false;
         let mut close_game = false;
+        let mut install_peer_map: Option<(SlotMap, IpAddr)> = None;
         let is_admin = crate::spoofer::is_admin();
         let setup_in_progress = self.multiplayer.setup_progress.is_some();
         let tailnet_ready = self.multiplayer.tailnet_ip.is_some();
@@ -930,6 +1038,18 @@ impl WorkshopState {
                 }
             }
         });
+        let received: Vec<LocalMap> = self
+            .multiplayer
+            .received_maps
+            .lock()
+            .map(|mut inbox| inbox.drain(..).collect())
+            .unwrap_or_default();
+        for map in received {
+            self.add_local_map(map);
+        }
+        if self.multiplayer.relay.is_some() {
+            self.render_maps_in_use(ui, &mut install_peer_map);
+        }
         if let Some(session) = &self.multiplayer.relay {
             ui.group(|ui| {
                 ui.strong("Relaying to the Workshop network.");
@@ -961,6 +1081,10 @@ impl WorkshopState {
 
         if launch {
             self.launch_multiplayer(rl_path, tx, ctx);
+        }
+
+        if let Some((map, peer)) = install_peer_map {
+            self.install_peer_map(map, peer, rl_path, ctx);
         }
 
         if close_game {
@@ -1141,18 +1265,262 @@ impl WorkshopState {
             }
         };
         self.multiplayer.setup_progress = Some("Starting the Workshop LAN relay...".to_string());
+        let manager = self.manager.clone();
+        // the in-game name comes from Rocket League's launch log and doesn't
+        // change mid-session, so it's only looked up until one is found
+        let player_name = Arc::new(Mutex::new(String::new()));
+        let map_provider: MapProvider = Arc::new(move || {
+            let mut name = player_name.lock().unwrap();
+            if name.is_empty() {
+                *name = hebnix_sdk::log::parse_launch_log(None, false, "INT")
+                    .session
+                    .username
+                    .unwrap_or_default();
+            }
+            LocalInfo {
+                player_name: name.clone(),
+                maps: manager
+                    .active_maps()
+                    .iter()
+                    .filter_map(|(slot, data)| {
+                        let id = id_of(data);
+                        valid_map_id(&id).then(|| SlotMap {
+                            slot: slot.clone(),
+                            name: str_of(data, "name", slot).to_string(),
+                            local: is_local_map_id(&id),
+                            author: str_of(data, "author", "").to_string(),
+                            description: str_of(data, "short_description", "").to_string(),
+                            id,
+                        })
+                    })
+                    .collect(),
+            }
+        });
+        // peers can only ever fetch maps this player imported themselves
+        let cache_dir = self.manager.cache_dir.clone();
+        let map_files: MapFileProvider = Arc::new(move |id| {
+            if !is_local_map_id(id) {
+                return None;
+            }
+            let path = cache_dir.join(format!("{id}.upk"));
+            path.is_file().then_some(path)
+        });
         let tx = tx.clone();
         let repaint = ctx.clone();
         std::thread::spawn(move || {
             let result = (|| {
                 ensure_beacon_relay_rule(&executable)?;
+                ensure_map_sync_rule(&executable)?;
                 // which peer(s) will actually connect isn't known up front
                 // any more (no room to report joined players' addresses),
                 // so this opens the whole tailnet range rather than one IP
                 ensure_rocket_league_lan_rule(&rocket_league, "10.242.77.0/24")?;
-                HostSession::start(sidecar, tailnet_ip, tx.clone())
+                HostSession::start(sidecar, tailnet_ip, map_provider, map_files, tx.clone())
             })();
             let _ = tx.send(AppMsg::WorkshopRelayStarted { result });
+            repaint.request_repaint();
+        });
+    }
+
+    /// who replaced which in-game map with what, next to what you have in
+    /// the same slot. every player has to replace the same in-game map, so
+    /// this flags a peer's map that sits in a different slot on your side.
+    fn render_maps_in_use(&self, ui: &mut egui::Ui, install: &mut Option<(SlotMap, IpAddr)>) {
+        let Some(session) = &self.multiplayer.relay else {
+            return;
+        };
+        let mine = self.manager.active_maps();
+        let offers = session.peer_offers();
+        let busy = self.multiplayer.map_install_busy.load(Ordering::Relaxed);
+        let ok = egui::Color32::LIGHT_GREEN;
+        let warn = egui::Color32::from_rgb(0xf3, 0x9c, 0x12);
+        ui.group(|ui| {
+            ui.strong("Maps in use");
+            ui.small(
+                "Everyone has to replace the same in-game map. If a player replaced \
+                 Utopia Retro, you need Utopia Retro replaced with the same map too, \
+                 not a different one.",
+            );
+            ui.add_space(4.0);
+            ui.label(egui::RichText::new("You").strong());
+            if mine.is_empty() {
+                ui.small("  You haven't replaced any map yet.");
+            }
+            for (slot, data) in &mine {
+                let id = id_of(data);
+                let name = str_of(data, "name", slot);
+                let mut problems = Vec::new();
+                for offer in &offers {
+                    match offer.maps.iter().find(|m| m.slot == *slot) {
+                        Some(theirs) if theirs.id == id => {}
+                        Some(theirs) => {
+                            problems.push(format!("{} has {} here", offer.label(), theirs.name))
+                        }
+                        None => match offer.maps.iter().find(|m| m.id == id) {
+                            Some(elsewhere) => problems.push(format!(
+                                "{} put it in {} instead",
+                                offer.label(),
+                                elsewhere.slot
+                            )),
+                            None => problems.push(format!("{} hasn't replaced it", offer.label())),
+                        },
+                    }
+                }
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(format!("  {slot}: {name}"));
+                    if offers.is_empty() {
+                        return;
+                    }
+                    if problems.is_empty() {
+                        ui.colored_label(ok, "everyone has it");
+                    } else {
+                        ui.colored_label(warn, problems.join("; "));
+                    }
+                });
+            }
+            ui.add_space(6.0);
+            if offers.is_empty() {
+                ui.small("No other players found yet.");
+            }
+            for offer in &offers {
+                ui.label(egui::RichText::new(offer.label()).strong());
+                if offer.maps.is_empty() {
+                    ui.small("  hasn't replaced any map.");
+                }
+                for map in &offer.maps {
+                    if target_filename(&map.slot).is_none() {
+                        continue;
+                    }
+                    let have = mine.get(&map.slot);
+                    let same = have.is_some_and(|m| id_of(m) == map.id);
+                    let elsewhere = mine
+                        .iter()
+                        .find(|(slot, m)| **slot != map.slot && id_of(m) == map.id)
+                        .map(|(slot, _)| slot.clone());
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(format!("  {}: {}", map.slot, map.name));
+                        if map.local {
+                            ui.small("(imported, not on the Workshop)");
+                        }
+                        if same {
+                            ui.colored_label(ok, "you have it");
+                            return;
+                        }
+                        let note = match (&elsewhere, have) {
+                            (Some(slot), _) => format!(
+                                "you put this map in {slot}, replace {} instead",
+                                map.slot
+                            ),
+                            (None, Some(m)) => format!(
+                                "you have {} in {}",
+                                str_of(m, "name", "another map"),
+                                map.slot
+                            ),
+                            (None, None) => format!("you haven't replaced {}", map.slot),
+                        };
+                        ui.colored_label(warn, note);
+                        let label = format!("Install to {}", map.slot);
+                        if ui.add_enabled(!busy, egui::Button::new(label)).clicked() {
+                            *install = Some((map.clone(), offer.ip));
+                        }
+                    });
+                }
+            }
+            let transfer = &self.multiplayer.map_transfer;
+            let total = transfer.total.load(Ordering::Relaxed);
+            if busy && total > 0 {
+                let done = transfer.done.load(Ordering::Relaxed);
+                ui.add(
+                    egui::ProgressBar::new(done as f32 / total as f32).text(format!(
+                        "Downloading from a player: {} / {} MB",
+                        done / 1_000_000,
+                        total / 1_000_000
+                    )),
+                );
+            } else if busy {
+                ui.small("Installing the map...");
+            } else if let Ok(result) = self.multiplayer.map_install_result.lock() {
+                if !result.is_empty() {
+                    ui.small(result.as_str());
+                }
+            }
+        });
+    }
+
+    /// installs a map a peer has into the same slot. cdn maps are downloaded
+    /// from the cdn; maps the peer imported themselves (not on the cdn) are
+    /// fetched from that peer and checked against their id first. the id was
+    /// validated when it came off the wire (see map_sync.rs).
+    fn install_peer_map(
+        &mut self,
+        map: SlotMap,
+        peer: IpAddr,
+        rl_path: &str,
+        ctx: &eframe::egui::Context,
+    ) {
+        if self.multiplayer.map_install_busy.swap(true, Ordering::Relaxed) {
+            return;
+        }
+        let map_data = self
+            .catalog
+            .iter()
+            .find(|entry| id_of(entry) == map.id)
+            .cloned()
+            .unwrap_or_else(|| {
+                serde_json::json!({
+                    "id": map.id,
+                    "name": map.name,
+                    "author": if map.author.is_empty() { "Unknown" } else { map.author.as_str() },
+                    "short_description": map.description,
+                    "local": map.local,
+                })
+            });
+        let manager = self.manager.clone();
+        let busy = self.multiplayer.map_install_busy.clone();
+        let result = self.multiplayer.map_install_result.clone();
+        let transfer = self.multiplayer.map_transfer.clone();
+        let received = self.multiplayer.received_maps.clone();
+        transfer.done.store(0, Ordering::Relaxed);
+        transfer.total.store(0, Ordering::Relaxed);
+        let rl_path = rl_path.to_string();
+        let repaint = ctx.clone();
+        std::thread::spawn(move || {
+            let outcome = (|| {
+                if map.local && !manager.is_cached(&map.id) {
+                    fetch_map_file(
+                        peer,
+                        MAP_SYNC_PORT,
+                        &map.id,
+                        &manager.cache_dir.join(format!("{}.upk", map.id)),
+                        MAX_MAP_BYTES,
+                        &transfer,
+                    )?;
+                    let entry = LocalMap {
+                        id: map.id.clone(),
+                        name: map.name.clone(),
+                        author: if map.author.is_empty() {
+                            "Unknown".to_string()
+                        } else {
+                            map.author.clone()
+                        },
+                        description: map.description.clone(),
+                        banner_path: String::new(),
+                    };
+                    record_received_map(&manager.runtime_dir, &entry)?;
+                    if let Ok(mut inbox) = received.lock() {
+                        inbox.push(entry);
+                    }
+                }
+                manager.install_map(&map_data, &map.slot, &rl_path)
+            })();
+            let text = match outcome {
+                Ok(()) => format!("Installed {} in {}.", map.name, map.slot),
+                Err(error) => format!("Could not install {}: {error}", map.name),
+            };
+            if let Ok(mut slot) = result.lock() {
+                *slot = text;
+            }
+            busy.store(false, Ordering::Relaxed);
             repaint.request_repaint();
         });
     }
@@ -1313,6 +1681,11 @@ impl WorkshopState {
         let map_data = &self.catalog[map_idx];
         let map_id = id_of(map_data);
         let mut name = str_of(map_data, "name", "Unknown").to_string();
+        // full name + description show when hovering the title
+        let hover = match str_of(map_data, "short_description", "") {
+            "" => name.clone(),
+            description => format!("{name}\n\n{description}"),
+        };
         if name.chars().count() > 28 {
             name = format!("{}...", name.chars().take(25).collect::<String>());
         }
@@ -1353,7 +1726,7 @@ impl WorkshopState {
                     }
                 }
 
-                ui.strong(name);
+                ui.strong(name).on_hover_text(hover);
                 ui.label(
                     egui::RichText::new(format!("by {author}"))
                         .italics()
@@ -1363,6 +1736,8 @@ impl WorkshopState {
 
                 let status = if !active_targets.is_empty() {
                     format!("🟢 Active on: {}", active_targets.join(", "))
+                } else if is_local_entry(map_data) {
+                    "📁 Imported".to_string()
                 } else if is_cached {
                     "📦 Cached".to_string()
                 } else {

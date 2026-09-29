@@ -1706,13 +1706,13 @@ impl HebnixApp {
                 }
                 AppMsg::WorkshopCatalog(result) => match result {
                     Ok(items) => {
-                        self.workshop.catalog = items;
-                        self.workshop.execute_search(true);
+                        self.workshop.set_catalog(items);
                         if self.workshop.valid.is_empty() {
                             self.workshop.catalog_status = "No maps found.".to_string();
                         }
                     }
                     Err(e) => {
+                        self.workshop.merge_local_maps();
                         self.workshop.catalog_status = "Failed to load maps.".to_string();
                         self.console
                             .write(format!("[Core] Failed to fetch maps: {e}"));

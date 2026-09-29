@@ -10,6 +10,7 @@ use crossbeam_channel::Sender;
 
 use crate::messages::AppMsg;
 use super::beacon::BeaconRelay;
+use super::map_sync::{MapFileProvider, MapProvider, MapSync, PeerOffer};
 use super::{PACKET_PUMP_INTERVAL, PEER_REFRESH_INTERVAL, TsnetSidecarHandle, TunnelStats};
 
 pub struct HostSession {
@@ -20,6 +21,8 @@ pub struct HostSession {
     // hosting does; also polled by the worker thread below for the live
     // peer list the relay sends to
     _sidecar: Arc<TsnetSidecarHandle>,
+    // None if its port couldn't be bound; the relay works without it
+    map_sync: Option<MapSync>,
 }
 
 impl std::fmt::Debug for HostSession {
@@ -40,6 +43,8 @@ impl HostSession {
     pub fn start(
         sidecar: Arc<TsnetSidecarHandle>,
         host_tailnet_ip: String,
+        map_provider: MapProvider,
+        map_files: MapFileProvider,
         tx: Sender<AppMsg>,
     ) -> Result<Self, String> {
         let host_octets = parse_ipv4(&host_tailnet_ip)?;
@@ -47,6 +52,13 @@ impl HostSession {
             .parse()
             .map_err(|_| format!("invalid tailnet address: {host_tailnet_ip}"))?;
         let relay = BeaconRelay::bind(host_ip)?;
+        let map_sync = match MapSync::start(sidecar.clone(), host_ip, map_provider, map_files) {
+            Ok(sync) => Some(sync),
+            Err(error) => {
+                let _ = tx.send(AppMsg::Log(format!("[Core] Map sync unavailable: {error}")));
+                None
+            }
+        };
         let stats = Arc::new(TunnelStats::default());
         let (stop_sender, stop_receiver) = mpsc::channel();
         let worker_stats = stats.clone();
@@ -138,7 +150,13 @@ impl HostSession {
             stop_sender,
             worker: Some(worker),
             _sidecar: sidecar,
+            map_sync,
         })
+    }
+
+    /// workshop maps online peers say they have installed
+    pub fn peer_offers(&self) -> Vec<PeerOffer> {
+        self.map_sync.as_ref().map(MapSync::offers).unwrap_or_default()
     }
 
     pub fn suspend(&mut self) {
