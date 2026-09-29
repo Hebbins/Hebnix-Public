@@ -300,7 +300,28 @@ pub fn kill_rocket_league() -> std::io::Result<()> {
         .args(["/F", "/IM", "RocketLeague.exe"])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
-        .map(|_| ())
+        .and_then(|output| {
+            if output.status.success() || !hebnix_sdk::process::is_rocket_league_running() {
+                Ok(())
+            } else {
+                Err(std::io::Error::other(
+                    String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+                ))
+            }
+        })
+}
+
+pub fn clear_rocket_league_web_cache() -> std::io::Result<()> {
+    let user_profile = std::env::var_os("USERPROFILE").ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "USERPROFILE is not set")
+    })?;
+    let web_cache = std::path::PathBuf::from(user_profile)
+        .join(r"Documents\My Games\Rocket League\TAGame\Cache\WebCache");
+    match std::fs::remove_dir_all(web_cache) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 
 pub fn set_startup_enabled(enabled: bool) -> std::io::Result<()> {

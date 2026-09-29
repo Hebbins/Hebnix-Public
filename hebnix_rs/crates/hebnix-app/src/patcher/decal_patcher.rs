@@ -694,6 +694,44 @@ fn match_texture_export<'a>(
     }
 
     let is_skin_variant = field_key.contains("skin") || field_key.contains("esport");
+    if skin_specific_upk && is_skin_variant {
+        if field_key.contains("diffuse") && !field_key.contains("mask") {
+            // Body_*_D is the car's base paint in many decal packages. Patching
+            // it reports success while leaving the equipped decal unchanged.
+            // A full-colour carrier must have its own skin texture.
+            let skin_textures: Vec<&TextureExport> = textures
+                .iter()
+                .filter(|texture| {
+                    let name = texture.export_name.to_ascii_lowercase();
+                    (name.starts_with("skin_")
+                        || name.contains("_skin_")
+                        || name.ends_with("_basecolor"))
+                        && !is_non_diffuse_export(&name)
+                        && !exclude.is_some_and(|x| texture.export_name.eq_ignore_ascii_case(x))
+                })
+                .collect();
+            return skin_textures
+                .iter()
+                .copied()
+                .find(|texture| {
+                    let name = texture.export_name.to_ascii_lowercase();
+                    name.ends_with("_d")
+                        || name.contains("_diffuse")
+                        || name.ends_with("_basecolor")
+                })
+                .or_else(|| (skin_textures.len() == 1).then(|| skin_textures[0]));
+        }
+        if field_key.contains("mask") {
+            if let Some(texture) = textures.iter().find(|texture| {
+                let name = texture.export_name.to_ascii_lowercase();
+                name.ends_with("_rgb")
+                    && !name.contains("blankskin")
+                    && !exclude.is_some_and(|x| texture.export_name.eq_ignore_ascii_case(x))
+            }) {
+                return Some(texture);
+            }
+        }
+    }
     let mut candidates: Vec<&TextureExport> = Vec::new();
 
     // C# builds a de-duplicated candidate list in keyword order.
@@ -1653,35 +1691,8 @@ fn restore_package_texture_regions(
                 .map_err(|error| format!("Failed to restore {}: {error}", tfc_path.display()))?;
         }
     }
-    if let Ok(entries) = fs::read_dir(backup_dir) {
-        for entry in entries.filter_map(Result::ok) {
-            let path = entry.path();
-            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-                continue;
-            };
-            let Some(tfc_stem) = name.strip_suffix("_APPENDLEN.txt") else {
-                continue;
-            };
-            let Ok(length) = fs::read_to_string(&path).and_then(|value| {
-                value
-                    .trim()
-                    .parse::<u64>()
-                    .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
-            }) else {
-                continue;
-            };
-            let tfc_path = game_dir.join(format!("{tfc_stem}.tfc"));
-            if tfc_path.is_file() {
-                fs::OpenOptions::new()
-                    .write(true)
-                    .open(&tfc_path)
-                    .and_then(|file| file.set_len(length))
-                    .map_err(|error| {
-                        format!("Failed to restore {}: {error}", tfc_path.display())
-                    })?;
-            }
-        }
-    }
+    // Keep appended TFC chunks until Restore All: other active packages may
+    // still point to data appended after this package was patched.
     fs::copy(&package_backup, game_dir.join(package_name))
         .map_err(|error| format!("Failed to restore {package_name}: {error}"))?;
     Ok(())
@@ -2179,16 +2190,41 @@ fn patch_decal_on_skin(
                     if side * side != mip.disk_size {
                         continue;
                     }
-                    let block_count = mip.disk_size.div_ceil(131_072);
-                    let Some(available) = mip.memory_size.checked_sub(16 + block_count * 8) else {
-                        continue;
-                    };
                     let mut black = vec![0u8; mip.disk_size];
                     for block in black.chunks_exact_mut(BLACK_DXT5_BLOCK.len()) {
                         block.copy_from_slice(&BLACK_DXT5_BLOCK);
                     }
-                    if let Ok(chunk) = build_tfc_chunk(&black, Some(available)) {
-                        write_tfc_region(&tfc_path, backup_dir, mip.tfc_offset, &chunk)?;
+                    if force_append {
+                        let chunk = build_tfc_chunk(&black, None)?;
+                        let new_offset = append_tfc_chunk(&tfc_path, backup_dir, &chunk)?;
+                        if mip.legacy_offset {
+                            let value = u32::try_from(new_offset)
+                                .map_err(|_| "TFC file exceeds legacy 32-bit offsets")?;
+                            package.logical_data[mip.offset_field..mip.offset_field + 4]
+                                .copy_from_slice(&value.to_le_bytes());
+                            package.mark_modified_range(mip.offset_field, mip.offset_field + 4)?;
+                        } else {
+                            package.logical_data[mip.offset_field..mip.offset_field + 8]
+                                .copy_from_slice(&(new_offset as i64).to_le_bytes());
+                            package.mark_modified_range(mip.offset_field, mip.offset_field + 8)?;
+                        }
+                        let chunk_len =
+                            i32::try_from(chunk.len()).map_err(|_| "TFC chunk is too large")?;
+                        package.logical_data[mip.memory_size_field..mip.memory_size_field + 4]
+                            .copy_from_slice(&chunk_len.to_le_bytes());
+                        package.mark_modified_range(
+                            mip.memory_size_field,
+                            mip.memory_size_field + 4,
+                        )?;
+                    } else {
+                        let block_count = mip.disk_size.div_ceil(131_072);
+                        let Some(available) = mip.memory_size.checked_sub(16 + block_count * 8)
+                        else {
+                            continue;
+                        };
+                        if let Ok(chunk) = build_tfc_chunk(&black, Some(available)) {
+                            write_tfc_region(&tfc_path, backup_dir, mip.tfc_offset, &chunk)?;
+                        }
                     }
                 }
             }
@@ -2530,21 +2566,6 @@ impl DecalPatcherState {
                             .and_then(|v| v.as_i64())
                             .unwrap_or(0) as i32;
 
-                        let skin_id = pack_data
-                            .get("SkinID")
-                            .or(pack_data.get("skin_id"))
-                            .and_then(|v| v.as_i64())
-                            .map(|v| v as i32);
-
-                        let target_upk = pack_data
-                            .get("TargetUpk")
-                            .or(pack_data.get("target_upk"))
-                            .or(pack_data.get("upk_path"))
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string());
-
-                        let (car_name, skin_name) = self.resolve_display_names(body_id, skin_id);
-
                         let mut fields = HashMap::new();
                         let mut preview_image = None;
 
@@ -2569,13 +2590,7 @@ impl DecalPatcherState {
                         }
 
                         if !fields.is_empty() {
-                            let display_name = if let Some(skin) = skin_name.as_ref() {
-                                format!("{} · {}", car_name, skin)
-                            } else if let Some(upk) = target_upk.as_ref() {
-                                format!("{} · {}", car_name, upk)
-                            } else {
-                                format!("{} · {}", car_name, pack_name)
-                            };
+                            let display_name = pack_name.to_string();
 
                             self.decals.push(DecalItem {
                                 name: display_name,
@@ -2589,16 +2604,6 @@ impl DecalPatcherState {
                 }
             }
         }
-    }
-
-    fn resolve_display_names(
-        &self,
-        body_id: i32,
-        skin_id: Option<i32>,
-    ) -> (String, Option<String>) {
-        let car_name = self.lookup_body_name(body_id);
-        let skin_name = skin_id.and_then(|id| self.lookup_skin_name(id));
-        (car_name, skin_name)
     }
 
     fn lookup_body_name(&self, body_id: i32) -> String {
@@ -2653,31 +2658,6 @@ impl DecalPatcherState {
         self.bodies_catalog.clone()
     }
 
-    fn lookup_skin_name(&self, skin_id: i32) -> Option<String> {
-        if let Some(cars) = self
-            .skins_catalog
-            .as_ref()
-            .and_then(|json| json.get("cars"))
-            .and_then(Value::as_object)
-        {
-            for car_data in cars.values() {
-                if let Some(skins) = car_data.get("skins").and_then(|v| v.as_array()) {
-                    for skin in skins {
-                        if let Some(id) = skin.get("id").and_then(|v| v.as_str()) {
-                            if id == skin_id.to_string() {
-                                return skin
-                                    .get("name")
-                                    .and_then(|v| v.as_str())
-                                    .map(|s| s.to_string());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        None
-    }
-
     fn validate_key_file(&self) -> Result<(), String> {
         load_upk_keys(&self.base_dir).map(|_| ())
     }
@@ -2725,6 +2705,20 @@ impl DecalPatcherState {
         let skin_id_owned = skin_id.to_string();
 
         let skin_info = self.find_skin(car_key, skin_id)?;
+        let active_key = format!("{car_key}|{skin_id}");
+        if self.active_decals.contains_key(&active_key)
+            || self.active_decals.keys().any(|key| {
+                key.split_once('|')
+                    .and_then(|(active_car, active_skin)| {
+                        self.find_skin(active_car, active_skin).ok()
+                    })
+                    .is_some_and(|skin| skin.upk_path.eq_ignore_ascii_case(&skin_info.upk_path))
+            })
+        {
+            return Err(
+                "This decal target already has an applied decal; restore it first".to_string(),
+            );
+        }
 
         let decal = self
             .decals
@@ -2774,16 +2768,6 @@ impl DecalPatcherState {
             .into_iter()
             .map(|skin| skin.upk_path)
             .collect::<Vec<_>>();
-        let previous_targets = self
-            .active_decals
-            .keys()
-            .filter_map(|active_key| active_key.split_once('|'))
-            .filter_map(|(active_car, active_skin)| self.find_skin(active_car, active_skin).ok())
-            .map(|skin| skin.upk_path)
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect::<Vec<_>>();
-
         self.processing_target = Some(format!("{} -> {}", decal_name, skin_info.name));
 
         let entry = self.build_backend_entry(decal);
@@ -2810,10 +2794,13 @@ impl DecalPatcherState {
         let fields_clone = entry.fields.clone();
         let field_labels_clone = entry.field_labels.clone();
         let target_candidates_clone = target_candidates.clone();
-        let legacy_shared_targets_clone = legacy_shared_targets;
+        let legacy_shared_targets_clone = if self.active_decals.is_empty() {
+            legacy_shared_targets
+        } else {
+            Vec::new()
+        };
         let selected_skin_upk = skin_info.upk_path.clone();
         let donor_upks_clone = donor_upks;
-        let previous_targets_clone = previous_targets;
         let local_tx = self.local_tx.clone();
         let ctx_clone = ctx.clone();
 
@@ -2829,19 +2816,6 @@ impl DecalPatcherState {
                         &backups_clone,
                         &base_dir_clone,
                     )
-                })
-                .and_then(|()| {
-                    previous_targets_clone
-                        .iter()
-                        .filter(|target| backups_clone.join(format!("{target}.bak")).is_file())
-                        .try_for_each(|target| {
-                            restore_package_texture_regions(
-                                target,
-                                &cooked_clone,
-                                &backups_clone,
-                                &base_dir_clone,
-                            )
-                        })
                 })
                 .and_then(|()| {
                     restore_package_texture_regions(
@@ -2868,7 +2842,7 @@ impl DecalPatcherState {
                         },
                     )
                 })
-                .and_then(|carrier_installed| {
+                .and_then(|_| {
                     patch_decal_on_skin(
                         entry.body_id,
                         &target_candidates_clone,
@@ -2878,7 +2852,7 @@ impl DecalPatcherState {
                         &fields_clone,
                         &field_labels_clone,
                         true,
-                        carrier_installed,
+                        true,
                         &|fraction, label| {
                             let _ = progress_tx.send(DecalOp::Progress {
                                 fraction,
@@ -3102,10 +3076,6 @@ impl DecalPatcherState {
                     self.processing_target = None;
                     self.progress = None;
                     self.progress_label.clear();
-                    // The C# patcher keeps one custom decal active. TFC append
-                    // storage is shared, so prior targets are restored before
-                    // a new target is installed.
-                    self.active_decals.clear();
                     self.active_decals.insert(active_key, name.clone());
                     active_changed = true;
                     let _ = tx.send(AppMsg::Log(format!(
@@ -3212,10 +3182,8 @@ impl DecalPatcherState {
                     .add_enabled(!is_processing, egui::Button::new("Import ZIP"))
                     .clicked()
                 {
-                    if let Some(file) = rfd::FileDialog::new()
-                        .add_filter("ZIP Archives", &["zip"])
-                        .pick_file()
-                    {
+                    let dialog = rfd::FileDialog::new().add_filter("ZIP Archives", &["zip"]);
+                    if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
                         if let Err(e) = self.import_zip(&file, tx) {
                             let _ = tx.send(AppMsg::Log(format!("[Decals] Import failed: {}", e)));
                         }
@@ -3445,13 +3413,6 @@ impl DecalPatcherState {
                     let selected_car_clone = self.selected_car.clone();
                     let selected_skin_id_clone = self.selected_skin_id.clone();
                     let selected_decal_name_clone = self.selected_decal_name.clone();
-                    let target_has_active = selected_car_clone
-                        .as_ref()
-                        .zip(selected_skin_id_clone.as_ref())
-                        .is_some_and(|(car, skin)| {
-                            self.active_decals.contains_key(&format!("{car}|{skin}"))
-                        });
-
                     if let Some(car) = self.selected_decal_car() {
                         ui.label(egui::RichText::new(format!("Car: {}", car.car_name)).strong());
                     } else if selected_decal_name_clone.is_some() {
@@ -3466,8 +3427,7 @@ impl DecalPatcherState {
                         );
                     }
 
-                    // Applied targets are locked until restored, matching the actual file state.
-                    ui.add_enabled_ui(!target_has_active, |ui| {
+                    ui.add_enabled_ui(self.processing_target.is_none(), |ui| {
                         // SKIN DROPDOWN
                         ui.horizontal(|ui| {
                             ui.label("Decal to replace:");
@@ -3483,10 +3443,12 @@ impl DecalPatcherState {
                                 selected_skin_id_clone.clone().unwrap_or_default();
 
                             if let Some(car) = car_info {
-                                egui::ComboBox::from_id_salt("skin_combo")
+                                let combo_id = ui.make_persistent_id("skin_combo");
+                                let mut popup_rect = None;
+                                let combo = egui::ComboBox::from_id_salt("skin_combo")
                                     .width(250.0)
                                     .height(300.0)
-                                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                                    .close_behavior(egui::PopupCloseBehavior::IgnoreClicks)
                                     .selected_text(
                                         car.skins
                                             .iter()
@@ -3541,10 +3503,27 @@ impl DecalPatcherState {
                                                     .changed()
                                                 {
                                                     self.selected_skin_id = Some(skin_id);
+                                                    ui.close();
                                                 }
                                             }
                                         }
+                                        popup_rect = Some(ui.clip_rect());
                                     });
+                                if let Some(position) = ui.input(|input| {
+                                    input
+                                        .pointer
+                                        .any_click()
+                                        .then(|| input.pointer.interact_pos())
+                                        .flatten()
+                                }) {
+                                    let inside_popup =
+                                        popup_rect.is_some_and(|rect: egui::Rect| {
+                                            rect.expand(8.0).contains(position)
+                                        });
+                                    if !inside_popup && !combo.response.rect.contains(position) {
+                                        egui::Popup::close_id(ui.ctx(), combo_id.with("popup"));
+                                    }
+                                }
                             } else if self.car_skins.is_empty() {
                                 ui.label("No decals available - check skins.json");
                             } else {
@@ -3731,5 +3710,53 @@ impl DecalPatcherState {
                 egui::Color32::WHITE,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod decal_matching_tests {
+    use super::*;
+
+    fn texture(name: &str) -> TextureExport {
+        TextureExport {
+            export_name: name.to_string(),
+            tfc_name: None,
+            mips: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn skin_specific_fields_avoid_body_paint_and_generic_masks() {
+        let mask_skin = vec![
+            texture("Body_Grain_D"),
+            texture("Body_Grain_Burst_RGB"),
+            texture("GradMask_T"),
+        ];
+        assert!(match_texture_export(4284, "1_Diffuse_Skin", &mask_skin, None, true).is_none());
+        assert_eq!(
+            match_texture_export(4284, "2_Diffuse_Skin_Mask", &mask_skin, None, true)
+                .unwrap()
+                .export_name,
+            "Body_Grain_Burst_RGB"
+        );
+
+        let carrier = vec![
+            texture("Body_Grain_D"),
+            texture("GradMask_T"),
+            texture("Skin_Grain_Dignitas_RGB"),
+            texture("Skin_Grain_Blackout_Diffuse"),
+        ];
+        assert_eq!(
+            match_texture_export(4284, "1_Diffuse_Skin", &carrier, None, true)
+                .unwrap()
+                .export_name,
+            "Skin_Grain_Blackout_Diffuse"
+        );
+        assert_eq!(
+            match_texture_export(4284, "2_Diffuse_Skin_Mask", &carrier, None, true)
+                .unwrap()
+                .export_name,
+            "Skin_Grain_Dignitas_RGB"
+        );
     }
 }

@@ -10,6 +10,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+fn is_ball_backup(name: &str) -> bool {
+    name.strip_suffix(".bak").is_some_and(crate::patcher::patch_core::gameinfo::is_ball_upk)
+        || crate::patcher::patch_core::standard_ball::is_ball_tfc_backup(name)
+        || matches!(name,
+            "Textures2.tfc_3164923583.bin" | "Textures2.tfc_3165101623.bin"
+            | "Textures2.tfc_3165152057.bin" | "Textures2.tfc_3165166143.bin")
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PatcherSubTab {
     Ball,
@@ -189,6 +197,13 @@ impl PatcherState {
         let tx_clone = tx.clone();
 
         std::thread::spawn(move || {
+            if let Err(error) = crate::patcher::backup_guard::check(
+                &cooked_pc_clone, &backups_dir_clone, "ball-build.sha256", is_ball_backup,
+            ) {
+                let _ = local_tx.send(PatcherOp::Error(error));
+                ctx_clone.request_repaint();
+                return;
+            }
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 let mut restored = 0usize;
                 let mut errors: Vec<String> = Vec::new();
@@ -378,29 +393,38 @@ impl PatcherState {
         let local_tx = self.local_tx.clone();
         let ctx_clone = ctx.clone();
         let _ = tx.send(AppMsg::Log(format!("[Patcher] Patching {}...", ball.name)));
+        let _ = tx.send(AppMsg::Log(format!(
+            "[Patcher] Ball patch mode: standard textures and matching inline ball mips. Executable: {}",
+            std::env::current_exe().map(|p| p.display().to_string()).unwrap_or_else(|_| "unknown".into())
+        )));
         std::thread::spawn(move || {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 if !upk_clone.exists() {
                     return Err("Mutators_Balls_SF.upk not found in game directory.".to_string());
                 }
+
                 let img_bytes =
                     fs::read(&img_clone).map_err(|e| format!("Failed to read image: {e}"))?;
-                crate::patch_core::mutators::patch_mutators(
-                    &upk_clone.to_string_lossy(),
+                crate::patch_core::standard_ball::validate_standard_tfcs(
                     &cooked_clone.to_string_lossy(),
-                    &backups_clone.to_string_lossy(),
-                    &img_bytes,
                 )?;
+                crate::patcher::backup_guard::prepare(
+                    &cooked_clone, &backups_clone, "ball-build.sha256", is_ball_backup,
+                )?;
+                // Legacy mutator texture writes lack compatible offsets and restore coverage.
                 crate::patch_core::standard_ball::patch_standard_tfcs(
                     &cooked_clone.to_string_lossy(),
                     &backups_clone.to_string_lossy(),
                     &img_bytes,
                 )?;
-                crate::patch_core::gameinfo::patch_ball_upks(
+                let patched_packages = crate::patch_core::gameinfo::patch_ball_upks(
                     &cooked_clone.to_string_lossy(),
                     &backups_clone.to_string_lossy(),
                     &img_bytes,
                 )?;
+                if patched_packages == 0 {
+                    return Err("No matching inline ball mips were found in the current packages.".into());
+                }
                 Ok(())
             }));
             let op = match outcome {
