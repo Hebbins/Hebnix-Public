@@ -18,7 +18,7 @@ use crate::plugins::PluginManager;
 use crate::tray::Tray;
 use crate::{dpi_fix, statsapi_ini, theme, winutil};
 
-pub const APP_VERSION: &str = "2.1.10";
+pub const APP_VERSION: &str = "2.1.11";
 pub const DEFAULT_WIDTH: f32 = 760.0;
 pub const DEFAULT_HEIGHT: f32 = 520.0;
 pub const MIN_WIDTH: f32 = 520.0;
@@ -2007,6 +2007,15 @@ impl LiteApp {
         {
             self.discord_presence
                 .configure(self.config.settings.discord_rich_presence);
+            changed = true;
+        }
+        if ui
+            .checkbox(
+                &mut self.config.settings.discord_rocket_league_only,
+                "Limit Discord RPC to Rocket League only",
+            )
+            .changed()
+        {
             changed = true;
         }
         ui.add_space(8.0);

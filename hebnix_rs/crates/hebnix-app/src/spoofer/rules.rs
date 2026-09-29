@@ -466,13 +466,22 @@ impl Rule for TitleRule {
 
 pub struct RankRule {
     pub spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
+    route_item_spawner: Arc<AtomicBool>,
     announced: AtomicBool,
 }
 
 impl RankRule {
     pub fn new(spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>) -> Self {
+        Self::with_item_spawner(spoofs, Arc::new(AtomicBool::new(false)))
+    }
+
+    pub fn with_item_spawner(
+        spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
+        route_item_spawner: Arc<AtomicBool>,
+    ) -> Self {
         Self {
             spoofs,
+            route_item_spawner,
             announced: AtomicBool::new(false),
         }
     }
@@ -498,7 +507,7 @@ impl Rule for RankRule {
         };
 
         let spoofs = self.spoofs.lock().unwrap().clone();
-        if spoofs.is_empty() {
+        if spoofs.is_empty() && !self.route_item_spawner.load(Ordering::Relaxed) {
             return false;
         }
         // Send game RPC through the intercepted config host, then route those
@@ -685,6 +694,28 @@ mod tests {
         let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
         assert_eq!(value["PsyNetUrl"], "https://config.psynet.gg/rpc");
         assert!(body.set_headers.iter().any(|(name, _)| name == "Psysignature"));
+    }
+
+    #[test]
+    fn item_spawner_routes_websocket_without_rank_spoofs() {
+        let enabled = Arc::new(AtomicBool::new(true));
+        let rule = RankRule::with_item_spawner(
+            Arc::new(Mutex::new(HashMap::new())),
+            Arc::clone(&enabled),
+        );
+        let mut body = Body::new(
+            "application/json",
+            br#"{"Result":{"PerConURLv2":"wss://ws.rlpp.psynet.gg/ws/gc2"}}"#.to_vec(),
+        );
+        assert!(rule.rewrite(&mut body));
+        let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(value["Result"]["PerConURLv2"], "ws://127.0.0.1:8025/ws/gc2");
+        enabled.store(false, Ordering::Relaxed);
+        let mut original = Body::new(
+            "application/json",
+            br#"{"Result":{"PerConURLv2":"wss://ws.rlpp.psynet.gg/ws/gc2"}}"#.to_vec(),
+        );
+        assert!(!rule.rewrite(&mut original));
     }
 
     #[test]

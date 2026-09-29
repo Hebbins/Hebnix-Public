@@ -499,8 +499,9 @@ impl SpooferManager {
                 self.base_dir.join("owned_products.json"),
             )),
             Box::new(TitleRule::new(Arc::clone(&self.title_settings))),
-            Box::new(crate::spoofer::rules::RankRule::new(
+            Box::new(crate::spoofer::rules::RankRule::with_item_spawner(
                 Arc::clone(&self.spoofed_ranks),
+                Arc::clone(&self.item_spawner_enabled),
             )),
         ]);
         self.ensure_crl(&ca);

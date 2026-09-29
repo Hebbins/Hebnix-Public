@@ -25,7 +25,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.10";
+pub const APP_VERSION: &str = "2.1.11";
 
 pub const DEFAULT_WIDTH: f32 = 1250.0;
 pub const DEFAULT_HEIGHT: f32 = 700.0;
@@ -2819,6 +2819,7 @@ impl HebnixApp {
                                         })
                                         .unwrap_or_else(|| egui::RichText::new("All"));
                                     egui::ComboBox::from_id_salt("title_spoof_target")
+                                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
                                         .width(210.0)
                                         .height(320.0)
                                         .selected_text(selected_title)
@@ -2887,6 +2888,7 @@ impl HebnixApp {
                                             egui::RichText::new("Choose a title...")
                                         });
                                     egui::ComboBox::from_id_salt("title_spoof_copy")
+                                        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
                                         .width(250.0)
                                         .height(320.0)
                                         .selected_text(copy_label)
@@ -3765,6 +3767,15 @@ impl HebnixApp {
                             {
                                 self.discord_presence
                                     .configure(self.config.settings.discord_rich_presence);
+                                changed = true;
+                            }
+                            if ui
+                                .checkbox(
+                                    &mut self.config.settings.discord_rocket_league_only,
+                                    "Limit Discord RPC to Rocket League only",
+                                )
+                                .changed()
+                            {
                                 changed = true;
                             }
                             ui.add_space(8.0);

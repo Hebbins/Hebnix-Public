@@ -81,7 +81,11 @@ pub fn clear() -> Result<(), String> {
 }
 
 fn is_ours(line: &str) -> bool {
-    let Some((_, comment)) = line.rsplit_once('#') else { return false };
+    let Some((mapping, comment)) = line.rsplit_once('#') else { return false };
+    let mut fields = mapping.split_whitespace();
+    if fields.next() != Some("127.0.0.1") || fields.next().is_none() {
+        return false;
+    }
     matches!(comment.trim().to_ascii_lowercase().as_str(), "hebnix spoofer" | "hebnix")
 }
 
@@ -150,7 +154,7 @@ mod tests {
     fn cleanup_preserves_other_hosts_and_line_endings() {
         let original = "# personal\n127.0.0.1 localhost\n127.0.0.1 config.psynet.gg # hebnix spoofer\n# trailing note\n";
         assert_eq!(without_redirects(original), "# personal\n127.0.0.1 localhost\n# trailing note\n");
-        assert_eq!(with_redirects(original, &["config.psynet.gg"]), original);
+        assert_eq!(with_redirects(original, &["config.psynet.gg"]), "# personal\n127.0.0.1 localhost\n# trailing note\n127.0.0.1 config.psynet.gg # hebnix spoofer\n");
 
         let windows = "127.0.0.1 other.example # user\r\n127.0.0.1 config.psynet.gg # hebnix spoofer\r\n";
         assert_eq!(without_redirects(windows), "127.0.0.1 other.example # user\r\n");
