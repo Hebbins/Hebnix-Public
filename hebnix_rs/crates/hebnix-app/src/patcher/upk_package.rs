@@ -754,6 +754,20 @@ impl UpkPackage {
         }
     }
 
+    /// Read a bounded nested tagged struct. Offsets are absolute in `image`.
+    pub(crate) fn nested_props(&self, start: usize, end: usize) -> Result<(Vec<Prop>, usize), String> {
+        let raw = self.image.get(..end).ok_or("Nested property range outside UPK")?;
+        let mut at = start;
+        let mut props = Vec::new();
+        for _ in 0..4096 {
+            let (prop, next, ended) = self.parse_tag(raw, at);
+            if ended { return Ok((props, next)); }
+            props.push(prop.ok_or("Invalid nested property stream")?);
+            if next <= at { return Err("Nested property stream did not advance".into()); }
+            at = next;
+        }
+        Err("Too many nested properties".into())
+    }
     pub fn parse_props(&self, e: &ExportEntry) -> Vec<Prop> {
         let Some(raw) = self
             .image

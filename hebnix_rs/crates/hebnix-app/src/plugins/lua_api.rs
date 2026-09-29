@@ -2890,6 +2890,18 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                                 req = req.header(k, v);
                             }
                         }
+                        if url.starts_with("https://req.hebnix.com/") {
+                            match hebnix_sdk::req_auth::app_token() {
+                                Ok(token) => req = req.header("X-App-Token", token),
+                                Err(error) => {
+                                    let _ = thread_tx.send(AppMsg::PluginHttpResult {
+                                        slug, req_id, status: 0,
+                                        body: error.into_bytes(), headers: String::new(),
+                                    });
+                                    return;
+                                }
+                            }
+                        }
                         let (status, body, hdrs) = send_req_full(req);
                         let _ = thread_tx.send(AppMsg::PluginHttpResult {
                             slug,

@@ -26,15 +26,15 @@ pub fn serve_one(
 ) -> Result<(), String> {
     let req = read_http_request(&mut tls)?;
     let matching: Vec<&Box<dyn Rule>> = rules.iter().filter(|r| r.matches_host(host)).collect();
-    let upstream_host = matching
-        .iter()
-        .find_map(|rule| rule.upstream_host(host, &req.path))
-        .unwrap_or(host);
-    // Requests received by the HTTPS proxy are normally origin-form, but some
-    // Rocket League clients send an absolute URI.  Always rebuild that URI with
-    // the selected upstream host: config.psynet.gg is redirected locally, while
-    // its /rpc and /Services calls must be released to api.rlpp.psynet.gg.
     let path_and_query = absolute_uri_path(&req.path);
+    // Config's PsyNet URL is intercepted locally, but its RPC paths belong to the API backend.
+    let upstream_host = if host.eq_ignore_ascii_case("config.psynet.gg")
+        && (path_and_query.starts_with("/rpc/") || path_and_query.starts_with("/Services/"))
+    {
+        "api.rlpp.psynet.gg"
+    } else {
+        host
+    };
     let url = format!("https://{upstream_host}{path_and_query}");
     let mut call = upstream.request(&req.method, &url);
     for (name, value) in &req.headers {
@@ -58,10 +58,10 @@ pub fn serve_one(
     };
 
     let (status, status_text, mut headers, mut bytes, ctype) = match res {
-        Ok(r) => read_ureq_response(r),
+        Ok(r) => read_ureq_response(r)?,
         Err(ureq::Error::Status(code, r)) => {
             let text = r.status_text().to_string();
-            let (_, _, h, b, ct) = read_ureq_response(r);
+            let (_, _, h, b, ct) = read_ureq_response(r)?;
             (code, text, h, b, ct)
         }
         Err(e) => return Err(format!("upstream {url}: {e}")),
@@ -123,7 +123,26 @@ fn absolute_uri_path(target: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::absolute_uri_path;
+    use super::{CertResolver, absolute_uri_path};
+    use crate::spoofer::ca;
+    use std::sync::Arc;
+
+    #[test]
+    fn localhost_bridge_has_a_certificate_without_sni() {
+        let base = std::env::temp_dir().join(format!("hebnix_bridge_cert_{}", std::process::id()));
+        let ca = Arc::new(ca::ensure(&base).expect("create bridge CA"));
+        let resolver = CertResolver::with_default_host(ca, "localhost");
+        assert_eq!(resolver.default_host.as_deref(), Some("localhost"));
+        assert!(resolver.leaf_for("localhost").is_some());
+        if let (Ok(root), Ok(path)) = (
+            std::fs::canonicalize(std::env::temp_dir()),
+            std::fs::canonicalize(&base),
+        ) {
+            if path.starts_with(&root) && path != root {
+                let _ = std::fs::remove_dir_all(path);
+            }
+        }
+    }
 
     #[test]
     fn absolute_request_target_keeps_only_path_and_query() {
@@ -203,7 +222,7 @@ pub fn read_http_request<S: Read>(stream: &mut S) -> Result<HttpRequest, String>
             .read(&mut tmp)
             .map_err(|e| format!("read body: {e}"))?;
         if n == 0 {
-            break;
+            return Err("client closed before request body completed".into());
         }
         body.extend_from_slice(&tmp[..n]);
     }
@@ -218,7 +237,7 @@ pub fn read_http_request<S: Read>(stream: &mut S) -> Result<HttpRequest, String>
 
 pub fn read_ureq_response(
     r: ureq::Response,
-) -> (u16, String, Vec<(String, String)>, Vec<u8>, String) {
+) -> Result<(u16, String, Vec<(String, String)>, Vec<u8>, String), String> {
     let status = r.status();
     let status_text = r.status_text().to_string();
     let ctype = r.content_type().to_string();
@@ -230,11 +249,11 @@ pub fn read_ureq_response(
         }
     }
     let mut bytes = Vec::new();
-    let _ = r
-        .into_reader()
+    r.into_reader()
         .take(32 * 1024 * 1024)
-        .read_to_end(&mut bytes);
-    (status, status_text, headers, bytes, ctype)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("upstream response body: {error}"))?;
+    Ok((status, status_text, headers, bytes, ctype))
 }
 
 pub fn build_server_config(resolver: Arc<CertResolver>) -> Result<Arc<ServerConfig>, String> {
@@ -274,6 +293,7 @@ pub struct CertResolver {
     ca: Arc<Ca>,
     cache: Mutex<HashMap<String, Arc<CertifiedKey>>>,
     provider: Arc<rustls::crypto::CryptoProvider>,
+    default_host: Option<String>,
 }
 
 impl std::fmt::Debug for CertResolver {
@@ -288,7 +308,14 @@ impl CertResolver {
             ca,
             cache: Mutex::new(HashMap::new()),
             provider: Arc::new(rustls::crypto::ring::default_provider()),
+            default_host: None,
         }
+    }
+
+    pub fn with_default_host(ca: Arc<Ca>, host: &str) -> Self {
+        let mut resolver = Self::new(ca);
+        resolver.default_host = Some(host.to_string());
+        resolver
     }
 
     fn leaf_for(&self, host: &str) -> Option<Arc<CertifiedKey>> {
@@ -312,6 +339,7 @@ impl CertResolver {
 
 impl ResolvesServerCert for CertResolver {
     fn resolve(&self, hello: ClientHello<'_>) -> Option<Arc<CertifiedKey>> {
-        self.leaf_for(hello.server_name()?)
+        let host = hello.server_name().or(self.default_host.as_deref())?;
+        self.leaf_for(host)
     }
 }

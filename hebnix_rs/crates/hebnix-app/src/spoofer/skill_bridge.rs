@@ -17,6 +17,7 @@ use tungstenite::handshake::server::{Request, Response};
 use tungstenite::http::{HeaderName, HeaderValue};
 use tungstenite::{Error, Message, accept_hdr, connect};
 
+
 use crate::messages::AppMsg;
 use crate::spoofer::rules::{Body, RankRule, Rule};
 
@@ -41,6 +42,7 @@ impl SkillBridge {
         ranks: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
         tx: Sender<AppMsg>,
         dump_path: PathBuf,
+        _base_dir: &std::path::Path,
     ) -> Result<Self, String> {
         let _ = std::fs::write(
             &dump_path,

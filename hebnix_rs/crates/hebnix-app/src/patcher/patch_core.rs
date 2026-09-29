@@ -1022,16 +1022,12 @@ pub mod standard_ball {
     use std::io::{Read, Seek, SeekFrom, Write};
     use std::path::Path;
 
-    const TFC_ENTRIES: [(&str, u64, usize, u32); 14] = [
+    const TFC_ENTRIES: [(&str, u64, usize, u32); 10] = [
         ("Textures2.tfc", 856931869, 686345, 2048),
         ("Textures2.tfc", 856758008, 173861, 1024),
         ("Textures2.tfc", 63510294, 47340, 512),
         ("Textures2.tfc", 63496818, 13476, 256),
         ("Textures2.tfc", 63492915, 3903, 128),
-        ("Textures2.tfc", 3164923583, 178040, 1024),
-        ("Textures2.tfc", 3165101623, 50434, 512),
-        ("Textures2.tfc", 3165152057, 14086, 256),
-        ("Textures2.tfc", 3165166143, 4132, 128),
         ("Textures4.tfc", 2792441005, 339187, 2048),
         ("Textures4.tfc", 2792328137, 112868, 1024),
         ("Textures4.tfc", 2792289507, 38630, 512),
@@ -1086,6 +1082,31 @@ pub mod standard_ball {
         )
     }
 
+    pub fn validate_standard_tfcs(game_dir: &str) -> Result<(), String> {
+        for (tfc_name, offset, slot_size, width) in TFC_ENTRIES {
+            let path = Path::new(game_dir).join(tfc_name);
+            let mut file = OpenOptions::new().read(true).open(&path)
+                .map_err(|e| format!("Cannot open {}: {e}", path.display()))?;
+            let end = offset.checked_add(slot_size as u64)
+                .ok_or_else(|| format!("Invalid ball texture offset in {tfc_name}"))?;
+            if file.metadata().map_err(|e| e.to_string())?.len() < end {
+                return Err(format!("Ball texture slot is outside {tfc_name}; this game build is not supported"));
+            }
+            file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
+            let mut header = [0u8; 16];
+            file.read_exact(&mut header).map_err(|e| e.to_string())?;
+            let word = |start: usize| u32::from_le_bytes(header[start..start + 4].try_into().unwrap());
+            if word(0) != super::upk::UPK_MAGIC
+                || word(4) != 131_072
+                || word(12) != width * width / 2
+                || word(8) as usize > slot_size - header.len()
+            {
+                return Err(format!("Ball texture slot in {tfc_name} has changed; this game build is not supported"));
+            }
+        }
+        Ok(())
+    }
+
     pub fn patch_standard_tfcs(
         game_dir: &str,
         backup_dir: &str,
@@ -1113,7 +1134,7 @@ pub mod standard_ball {
         for (tfc_name, offset, slot_size, w) in TFC_ENTRIES {
             let tfc_path = Path::new(game_dir).join(tfc_name);
             if !tfc_path.exists() {
-                continue;
+                return Err(format!("Missing ball texture cache {}", tfc_path.display()));
             }
 
             let backup_bin = Path::new(backup_dir).join(format!("{}_{}.bin", tfc_name, offset));
@@ -1178,11 +1199,13 @@ pub mod standard_ball {
                     tfc::tfc_compress(f_dxt, slot_size, Some(&tfc_path.to_string_lossy()), offset);
             }
 
-            if let Some(payload) = payload_opt {
-                if tfc_file.seek(SeekFrom::Start(offset)).is_ok() {
-                    let _ = tfc_file.write_all(&payload);
-                }
-            }
+            let payload = payload_opt.ok_or_else(|| {
+                format!("Could not fit ball texture in {tfc_name} at offset {offset}")
+            })?;
+            tfc_file.seek(SeekFrom::Start(offset))
+                .map_err(|e| format!("Could not seek {tfc_name}: {e}"))?;
+            tfc_file.write_all(&payload)
+                .map_err(|e| format!("Could not write {tfc_name}: {e}"))?;
         }
 
         Ok(())
@@ -1488,155 +1511,124 @@ pub mod gameinfo {
         target_name: &str,
     ) -> Result<bool, String> {
         let target_path = Path::new(game_dir).join(target_name);
-        if !target_path.exists() {
+        if !target_path.is_file() {
             return Ok(false);
         }
-
         let bak_path = Path::new(backup_dir).join(format!("{target_name}.bak"));
-        let created_backup = !bak_path.exists();
-        if !bak_path.exists() {
-            fs::copy(&target_path, &bak_path).map_err(|e| e.to_string())?;
-        }
-
-        let van_bytes = fs::read(&bak_path).map_err(|e| e.to_string())?;
-
-        let mut found = None;
-        // Match C# FindSig: the package header stores the first compressed
-        // region offset at byte 8, so do not scan the entire header bytewise.
-        let mut off = van_bytes
+        let vanilla = fs::read(if bak_path.is_file() { &bak_path } else { &target_path })
+            .map_err(|e| e.to_string())?;
+        let mut offset = vanilla
             .get(8..12)
-            .map(|bytes| u32::from_le_bytes(bytes.try_into().unwrap()) as usize)
-            .filter(|offset| *offset > 16 && *offset < van_bytes.len())
-            .unwrap_or(4);
-        while off + 16 <= van_bytes.len() {
-            if let Ok((dec, blk_sz, end_pos)) = upk::decomp_chunk_at(&van_bytes, off) {
-                if let Some(idx) = index_of(&dec, &VANILLA_THUMB_SIG, 0) {
-                    found = Some((off, end_pos, idx, dec, blk_sz));
-                    break;
-                } else if let Some(idx) = index_of(&dec, &VAN_PRE_TRAIL, 0) {
-                    found = Some((off, end_pos, idx + 116, dec, blk_sz));
-                    break;
-                }
-                off = end_pos;
-            } else {
-                off += 1;
-            }
-        }
-
-        let Some((chunk_pos, chunk_end, local_idx_raw, dec_orig, blk_sz)) = found else {
-            // C# treats packages without the ball texture signature as a skip.
-            if created_backup {
-                let _ = fs::remove_file(&bak_path);
-            }
-            return Ok(false);
-        };
-
-        if local_idx_raw < 116 {
-            return Err("Signature too close to chunk boundary".into());
-        }
-
-        let mut dec_modified = dec_orig.clone();
-
-        let thumb_data = &dec_orig[local_idx_raw + 2048..local_idx_raw + 2744];
-        let mut patched_thumb = Vec::with_capacity(2744);
-        patched_thumb.extend_from_slice(&textures.dxt64);
-        patched_thumb.extend_from_slice(thumb_data);
-
-        // This metadata describes the replacement thumbnail/mip trail.  The
-        // old Rust port accidentally wrote the vanilla descriptor back here,
-        // so UE selected the wrong data once the texture streamed to a lower
-        // mip at distance.
-        dec_modified[local_idx_raw - 116..local_idx_raw].copy_from_slice(&PATCHED_PRE_TRAIL);
-        dec_modified[local_idx_raw..local_idx_raw + 2744].copy_from_slice(&patched_thumb);
-        dec_modified[local_idx_raw + 2744..local_idx_raw + 2860]
-            .copy_from_slice(&textures.post_trail);
-
-        let (new_chunk_opt, _, ok) = patcher::recomp_chunk_inplace(
-            &van_bytes,
-            chunk_pos,
-            &dec_modified,
-            blk_sz as usize,
-            (local_idx_raw - 116, local_idx_raw + 2860),
-        );
-
-        let new_chunk = if ok && new_chunk_opt.is_some() {
-            new_chunk_opt.unwrap()
-        } else {
-            match upk::recomp_chunk_safely_padded(
-                &dec_modified,
-                blk_sz as usize,
-                Some(chunk_end - chunk_pos),
-            ) {
-                Ok(chunk) => chunk,
-                Err(upk::UpkError::OversizedChunk) => return Ok(false),
-                Err(error) => return Err(format!("{error:?}")),
-            }
-        };
-
-        let mut final_file = Vec::with_capacity(van_bytes.len());
-        final_file.extend_from_slice(&van_bytes[..chunk_pos]);
-        final_file.extend_from_slice(&new_chunk);
-        if chunk_pos + new_chunk.len() < chunk_end {
-            final_file.resize(chunk_end, 0);
-        }
-        final_file.extend_from_slice(&van_bytes[chunk_end..]);
-
-        // Match the C# two-pass write. Keeping the lower-mip rewrite separate
-        // prevents the wider modified range from making the thumbnail chunk
-        // exceed its fixed physical slot. If a secondary mip pass cannot fit,
-        // retain the valid thumbnail patch instead of aborting the whole ball.
-        if let Ok((dec_after_thumb, _, after_end)) = upk::decomp_chunk_at(&final_file, chunk_pos) {
-            let mut dec_with_mips = dec_after_thumb.clone();
-            let mut mip_range: Option<(usize, usize)> = None;
-            for chain in find_inline_chains(&dec_orig) {
-                let Some((_, first_start, first_end)) = chain.first().copied() else {
-                    continue;
-                };
-                let top_changed = first_end <= dec_orig.len()
-                    && first_end <= dec_after_thumb.len()
-                    && dec_orig[first_start..first_end] != dec_after_thumb[first_start..first_end];
-                let lower_still_vanilla = chain.iter().skip(1).any(|&(_, start, end)| {
-                    end <= dec_orig.len()
-                        && end <= dec_after_thumb.len()
-                        && dec_orig[start..end] == dec_after_thumb[start..end]
-                });
-                if !top_changed || !lower_still_vanilla {
-                    continue;
-                }
-                for (width, start, _) in chain {
-                    if let Some(data) = textures.ph4d_dxt.get(&width) {
-                        if start + data.len() <= dec_with_mips.len() {
-                            dec_with_mips[start..start + data.len()].copy_from_slice(data);
-                            mip_range = Some(match mip_range {
-                                Some((min, max)) => (min.min(start), max.max(start + data.len())),
-                                None => (start, start + data.len()),
-                            });
+            .map(|b| u32::from_le_bytes(b.try_into().unwrap()) as usize)
+            .filter(|&v| v > 16 && v < vanilla.len())
+            .ok_or("Invalid UPK chunk offset")?;
+        while offset + 16 <= vanilla.len() {
+            if let Ok((decoded, block_size, end)) = upk::decomp_chunk_at(&vanilla, offset) {
+                if let Some(signature) = index_of(&decoded, &VANILLA_THUMB_SIG, 0) {
+                    let chain = find_inline_chains(&decoded)
+                        .into_iter()
+                        .find(|chain| chain.first().is_some_and(|(_, start, _)| *start == signature))
+                        .ok_or("Ball thumbnail has no matching inline mip chain")?;
+                    if chain.len() != PH4D_SPECS.len() {
+                        return Err("Ball inline mip chain is incomplete".into());
+                    }
+                    let mut changed = decoded.clone();
+                    for (width, start, finish) in &chain {
+                        let data = textures.ph4d_dxt.get(width).ok_or("Missing ball mip")?;
+                        if data.len() != finish - start {
+                            return Err("Ball mip size differs from package".into());
                         }
+                        changed[*start..*finish].copy_from_slice(data);
                     }
-                }
-            }
-
-            if let Some(range) = mip_range {
-                let (mip_chunk, _, fits) = patcher::recomp_chunk_inplace(
-                    &final_file,
-                    chunk_pos,
-                    &dec_with_mips,
-                    blk_sz as usize,
-                    range,
-                );
-                if fits {
-                    if let Some(mip_chunk) = mip_chunk {
-                        final_file[chunk_pos..after_end].copy_from_slice(&mip_chunk);
+                    let range = (chain.first().unwrap().1, chain.last().unwrap().2);
+                    let (chunk, _, fits) = patcher::recomp_chunk_inplace(
+                        &vanilla, offset, &changed, block_size as usize, range,
+                    );
+                    let chunk = if fits {
+                        chunk.ok_or("Ball mip recompression failed")?
+                    } else {
+                        match upk::recomp_chunk_safely_padded(
+                            &changed, block_size as usize, Some(end - offset),
+                        ) {
+                            Ok(chunk) => chunk,
+                            Err(upk::UpkError::OversizedChunk) => return Ok(false),
+                            Err(error) => return Err(format!("Ball mip recompression failed: {error:?}")),
+                        }
+                    };
+                    if chunk.len() != end - offset {
+                        return Err("Ball mip changed package size".into());
                     }
+                    let mut result = vanilla.clone();
+                    result[offset..end].copy_from_slice(&chunk);
+                    let (verified, _, _) = upk::decomp_chunk_at(&result, offset)
+                        .map_err(|e| format!("Ball mip validation failed: {e:?}"))?;
+                    if verified != changed {
+                        return Err("Ball mip validation mismatch".into());
+                    }
+                    if !bak_path.is_file() {
+                        fs::copy(&target_path, &bak_path).map_err(|e| e.to_string())?;
+                    }
+                    fs::write(&target_path, result).map_err(|e| e.to_string())?;
+                    return Ok(true);
                 }
+                offset = end;
+            } else {
+                offset += 1;
             }
         }
-
-        fs::write(&target_path, &final_file).map_err(|e| e.to_string())?;
-
-        Ok(true)
+        Ok(false)
     }
 
+    #[cfg(test)]
+    #[test]
+    fn current_soccar_mips_patch_without_changing_metadata() {
+        let Ok(package_path) = std::env::var("HEBNIX_INSPECT_UPK") else { return };
+        let Ok(png_path) = std::env::var("HEBNIX_INSPECT_PNG") else { return };
+        let source = Path::new(&package_path);
+        let temp = std::env::temp_dir().join(format!("hebnix-soccar-mip-test-{}", std::process::id()));
+        fs::create_dir_all(&temp).unwrap();
+        let target = temp.join("gameinfo_soccar_sf.upk");
+        let backup = temp.join("gameinfo_soccar_sf.upk.bak");
+        fs::copy(source, &target).unwrap();
+        fs::copy(source, &backup).unwrap();
+        let original = fs::read(&target).unwrap();
+        let png = fs::read(png_path).unwrap();
+        assert!(patch_soccar_ball_upk(temp.to_str().unwrap(), temp.to_str().unwrap(), &png).unwrap());
+        let patched = fs::read(&target).unwrap();
+        assert_eq!(original.len(), patched.len());
+        assert_ne!(original, patched);
+        fs::remove_dir_all(temp).unwrap();
+    }
+    #[cfg(test)]
+    #[test]
+    fn current_arena_mips_patch_without_changing_metadata() {
+        let Ok(package_path) = std::env::var("HEBNIX_INSPECT_UPK") else { return };
+        let Ok(png_path) = std::env::var("HEBNIX_INSPECT_PNG") else { return };
+        let source = Path::new(&package_path);
+        let name = source.file_name().unwrap().to_string_lossy().to_ascii_lowercase();
+        let temp = std::env::temp_dir().join(format!("hebnix-arena-mip-test-{}", std::process::id()));
+        fs::create_dir_all(&temp).unwrap();
+        let target = temp.join(&name);
+        let backup = temp.join(format!("{name}.bak"));
+        fs::copy(source, &target).unwrap();
+        fs::copy(source, &backup).unwrap();
+        let original = fs::read(&target).unwrap();
+        let png = fs::read(png_path).unwrap();
+        let textures = prepare_ball_textures(&png).unwrap();
+        assert!(patch_ball_upk(temp.to_str().unwrap(), temp.to_str().unwrap(), &textures, &name).unwrap());
+        let patched = fs::read(&target).unwrap();
+        assert_eq!(original.len(), patched.len());
+        assert_ne!(original, patched);
+        fs::remove_dir_all(temp).unwrap();
+    }
+    pub fn patch_soccar_ball_upk(
+        game_dir: &str,
+        backup_dir: &str,
+        png_bytes: &[u8],
+    ) -> Result<bool, String> {
+        let textures = prepare_ball_textures(png_bytes)?;
+        patch_ball_upk(game_dir, backup_dir, &textures, "gameinfo_soccar_sf.upk")
+    }
     pub fn patch_ball_upks(
         game_dir: &str,
         backup_dir: &str,

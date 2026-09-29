@@ -19,9 +19,11 @@ mod decal_patcher {
     pub use crate::patcher::decal_patcher::*;
 }
 mod deep_link;
+mod epic_connection;
 mod discord_presence;
 mod dpi_fix;
 mod hotkey;
+mod hosts_file;
 #[path = "item-spawning/mod.rs"]
 mod item_spawning;
 mod veryimportantfile;
@@ -222,9 +224,11 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
 
-    eframe::run_native(
+    let result = eframe::run_native(
         "Hebnix",
         options,
         Box::new(|cc| Ok(Box::new(HebnixApp::new(cc)))),
-    )
+    );
+    watchdog::finish_live_handoff();
+    result
 }

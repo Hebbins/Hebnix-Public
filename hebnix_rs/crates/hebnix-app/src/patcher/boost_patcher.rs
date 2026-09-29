@@ -1091,6 +1091,14 @@ pub fn patch_boost_meter(
 
     fs::create_dir_all(backup_dir)
         .map_err(|e| format!("Failed to create backup directory: {e}"))?;
+    // Validate the installed package before it can become the new pristine backup.
+    let live_raw = fs::read(&upk_path).map_err(|e| format!("Failed to read {}: {e}", GFX_UPK))?;
+    EncryptedPackage::load(live_raw, key_file)
+        .map_err(|e| format!("Installed {} is not a valid package: {e}", GFX_UPK))?;
+    crate::patcher::backup_guard::prepare(
+        Path::new(game_dir), Path::new(backup_dir), "boost-build.sha256",
+        |name| name == format!("{}.bak", GFX_UPK),
+    )?;
     let backup_upk = Path::new(backup_dir).join(format!("{}.bak", GFX_UPK));
     if !backup_upk.exists() {
         fs::copy(&upk_path, &backup_upk)
@@ -1353,6 +1361,14 @@ impl BoostPatcherState {
         ));
 
         std::thread::spawn(move || {
+            if let Err(error) = crate::patcher::backup_guard::check(
+                &cooked_pc_clone, &backups_dir_clone, "boost-build.sha256",
+                |name| name == format!("{}.bak", GFX_UPK),
+            ) {
+                let _ = local_tx.send(BoostOp::Error(error));
+                ctx_clone.request_repaint();
+                return;
+            }
             let backup_gfx = backups_dir_clone.join(format!("{}.bak", GFX_UPK));
             if backup_gfx.exists() && fs::copy(&backup_gfx, &cooked_pc_clone.join(GFX_UPK)).is_ok()
             {

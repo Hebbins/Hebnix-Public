@@ -3,6 +3,7 @@
 //! Keeping these modules together makes the patching boundary explicit while
 //! the compatibility re-exports in main.rs preserve the existing call sites.
 pub mod background_merger;
+pub mod backup_guard;
 pub mod ball;
 pub mod boost_patcher;
 pub mod catalog;
@@ -12,6 +13,7 @@ pub mod cosmetic_upk;
 pub mod decal_patcher;
 pub mod heatseeker;
 pub mod patch_core;
+pub mod painted_swap;
 pub mod rl_font;
 pub mod swapper;
 pub mod upk_keys;

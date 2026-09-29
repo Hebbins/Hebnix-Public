@@ -281,7 +281,15 @@ pub fn kill_rocket_league() -> std::io::Result<()> {
         .args(["/F", "/IM", "RocketLeague.exe"])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
-        .map(|_| ())
+        .and_then(|output| {
+            if output.status.success() || !hebnix_sdk::process::is_rocket_league_running() {
+                Ok(())
+            } else {
+                Err(std::io::Error::other(
+                    String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+                ))
+            }
+        })
 }
 
 /// Remove Rocket League's embedded-browser cache, if it exists.

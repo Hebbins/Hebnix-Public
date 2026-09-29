@@ -122,9 +122,12 @@ impl TrackerClient {
             urlencode(platform),
             urlencode(platform_user_id)
         );
-        let response = match ureq::get(&url)
+        let token = crate::req_auth::app_token()?;
+        let agent = ureq::AgentBuilder::new().redirects(0).build();
+        let response = match agent.get(&url)
+            .set("X-App-Token", &token)
             .set("Accept", "application/json")
-            .set("User-Agent", "Hebnix/2.1.9")
+            .set("User-Agent", "Hebnix/2.1.11")
             .timeout(self.timeout)
             .call()
         {

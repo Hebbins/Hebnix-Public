@@ -1,4 +1,5 @@
 use crate::messages::AppMsg;
+use crate::patcher::painted_swap::{self, SwapPaint};
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use eframe::egui;
 use serde::{Deserialize, Serialize};
@@ -103,6 +104,8 @@ struct ActiveSwap {
     target_upk: String,
     #[serde(default)]
     target_bnk: Option<String>,
+    #[serde(default)]
+    paint: SwapPaint,
     #[serde(default)]
     target_thumbnail: Option<String>,
 }
@@ -260,6 +263,7 @@ pub struct SwapperState {
     spawn_search: HashMap<SwapCategory, String>,
     spawn_page: HashMap<SwapCategory, usize>,
     spawn_paint: HashMap<(SwapCategory, i64), usize>,
+    swap_paint: HashMap<String, SwapPaint>,
 }
 
 impl SwapperState {
@@ -323,6 +327,7 @@ impl SwapperState {
             spawn_search: HashMap::new(),
             spawn_page: HashMap::new(),
             spawn_paint: HashMap::new(),
+            swap_paint: HashMap::new(),
         }
     }
 
@@ -533,6 +538,7 @@ impl SwapperState {
         category: SwapCategory,
         source: &SwapItem,
         target: &SwapItem,
+        paint: SwapPaint,
         cooked_pc: &Path,
         backups_dir: &Path,
     ) -> Result<(), String> {
@@ -568,13 +574,15 @@ impl SwapperState {
         } else {
             &source_live
         };
-        crate::cosmetic_upk::patch_for_target(
+        painted_swap::patch_for_target(
             copy_source,
             &target_backup,
             &target_live,
             &self.base_dir,
             source.path.as_deref(),
             target.path.as_deref(),
+            &source.upk,
+            paint,
         )
         .map_err(|error| format!("Failed to patch {} for {}: {error}", source.upk, target.upk))?;
         let mut target_bnk = None;
@@ -669,6 +677,7 @@ impl SwapperState {
             target_name: target.name.clone(),
             target_upk: target.upk.clone(),
             target_bnk,
+            paint,
             target_thumbnail,
         });
         self.save_active(backups_dir)
@@ -911,7 +920,7 @@ impl SwapperState {
                                         .fit_to_exact_size(egui::vec2(48.0, 48.0)),
                                     );
                                 });
-                                ui.strong(format!("{target_name} → {source_name}"));
+                                ui.strong(format!("{target_name} → {source_name} ({})", swap.paint.label()));
                                 ui.weak("Original → replacement");
                             } else {
                                 ui.add(
@@ -1198,7 +1207,7 @@ impl SwapperState {
                 self.queue_thumbnail(ui, category, &filename, cooked_pc);
             }
         }
-        let mut action: Option<(usize, usize, bool)> = None;
+        let mut action: Option<(usize, usize, bool, SwapPaint)> = None;
         egui::ScrollArea::vertical()
             .id_salt(("swapper_grid", category))
             .auto_shrink([false, false])
@@ -1352,8 +1361,20 @@ impl SwapperState {
                                             ui.weak("No owned replacement is available");
                                             return;
                                         }
+                                        let selected_paint = self.swap_paint.entry(key.clone()).or_default();
+                                        if painted_swap::supports(&source.upk) {
+                                            egui::ComboBox::from_id_salt(("swap_paint", &key))
+                                                .selected_text(format!("Paint: {}", selected_paint.label()))
+                                                .show_ui(ui, |ui| {
+                                                    for paint in SwapPaint::ALL {
+                                                        ui.selectable_value(selected_paint, paint, paint.label());
+                                                    }
+                                                });
+                                            ui.weak("Experimental paint — check in game");
+                                        }
+                                        let paint = *selected_paint;
                                         let active = self.active.iter().find(|swap| {
-                                            swap.category == category.slug()
+                                            swap.paint == paint && swap.category == category.slug()
                                                 && swap.source_upk.eq_ignore_ascii_case(&source.upk)
                                                 && swap
                                                     .target_upk
@@ -1377,6 +1398,7 @@ impl SwapperState {
                                                 source_index,
                                                 *target_index,
                                                 active.is_some(),
+                                                paint,
                                             ));
                                         }
                                     });
@@ -1387,7 +1409,7 @@ impl SwapperState {
                     ui.add_space(6.0);
                 }
             });
-        if let Some((source_index, target_index, restoring)) = action {
+        if let Some((source_index, target_index, restoring, paint)) = action {
             if crate::messages::block_item_action_if_game_running(tx) {
                 return owned_filter_requested;
             }
@@ -1396,7 +1418,7 @@ impl SwapperState {
             let result = if restoring {
                 self.restore_swap(&target.upk, cooked_pc, backups_dir)
             } else {
-                self.apply_swap(category, &source, &target, cooked_pc, backups_dir)
+                self.apply_swap(category, &source, &target, paint, cooked_pc, backups_dir)
             };
             match result {
                 Ok(()) => {
