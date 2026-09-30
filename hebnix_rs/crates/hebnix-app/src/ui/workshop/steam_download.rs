@@ -45,7 +45,7 @@ const BOILERPLATE: [&str; 3] = [
     "editorlandscaperesources.upk",
     "workshopiteminfo.json",
 ];
-const IMAGE_EXTS: [&str; 4] = ["jpg", "jpeg", "jfif", "png"];
+const IMAGE_EXTS: [&str; 6] = ["jpg", "jpeg", "jfif", "png", "webp", "bmp"];
 
 #[derive(Default, Deserialize, Serialize)]
 struct Settings {
@@ -367,7 +367,7 @@ pub fn parse_item_info(text: &str) -> Option<ItemInfo> {
     (info != ItemInfo::default()).then_some(info)
 }
 
-fn read_item_info(dir: &Path) -> Option<ItemInfo> {
+pub(super) fn read_item_info(dir: &Path) -> Option<ItemInfo> {
     let mut files = Vec::new();
     walk_files(dir, &mut files);
     files

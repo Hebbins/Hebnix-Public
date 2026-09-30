@@ -221,6 +221,167 @@ pub fn write_item_vdf(
     Ok(path)
 }
 
+/// true if the picture is one `import_map` can store as a banner. Used to
+/// drop an odd image from a zip or download instead of failing the import.
+pub fn usable_banner(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|m| m.len() <= MAX_BANNER_BYTES)
+        && std::fs::read(path).is_ok_and(|bytes| {
+            matches!(
+                image::guess_format(&bytes),
+                Ok(image::ImageFormat::Png
+                    | image::ImageFormat::Jpeg
+                    | image::ImageFormat::WebP
+                    | image::ImageFormat::Bmp)
+            ) && image::load_from_memory(&bytes).is_ok()
+        })
+}
+
+// zip
+
+/// files worth unpacking from a map zip; anything else is skipped
+const ZIP_KEEP_EXTS: [&str; 11] = [
+    "upk", "udk", "vdf", "json", "png", "jpg", "jpeg", "jfif", "webp", "bmp", "gif",
+];
+
+/// what a map zip turned out to hold, unpacked into a folder
+#[derive(Debug, Default)]
+pub struct ZipContents {
+    pub map_file: PathBuf,
+    pub meta: ImportMeta,
+    pub banner: Option<PathBuf>,
+    /// the steam workshop id, when the zip's .vdf has one
+    pub published_file_id: String,
+    /// entries left out: unrelated files, or ones that couldn't be read
+    pub skipped: Vec<String>,
+}
+
+/// unpacks a map zip (map file, preview image, .vdf, maybe a
+/// WorkshopItemInfo.json) into `dest` and works out the details. Unrelated
+/// or unreadable entries are skipped, not treated as an error; only a zip
+/// without any .upk/.udk map fails.
+pub fn extract_map_zip(zip_path: &Path, dest: &Path) -> Result<ZipContents, String> {
+    use std::io::Read;
+    let max_entry = crate::multiplayer_lan::MAX_MAP_BYTES;
+    let file = std::fs::File::open(zip_path).map_err(|e| format!("Could not open the zip: {e}"))?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| format!("That isn't a readable zip file: {e}"))?;
+    std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
+
+    let mut skipped = Vec::new();
+    for index in 0..archive.len() {
+        let mut entry = match archive.by_index(index) {
+            Ok(entry) => entry,
+            Err(error) => {
+                skipped.push(format!("entry {index} ({error})"));
+                continue;
+            }
+        };
+        if entry.is_dir() {
+            continue;
+        }
+        let name = entry.name().to_string();
+        // enclosed_name refuses absolute paths and "..", so nothing lands
+        // outside dest
+        let Some(relative) = entry.enclosed_name() else {
+            skipped.push(name);
+            continue;
+        };
+        let extension = relative
+            .extension()
+            .map(|e| e.to_string_lossy().to_ascii_lowercase())
+            .unwrap_or_default();
+        if !ZIP_KEEP_EXTS.contains(&extension.as_str()) || entry.size() > max_entry {
+            skipped.push(name);
+            continue;
+        }
+        let target = dest.join(relative);
+        let written = target
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|_| std::fs::File::create(&target))
+            .and_then(|mut out| std::io::copy(&mut (&mut entry).take(max_entry), &mut out));
+        if written.is_err() {
+            let _ = std::fs::remove_file(&target);
+            skipped.push(name);
+        }
+    }
+
+    let map_file = super::steam_download::find_map_file(dest)
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("upk") || e.eq_ignore_ascii_case("udk"))
+        })
+        .ok_or("The zip has no .upk or .udk map file in it.")?;
+
+    let mut files = Vec::new();
+    collect_files(dest, &mut files);
+    let vdf = files
+        .iter()
+        .filter(|path| path.extension().is_some_and(|e| e.eq_ignore_ascii_case("vdf")))
+        .find_map(|path| {
+            let item = parse_workshop_vdf(&std::fs::read_to_string(path).ok()?).ok()?;
+            Some((path.clone(), item))
+        });
+    let info = super::steam_download::read_item_info(dest).or_else(|| {
+        files
+            .iter()
+            .filter(|path| path.extension().is_some_and(|e| e.eq_ignore_ascii_case("json")))
+            .find_map(|path| super::steam_download::parse_item_info(&std::fs::read_to_string(path).ok()?))
+    });
+
+    let pick = |from_vdf: Option<&str>, from_info: Option<&str>| {
+        from_vdf
+            .filter(|v| !v.trim().is_empty())
+            .or(from_info.filter(|v| !v.trim().is_empty()))
+            .unwrap_or_default()
+            .to_string()
+    };
+    let item = vdf.as_ref().map(|(_, item)| item);
+    let mut name = pick(item.map(|i| i.title.as_str()), info.as_ref().map(|i| i.title.as_str()));
+    if name.is_empty() {
+        name = map_file
+            .file_stem()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+    }
+    let description = super::steam_download::strip_bbcode(&pick(
+        item.map(|i| i.description.as_str()),
+        info.as_ref().map(|i| i.description.as_str()),
+    ));
+    let author = info.as_ref().map(|i| i.author.clone()).unwrap_or_default();
+
+    let vdf_preview = vdf.as_ref().and_then(|(path, item)| {
+        (!item.preview_file.is_empty())
+            .then(|| resolve_beside(path, &item.preview_file))
+            .filter(|p| p.is_file())
+    });
+    let banner = vdf_preview
+        .or_else(|| super::steam_download::find_bundled_preview(dest))
+        .filter(|p| usable_banner(p));
+
+    Ok(ZipContents {
+        map_file,
+        meta: ImportMeta { name, author, description },
+        banner,
+        published_file_id: item.map(|i| i.published_file_id.clone()).unwrap_or_default(),
+        skipped,
+    })
+}
+
+fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_files(&path, out);
+        } else {
+            out.push(path);
+        }
+    }
+}
+
 /// true if the file looks like an unreal package. only used for a warning:
 /// a cooked map that doesn't start with the magic might still be valid.
 pub fn looks_like_package(path: &Path) -> bool {
@@ -397,16 +558,63 @@ pub struct ImportWizard {
     error: String,
     /// last successfully imported map's name, shown once on the first step
     done: Option<String>,
+    /// where a picked zip was unpacked, removed again on reset
+    zip_dir: Option<PathBuf>,
+    /// steam workshop id from a zip's .vdf, saved with the map
+    published_file_id: String,
 }
 
 impl ImportWizard {
     fn reset(&mut self) {
+        if let Some(dir) = self.zip_dir.take() {
+            let _ = std::fs::remove_dir_all(dir);
+        }
         *self = Self::default();
     }
 
+    fn load_zip(&mut self, zip: &Path) {
+        self.reset();
+        let dir = std::env::temp_dir().join(format!("hebnix_zip_import_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        self.zip_dir = Some(dir.clone());
+        match extract_map_zip(zip, &dir) {
+            Ok(contents) => {
+                let mut notice = format!(
+                    "Filled in from the zip{}.",
+                    if contents.banner.is_some() { ", including the image" } else { "" }
+                );
+                if !contents.skipped.is_empty() {
+                    notice.push_str(&format!(
+                        " Skipped {} unrelated file(s): {}.",
+                        contents.skipped.len(),
+                        contents.skipped.join(", ")
+                    ));
+                }
+                if !looks_like_package(&contents.map_file) {
+                    notice.push_str(" The map file doesn't look like an Unreal package, check it's the right one.");
+                }
+                self.map_file = Some(contents.map_file);
+                self.meta = contents.meta;
+                self.banner = contents.banner;
+                self.published_file_id = contents.published_file_id;
+                self.notice = notice;
+                self.step = Step::Details;
+            }
+            Err(error) => {
+                self.reset();
+                self.error = error;
+            }
+        }
+    }
+
     fn pick_map_file(&mut self) {
-        let dialog = rfd::FileDialog::new().add_filter("Rocket League map", &["upk", "udk"]);
+        let dialog =
+            rfd::FileDialog::new().add_filter("Rocket League map or map zip", &["upk", "udk", "zip"]);
         if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
+            if file.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
+                self.load_zip(&file);
+                return;
+            }
             if self.meta.name.is_empty() {
                 self.meta.name = file
                     .file_stem()
@@ -484,7 +692,7 @@ impl ImportWizard {
         match self.step {
             Step::File => {
                 ui.strong("Step 1: Choose the map file");
-                ui.small("A .upk or .udk file.");
+                ui.small("A .upk or .udk file, or a .zip with the map inside (like the ones from the RL Workshop Archive).");
                 ui.add_space(6.0);
                 if let Some(name) = &self.done {
                     ui.colored_label(egui::Color32::LIGHT_GREEN, format!("Imported {name}."));
@@ -553,6 +761,9 @@ impl ImportWizard {
                             ) {
                                 Ok(map) => {
                                     let name = map.name.clone();
+                                    if !self.published_file_id.is_empty() {
+                                        let _ = write_item_vdf(cache_dir, &map, &self.published_file_id);
+                                    }
                                     imported = Some(map);
                                     self.reset();
                                     self.done = Some(name);
@@ -701,5 +912,65 @@ mod tests {
         };
         let error = import_map(&dir, &dir, &source, &named, Some(&fake_image)).unwrap_err();
         assert!(error.contains("PNG"), "{error}");
+    }
+
+    fn write_zip(path: &Path, files: &[(&str, Vec<u8>)]) {
+        use std::io::Write;
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+        for (name, bytes) in files {
+            zip.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
+            zip.write_all(bytes).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    fn png_bytes() -> Vec<u8> {
+        // noisy so it's comfortably over the 1 KB tiny-icon cutoff
+        let image = image::RgbImage::from_fn(64, 64, |x, y| image::Rgb([(x * 7) as u8, (y * 13) as u8, (x ^ y) as u8]));
+        let mut bytes = Vec::new();
+        image::DynamicImage::ImageRgb8(image)
+            .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png)
+            .unwrap();
+        bytes
+    }
+
+    #[test]
+    fn a_map_zip_is_read_and_unrelated_files_are_skipped() {
+        let dir = temp_dir("zip");
+        let zip = dir.join("map.zip");
+        let mut map = UPK_MAGIC.to_vec();
+        map.extend_from_slice(&[0u8; 4096]);
+        write_zip(&zip, &[
+            ("Cool Map/CoolMap.udk", map),
+            ("Cool Map/thumb.png", png_bytes()),
+            (
+                "Cool Map/item.vdf",
+                b"\"workshopitem\" { \"title\" \"Cool Map\" \"description\" \"[b]Fast[/b] map\" \"previewfile\" \"thumb.png\" \"publishedfileid\" \"123\" }".to_vec(),
+            ),
+            ("Cool Map/readme.txt", b"hi".to_vec()),
+            ("Cool Map/installer.exe", b"MZ".to_vec()),
+        ]);
+        let contents = extract_map_zip(&zip, &dir.join("out")).unwrap();
+        assert!(contents.map_file.ends_with("CoolMap.udk"));
+        assert_eq!(contents.meta.name, "Cool Map");
+        assert_eq!(contents.meta.description, "Fast map");
+        assert_eq!(contents.published_file_id, "123");
+        assert!(contents.banner.as_ref().is_some_and(|b| b.ends_with("thumb.png")));
+        assert_eq!(contents.skipped.len(), 2, "{:?}", contents.skipped);
+        assert!(!dir.join("out/Cool Map/installer.exe").exists());
+    }
+
+    #[test]
+    fn a_zip_without_a_map_fails_and_a_bad_image_is_dropped() {
+        let dir = temp_dir("zip_bad");
+        let empty = dir.join("empty.zip");
+        write_zip(&empty, &[("notes.txt", b"x".to_vec())]);
+        assert!(extract_map_zip(&empty, &dir.join("a")).is_err());
+
+        let zip = dir.join("map.zip");
+        write_zip(&zip, &[("m.upk", b"x".to_vec()), ("preview.png", vec![7u8; 4096])]);
+        let contents = extract_map_zip(&zip, &dir.join("b")).unwrap();
+        assert_eq!(contents.meta.name, "m");
+        assert!(contents.banner.is_none());
     }
 }

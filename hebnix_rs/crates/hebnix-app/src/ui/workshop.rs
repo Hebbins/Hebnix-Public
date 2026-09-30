@@ -22,10 +22,16 @@ use crate::multiplayer_lan::{
     ensure_sidecar_rule, fetch_map_file, is_local_map_id, valid_map_id,
 };
 mod background_changer;
+mod archive;
 mod local_import;
 mod steam_download;
 use background_changer::BackgroundChangerState;
+use archive::ArchiveBrowser;
 use steam_download::SteamDownloader;
+
+/// common Workshop multiplayer problems (VPNs/proxies, firewalls) and fixes
+const MULTIPLAYER_HELP_URL: &str =
+    "https://github.com/xplodingeggo/hebnix-linux/blob/feature/tsnet-multiplayer/docs/workshop-multiplayer-help.md"; // TEST ONLY: point at HebnixRL/Hebnix-Public main once merged
 use local_import::{
     ImportWizard, LocalMap, is_local_entry, load_local_maps, record_received_map, remove_local_map,
 };
@@ -352,6 +358,16 @@ impl MapManager {
     }
 }
 
+fn multiplayer_help_button(ui: &mut egui::Ui) {
+    if ui
+        .button("Using a VPN/proxy, or having issues? Read this")
+        .on_hover_text("Opens the Workshop multiplayer help page on GitHub")
+        .clicked()
+    {
+        ui.ctx().open_url(egui::OpenUrl::new_tab(MULTIPLAYER_HELP_URL));
+    }
+}
+
 fn find_map_file(dir: &Path) -> Option<PathBuf> {
     let entries = std::fs::read_dir(dir).ok()?;
     let mut dirs: Vec<PathBuf> = Vec::new();
@@ -546,6 +562,7 @@ pub struct WorkshopState {
     background_changer: BackgroundChangerState,
     import_wizard: ImportWizard,
     steam_downloader: SteamDownloader,
+    archive_browser: ArchiveBrowser,
     multiplayer: MultiplayerState,
     rl_launch: crate::config::RlLaunchCfg,
 }
@@ -576,6 +593,7 @@ impl WorkshopState {
             background_changer: BackgroundChangerState::default(),
             import_wizard: ImportWizard::default(),
             steam_downloader: SteamDownloader::default(),
+            archive_browser: ArchiveBrowser::default(),
             multiplayer,
             rl_launch: crate::config::RlLaunchCfg::default(),
         }
@@ -722,6 +740,15 @@ impl WorkshopState {
             if let Some(map) = downloaded {
                 self.add_local_map(map);
             }
+            ui.add_space(12.0);
+            ui.separator();
+            ui.add_space(8.0);
+            let from_archive =
+                self.archive_browser
+                    .render(ui, &self.manager.cache_dir, &self.manager.runtime_dir);
+            if let Some(map) = from_archive {
+                self.add_local_map(map);
+            }
             return;
         }
         if self.view == WorkshopView::Multiplayer {
@@ -757,6 +784,10 @@ impl WorkshopState {
                 ui.label(
                     "Can't find the map you want? You can download maps straight from \
                      the Steam Workshop in the Import Map tab.",
+                );
+                ui.label(
+                    "No Hubcap API key? The Import Map tab also lists the RL Workshop \
+                     Archive, where anyone can request a Workshop map.",
                 );
             })
             .response
@@ -966,6 +997,8 @@ impl WorkshopState {
                     self.multiplayer.wizard_started = true;
                     self.start_tailnet(tx, ctx);
                 }
+                ui.add_space(10.0);
+                multiplayer_help_button(ui);
             });
             return;
         }
@@ -990,6 +1023,9 @@ impl WorkshopState {
                 return;
             }
             ui.strong("Workshop Multiplayer");
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                multiplayer_help_button(ui);
+            });
         });
         ui.group(|ui| {
             ui.strong("Setup");
