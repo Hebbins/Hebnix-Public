@@ -276,6 +276,7 @@ enum Tab {
     Colours,
     Settings,
     Plugins,
+    RlApi,
     About,
 }
 
@@ -400,6 +401,7 @@ pub struct HebnixApp {
     patcher_subtab: PatcherSubTab,
     console: ConsoleState,
     workshop: WorkshopState,
+    rlapi_panel: crate::ui::rlapi::RlApiPanel,
 
     hidden: bool,
     topmost: bool,
@@ -870,6 +872,7 @@ impl HebnixApp {
             patcher_subtab: PatcherSubTab::Ball,
             console: ConsoleState::default(),
             workshop,
+            rlapi_panel: crate::ui::rlapi::RlApiPanel::default(),
             hidden,
             topmost: false,
             currently_connected: false,
@@ -1065,6 +1068,49 @@ impl HebnixApp {
         fetch_catalogs(self.tx.clone(), ctx.clone());
     }
 
+    fn enable_rlapi(&mut self) {
+        if self.rlapi_panel.starting { return; }
+        if !spoofer::is_admin() {
+            self.rlapi_panel.complete(Err("Run Hebnix as administrator, then enable RLAPI capture.".into()));
+            return;
+        }
+        self.rlapi_panel.starting = true;
+        let manager = Arc::clone(&self.spoofer_mgr);
+        let base_dir = self.base_dir.clone();
+        let tx = self.tx.clone();
+        std::thread::spawn(move || {
+            let result = (|| {
+                // Reuse the user's existing setup. Never install a CA or
+                // request elevated privileges implicitly from this tab.
+                if !spoofer::ca::is_current_installed(&base_dir) {
+                    return Err("Install the existing Hebnix certificate in Spoofer settings, then enable RLAPI.".into());
+                }
+                if !hebnix_sdk::process::is_rocket_league_running() {
+                    crate::winutil::clear_rocket_league_web_cache().map_err(|e|format!("Could not refresh Rocket League's cached configuration: {e}"))?;
+                }
+                manager.enable_rlapi()
+            })();
+            let _ = tx.send(AppMsg::RlApiCaptureReady(result));
+        });
+    }
+
+    fn render_rlapi_tab(&mut self, ui: &mut egui::Ui) {
+        use crate::ui::rlapi::Action;
+        let session = hebnix_sdk::rlapi::session::shared_game_session();
+        let status = if self.rlapi_panel.starting { "Enabling capture…".into() } else { session.status() };
+        match self.rlapi_panel.show(ui, session.enabled(), session.connected(), &status) {
+            Some(Action::Enable) => self.enable_rlapi(),
+            Some(Action::Disable) => self.spoofer_mgr.disable_rlapi(),
+            Some(Action::Send { service, body }) => {
+                let tx = self.tx.clone();
+                std::thread::spawn(move || {
+                    let result = session.request(&service, body);
+                    let _ = tx.send(AppMsg::RlApiResponse(result));
+                });
+            }
+            None => {}
+        }
+    }
     fn render_presets_tab(&mut self, ui: &mut egui::Ui, backups_dir: &std::path::Path) {
         ui.heading("Presets");
         ui.label("Save and restore named collections of your current item changes.");
@@ -1386,12 +1432,18 @@ impl HebnixApp {
         while let Ok(msg) = self.rx.try_recv() {
             match msg {
                 AppMsg::Log(s) => self.console.write(s),
+                AppMsg::RlApiCaptureReady(result) => {
+                    self.rlapi_panel.starting = false;
+                    if let Err(error) = result { self.rlapi_panel.complete(Err(error)); }
+                }
+                AppMsg::RlApiResponse(result) => self.rlapi_panel.complete(result),
                 AppMsg::GameEvent(event) => self.handle_game_event(event),
                 AppMsg::RlStatus {
                     rl_open,
                     api_open,
                     root_dir,
                 } => {
+                    self.spoofer_mgr.cleanup_idle_rlapi();
                     let rl_state_changed = rl_open != self.last_rl_open;
                     let mut platform_changed = false;
                     if let Some(root) = root_dir {
@@ -5673,6 +5725,7 @@ impl eframe::App for HebnixApp {
                     ui.selectable_value(&mut self.tab, Tab::Patcher, "Items");
                     ui.selectable_value(&mut self.tab, Tab::Settings, "Settings");
                     ui.selectable_value(&mut self.tab, Tab::Plugins, "Plugins");
+                    ui.selectable_value(&mut self.tab, Tab::RlApi, "RLAPI");
                     ui.selectable_value(&mut self.tab, Tab::About, "About");
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -6187,6 +6240,7 @@ impl eframe::App for HebnixApp {
 
                     Tab::Settings => self.render_settings_tab(ui),
                     Tab::Plugins => self.render_plugins_tab(ui),
+                    Tab::RlApi => self.render_rlapi_tab(ui),
                     Tab::About => self.render_about_tab(ui),
                 }
             });

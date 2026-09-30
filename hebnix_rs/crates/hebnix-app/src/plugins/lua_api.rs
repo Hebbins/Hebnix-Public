@@ -727,7 +727,7 @@ fn play_audio(
 // Poll for the result using the same asynchronous result pattern.
 
 use hebnix_sdk::eos::{self, EOSToken, Platform as EosPlatform};
-use hebnix_sdk::rlapi::RlApi;
+use hebnix_sdk::rlapi::session::shared_game_session;
 
 /// parse a user platform string into an eos platform
 fn parse_eos_platform(s: &str) -> Option<EosPlatform> {
@@ -830,12 +830,6 @@ fn async_rpc() -> &'static std::sync::Mutex<std::collections::HashMap<String, As
     MAP.get_or_init(Default::default)
 }
 
-/// is the shared psynet session connected
-fn rlapi_connected_flag() -> &'static std::sync::atomic::AtomicBool {
-    static FLAG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-    &FLAG
-}
-
 fn store_rpc(key: &str, ok: bool, result: serde_json::Value, error: String) {
     async_rpc()
         .lock()
@@ -844,72 +838,27 @@ fn store_rpc(key: &str, ok: bool, result: serde_json::Value, error: String) {
 }
 
 fn rlapi_queue() -> &'static crossbeam_channel::Sender<RlApiJob> {
-    use std::sync::atomic::Ordering;
     static QUEUE: OnceLock<crossbeam_channel::Sender<RlApiJob>> = OnceLock::new();
     QUEUE.get_or_init(|| {
         let (tx, rx) = crossbeam_channel::unbounded::<RlApiJob>();
         std::thread::Builder::new()
             .name("rlapi-worker".into())
             .spawn(move || {
-                let mut session: Option<RlApi> = None;
-                let mut session_platform: Option<EosPlatform> = None;
-
-                // Connect using the shared EOS token cache (so we never race
-                // the eos-worker for a fresh Steam ticket).
-                let connect = |platform: EosPlatform| -> Result<RlApi, String> {
-                    let token = get_or_fetch_eos(platform).ok_or_else(|| {
-                        format!("could not obtain an EOS token for {}", platform.as_str())
-                    })?;
-                    RlApi::connect_with_token(&token, platform)
-                };
-
                 while let Ok(job) = rx.recv() {
-                    // (Re)connect if we have no session or the platform changed.
-                    if session.is_none() || session_platform != Some(job.platform) {
-                        session = None;
-                        rlapi_connected_flag().store(false, Ordering::Relaxed);
-                        match connect(job.platform) {
-                            Ok(api) => {
-                                session = Some(api);
-                                session_platform = Some(job.platform);
-                                rlapi_connected_flag().store(true, Ordering::Relaxed);
-                            }
-                            Err(e) => {
-                                store_rpc(&job.key, false, serde_json::Value::Null, e);
-                                continue;
-                            }
-                        }
-                    }
-
-                    let api = session.as_mut().unwrap();
-                    let mut result = api.request(&job.service, job.body.clone());
-
-                    // If the bridge dropped, reconnect once and retry.
-                    if is_disconnect(&result) {
-                        rlapi_connected_flag().store(false, Ordering::Relaxed);
-                        session = connect(job.platform).ok();
-                        session_platform = session.as_ref().map(|_| job.platform);
-                        rlapi_connected_flag().store(session.is_some(), Ordering::Relaxed);
-                        if let Some(api) = session.as_mut() {
-                            result = api.request(&job.service, job.body.clone());
-                        }
-                    }
-
-                    match result {
+                    // The existing platform argument remains accepted for Lua
+                    // compatibility. Requests always use the active game's
+                    // account; never mint credentials or log in a second time.
+                    let _platform = job.platform;
+                    match shared_game_session().request(&job.service, job.body) {
                         Ok(value) => store_rpc(&job.key, true, value, String::new()),
-                        Err(e) => store_rpc(&job.key, false, serde_json::Value::Null, e),
+                        Err(error) => store_rpc(&job.key, false, serde_json::Value::Null, error),
                     }
                 }
             })
-            .ok();
+            .expect("could not start RLAPI request worker");
         tx
     })
 }
-
-fn is_disconnect(result: &Result<serde_json::Value, String>) -> bool {
-    matches!(result, Err(e) if e.contains("closed") || e.contains("connection") || e.contains("write") || e.contains("flush"))
-}
-
 /// optional lua body table to a json object (empty obj when absent, so
 /// no-arg psynet services get {} not [])
 fn lua_body_to_json(lua: &Lua, body: Option<LuaValue>) -> serde_json::Value {
@@ -1940,7 +1889,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     // Non-blocking PsyNet request. `service` e.g. "Skills/GetPlayerSkill v1";
     // `body` an optional table; `platform` optional (defaults to detected).
     // Returns a request key to poll with hebnix.rlapi_result(key).
-    // The session auto-authenticates (acquiring an EOS token) on first use.
+    // Enable RLAPI capture in Hebnix first. Uses the game connection without logging in.
     {
         let host = Rc::clone(&host);
         hebnix.set(
@@ -1997,7 +1946,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     hebnix.set(
         "rlapi_connected",
         lua.create_function(|_, ()| {
-            Ok(rlapi_connected_flag().load(std::sync::atomic::Ordering::Relaxed))
+            Ok(shared_game_session().connected())
         })?,
     )?;
 

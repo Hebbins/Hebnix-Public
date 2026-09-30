@@ -9,7 +9,7 @@ static LIVE_SPOOFER: OnceLock<Arc<SpooferManager>> = OnceLock::new();
 
 pub fn handoff_live_spoofer(spoofer: Arc<SpooferManager>) -> bool {
     if !hebnix_sdk::process::is_rocket_league_running()
-        || !(spoofer.http_running() || spoofer.socket_running())
+        || !(spoofer.http_running() || spoofer.socket_running() || spoofer.rlapi_running())
     {
         return false;
     }

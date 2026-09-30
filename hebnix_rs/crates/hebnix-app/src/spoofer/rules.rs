@@ -766,3 +766,33 @@ mod tests {
         );
     }
 }
+
+/// Keep normal spoof rules inactive when only the RLAPI workbench is enabled.
+pub struct EnabledRule {
+    pub inner: Box<dyn Rule>,
+    pub http: Arc<AtomicBool>,
+    pub socket: Arc<AtomicBool>,
+}
+impl Rule for EnabledRule {
+    fn matches_host(&self, host: &str) -> bool {
+        (self.http.load(Ordering::Relaxed) || self.socket.load(Ordering::Relaxed)) && self.inner.matches_host(host)
+    }
+    fn strip_request_headers(&self) -> &[&str] { self.inner.strip_request_headers() }
+    fn rewrite(&self, body: &mut Body) -> bool { self.inner.rewrite(body) }
+    fn announce(&self) -> Option<String> { self.inner.announce() }
+}
+
+/// Route the original game authentication and WebSocket, with no data spoofs.
+pub struct RlApiRouteRule;
+impl Rule for RlApiRouteRule {
+    fn matches_host(&self, host: &str) -> bool {
+        hebnix_sdk::rlapi::session::shared_game_session().enabled()
+            && (host.eq_ignore_ascii_case(TITLE_HOST) || host.eq_ignore_ascii_case("api.rlpp.psynet.gg"))
+    }
+    fn strip_request_headers(&self) -> &[&str] { &["if-none-match", "if-modified-since"] }
+    fn rewrite(&self, body: &mut Body) -> bool {
+        if !hebnix_sdk::rlapi::session::shared_game_session().enabled() { return false; }
+        let route = RankRule::with_item_spawner(Arc::new(Mutex::new(HashMap::new())), Arc::new(AtomicBool::new(true)));
+        route.rewrite(body)
+    }
+}

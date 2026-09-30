@@ -10,6 +10,8 @@
 //! request() sends any service by name, returns raw json. typed wrappers cover
 //! the common ones. everything in REQUESTS.md is reachable via request().
 
+pub mod session;
+
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
@@ -215,7 +217,7 @@ impl RlApi {
 
     /// Players/GetProfile v1: public profile for one player
     pub fn get_profile(&mut self, player_id: &str) -> Result<Value, String> {
-        self.request("Players/GetProfile v1", json!({ "PlayerID": player_id }))
+        self.request("Players/GetProfile v1", json!({ "PlayerIDs": [player_id] }))
     }
 
     /// Population/GetPopulation v1: online pop per playlist
