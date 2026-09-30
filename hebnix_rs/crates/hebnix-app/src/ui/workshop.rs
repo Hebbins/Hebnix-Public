@@ -118,7 +118,6 @@ fn rocket_league_multihome_address() -> Option<String> {
     })
 }
 
-pub const WORKSHOP_COLLECTION_URL: &str = "https://xplodingeggo.github.io/RLWorkshopCollection";
 pub const WORKSHOP_PLUGIN_ID: &str = "workshop_map_loader";
 pub const WORKSHOP_MODS_DIR_NAME: &str = "mods";
 pub const REMOTE_FILES_BASE: &str = "https://hebnix.com";
@@ -756,10 +755,9 @@ impl WorkshopState {
             ui.menu_button("?", |ui| {
                 ui.set_max_width(280.0);
                 ui.label(
-                    "Can't find the map you want? To download a map from the Steam \
-                     Workshop, use this website, then add it with the Import Map tab:",
+                    "Can't find the map you want? You can download maps straight from \
+                     the Steam Workshop in the Import Map tab.",
                 );
-                ui.hyperlink_to(WORKSHOP_COLLECTION_URL, WORKSHOP_COLLECTION_URL);
             })
             .response
             .on_hover_text("Can't find a map?");
