@@ -1,11 +1,12 @@
 // tells tailnet peers which workshop map is in which slot, so a guest can see
 // that they're missing the host's map and offer to install it. maps from the
-// workshop cdn are only ever described by id (the guest downloads them from
-// the cdn itself). maps a player imported themselves (`local_<hash>` ids)
-// aren't on the cdn, so those can also be fetched from the peer -- see
-// fetch_map_file for how that stays safe. every value read off the wire is
+// workshop cdn are described by id and can be downloaded from the cdn or, if
+// the cdn is slow or down, fetched from the peer. maps a player imported
+// themselves (`local_<hash>` ids) aren't on the cdn, so those only come from
+// the peer -- see fetch_map_file for how that stays safe. every value read off the wire is
 // untrusted and gets validated before it's used for anything.
 
+use std::collections::{HashMap, VecDeque};
 use std::io::{Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
@@ -14,7 +15,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -28,6 +29,9 @@ pub const LOCAL_ID_PREFIX: &str = "local_";
 const LOCAL_ID_HASH_CHARS: usize = 24;
 /// hard cap on a map file received from a peer
 pub const MAX_MAP_BYTES: u64 = 512 * 1024 * 1024;
+
+/// first four bytes of an unreal package (0x9E2A83C1, little endian)
+const UPK_MAGIC: [u8; 4] = [0xC1, 0x83, 0x2A, 0x9E];
 
 const REQUEST: &str = "HEBNIX-MAPS 1";
 const GET_REQUEST: &str = "HEBNIX-GET 1 ";
@@ -44,6 +48,30 @@ const IO_TIMEOUT: Duration = Duration::from_secs(3);
 const TRANSFER_TIMEOUT: Duration = Duration::from_secs(15);
 const POLL_INTERVAL: Duration = Duration::from_secs(10);
 const ACCEPT_IDLE: Duration = Duration::from_millis(200);
+/// anything smaller can't be a real map
+const MIN_SHARED_BYTES: u64 = 1024;
+/// the whole request line has to arrive within this, so a peer can't hold a
+/// connection open by dripping one byte every few seconds
+const REQUEST_DEADLINE: Duration = Duration::from_secs(5);
+
+// per-player limits on the map sync port. every hebnix player shares one
+// tailnet, so these keep one of them from tying up or flooding everyone
+// else. a normal client polls once every POLL_INTERVAL and downloads a map
+// now and then, nowhere near any of these.
+const MAX_CONNECTIONS_PER_PEER: usize = 2;
+const CONNECT_BURST: f64 = 5.0;
+const CONNECT_REFILL: Duration = Duration::from_secs(2);
+const GETS_PER_WINDOW: usize = 3;
+const GET_WINDOW: Duration = Duration::from_secs(10 * 60);
+/// online peers polled per round, so a flood of nodes can't balloon polling
+const MAX_POLLED_PEERS: usize = 32;
+/// a transfer that crawls below this is dropped (both directions)
+const MIN_TRANSFER_RATE: u64 = 32 * 1024;
+const RATE_WINDOW: Duration = Duration::from_secs(20);
+/// overall transfer budget: this many bytes a second, plus TRANSFER_GRACE
+const EXPECTED_TRANSFER_RATE: u64 = 128 * 1024;
+const TRANSFER_GRACE: Duration = Duration::from_secs(30);
+const MAX_TRANSFER_TIME: Duration = Duration::from_secs(30 * 60);
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SlotMap {
@@ -72,18 +100,127 @@ pub struct PeerOffer {
 }
 
 impl PeerOffer {
-    /// "Name (10.242.77.3)", or just the address if there's no name at all
+    /// in-game name, else the tailnet hostname. never the address, so
+    /// screenshots and streams don't hand out anyone's ip
     pub fn label(&self) -> String {
-        let who = if !self.player_name.is_empty() {
-            &self.player_name
+        if !self.player_name.is_empty() {
+            self.player_name.clone()
+        } else if !self.hostname.is_empty() {
+            self.hostname.clone()
         } else {
-            &self.hostname
-        };
-        if who.is_empty() {
-            self.ip.to_string()
-        } else {
-            format!("{who} ({})", self.ip)
+            "Unknown player".to_string()
         }
+    }
+}
+
+#[derive(Default)]
+struct PeerUse {
+    open: usize,
+    tokens: f64,
+    refilled: Option<Instant>,
+    gets: VecDeque<Instant>,
+    transferring: bool,
+}
+
+/// per-player connection and download limits for the map sync server
+#[derive(Default)]
+struct PeerLimits {
+    peers: Mutex<HashMap<IpAddr, PeerUse>>,
+}
+
+impl PeerLimits {
+    /// a new connection from `ip`, false if it's over its share
+    fn try_open(&self, ip: IpAddr) -> bool {
+        let Ok(mut peers) = self.peers.lock() else {
+            return false;
+        };
+        let now = Instant::now();
+        let peer = peers.entry(ip).or_default();
+        let since = peer.refilled.map_or(Duration::MAX, |at| now - at);
+        peer.tokens = (peer.tokens + since.as_secs_f64() / CONNECT_REFILL.as_secs_f64())
+            .min(CONNECT_BURST);
+        peer.refilled = Some(now);
+        if peer.open >= MAX_CONNECTIONS_PER_PEER || peer.tokens < 1.0 {
+            return false;
+        }
+        peer.tokens -= 1.0;
+        peer.open += 1;
+        true
+    }
+
+    fn close(&self, ip: IpAddr) {
+        if let Ok(mut peers) = self.peers.lock() {
+            if let Some(peer) = peers.get_mut(&ip) {
+                peer.open = peer.open.saturating_sub(1);
+            }
+        }
+    }
+
+    /// one download at a time per player, and only a few per GET_WINDOW
+    fn try_start_transfer(&self, ip: IpAddr) -> bool {
+        let Ok(mut peers) = self.peers.lock() else {
+            return false;
+        };
+        let now = Instant::now();
+        let peer = peers.entry(ip).or_default();
+        while peer.gets.front().is_some_and(|at| now - *at > GET_WINDOW) {
+            peer.gets.pop_front();
+        }
+        if peer.transferring || peer.gets.len() >= GETS_PER_WINDOW {
+            return false;
+        }
+        peer.gets.push_back(now);
+        peer.transferring = true;
+        true
+    }
+
+    fn end_transfer(&self, ip: IpAddr) {
+        if let Ok(mut peers) = self.peers.lock() {
+            if let Some(peer) = peers.get_mut(&ip) {
+                peer.transferring = false;
+            }
+        }
+    }
+}
+
+/// how long a transfer of `size` bytes may take in total
+fn transfer_budget(size: u64) -> Duration {
+    (Duration::from_secs(size / EXPECTED_TRANSFER_RATE) + TRANSFER_GRACE).min(MAX_TRANSFER_TIME)
+}
+
+/// drops transfers that blow their overall budget or crawl along so slowly
+/// they'd hold a slot for ages
+struct TransferGuard {
+    deadline: Instant,
+    window_start: Instant,
+    window_bytes: u64,
+}
+
+impl TransferGuard {
+    fn new(size: u64) -> Self {
+        let now = Instant::now();
+        Self {
+            deadline: now + transfer_budget(size),
+            window_start: now,
+            window_bytes: 0,
+        }
+    }
+
+    fn check(&mut self, moved: u64) -> Result<(), String> {
+        let now = Instant::now();
+        if now > self.deadline {
+            return Err("the transfer took too long".to_string());
+        }
+        self.window_bytes += moved;
+        let elapsed = now - self.window_start;
+        if elapsed >= RATE_WINDOW {
+            if self.window_bytes < MIN_TRANSFER_RATE * elapsed.as_secs() {
+                return Err("the transfer is too slow".to_string());
+            }
+            self.window_start = now;
+            self.window_bytes = 0;
+        }
+        Ok(())
     }
 }
 
@@ -109,7 +246,7 @@ pub struct PeerInfoReply {
 /// supplies this machine's in-game name and installed workshop maps
 pub type MapProvider = Arc<dyn Fn() -> LocalInfo + Send + Sync>;
 
-/// looks up the cached file for a `local_` map id, None if we don't have it
+/// looks up the cached file for a map id, None if we don't have it
 pub type MapFileProvider = Arc<dyn Fn(&str) -> Option<PathBuf> + Send + Sync>;
 
 /// live progress of a download from a peer, polled by the ui
@@ -177,6 +314,9 @@ fn peer_allowed(local: IpAddr, peer: IpAddr) -> bool {
 pub struct MapSync {
     stop: Arc<AtomicBool>,
     offers: Arc<Mutex<Vec<PeerOffer>>>,
+    /// players blocked this session, with the name they had when blocked:
+    /// their maps are hidden and their connections dropped
+    blocked: Arc<Mutex<HashMap<IpAddr, String>>>,
 }
 
 impl MapSync {
@@ -189,15 +329,20 @@ impl MapSync {
         let (sync, _) = Self::start_server(bind_ip, MAP_SYNC_PORT, provider, files)?;
         let stop = sync.stop.clone();
         let offers = sync.offers.clone();
+        let blocked = sync.blocked.clone();
         thread::spawn(move || {
             while !stop.load(Ordering::Relaxed) {
                 let mut found = Vec::new();
                 if let Ok(peers) = sidecar.peers_now() {
-                    for peer in peers.into_iter().filter(|peer| peer.online) {
+                    let peers = peers
+                        .into_iter()
+                        .filter(|peer| peer.online)
+                        .take(MAX_POLLED_PEERS);
+                    for peer in peers {
                         let Ok(ip) = peer.tailnet_ip.parse::<IpAddr>() else {
                             continue;
                         };
-                        if !peer_allowed(bind_ip, ip) {
+                        if !peer_allowed(bind_ip, ip) || is_blocked(&blocked, ip) {
                             continue;
                         }
                         if let Ok(info) = fetch_peer_info(ip, MAP_SYNC_PORT) {
@@ -236,15 +381,23 @@ impl MapSync {
             .map_err(|error| error.to_string())?;
         let port = listener.local_addr().map_err(|e| e.to_string())?.port();
         let stop = Arc::new(AtomicBool::new(false));
+        let blocked = Arc::new(Mutex::new(HashMap::new()));
         let server_stop = stop.clone();
+        let server_blocked = blocked.clone();
         let connections = Arc::new(AtomicUsize::new(0));
         let transfers = Arc::new(AtomicUsize::new(0));
+        let limits = Arc::new(PeerLimits::default());
         thread::spawn(move || {
             while !server_stop.load(Ordering::Relaxed) {
                 match listener.accept() {
                     Ok((stream, addr)) => {
-                        if !peer_allowed(bind_ip, addr.ip())
+                        let ip = addr.ip();
+                        // anything over a limit is just dropped here, before a
+                        // thread is spent on it
+                        if !peer_allowed(bind_ip, ip)
+                            || is_blocked(&server_blocked, ip)
                             || connections.load(Ordering::Relaxed) >= MAX_CONNECTIONS
+                            || !limits.try_open(ip)
                         {
                             continue;
                         }
@@ -255,8 +408,10 @@ impl MapSync {
                         let files = files.clone();
                         let connections = connections.clone();
                         let transfers = transfers.clone();
+                        let limits = limits.clone();
                         thread::spawn(move || {
-                            let _ = serve(stream, &provider, &files, &transfers);
+                            let _ = serve(stream, ip, &provider, &files, &transfers, &limits);
+                            limits.close(ip);
                             connections.fetch_sub(1, Ordering::Relaxed);
                         });
                     }
@@ -267,6 +422,7 @@ impl MapSync {
         let sync = Self {
             stop,
             offers: Arc::new(Mutex::new(Vec::new())),
+            blocked,
         };
         Ok((sync, port))
     }
@@ -274,6 +430,39 @@ impl MapSync {
     pub fn offers(&self) -> Vec<PeerOffer> {
         self.offers.lock().map(|o| o.clone()).unwrap_or_default()
     }
+
+    /// hides a player's maps and refuses their connections until this
+    /// session ends
+    pub fn block(&self, ip: IpAddr, label: String) {
+        if let Ok(mut blocked) = self.blocked.lock() {
+            blocked.insert(ip, label);
+        }
+        if let Ok(mut offers) = self.offers.lock() {
+            offers.retain(|offer| offer.ip != ip);
+        }
+    }
+
+    /// lets a blocked player back in; their maps show up on the next poll
+    pub fn unblock(&self, ip: IpAddr) {
+        if let Ok(mut blocked) = self.blocked.lock() {
+            blocked.remove(&ip);
+        }
+    }
+
+    /// everyone blocked this session, by name
+    pub fn blocked(&self) -> Vec<(IpAddr, String)> {
+        let mut list: Vec<(IpAddr, String)> = self
+            .blocked
+            .lock()
+            .map(|blocked| blocked.iter().map(|(ip, label)| (*ip, label.clone())).collect())
+            .unwrap_or_default();
+        list.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+        list
+    }
+}
+
+fn is_blocked(blocked: &Mutex<HashMap<IpAddr, String>>, ip: IpAddr) -> bool {
+    blocked.lock().map(|set| set.contains_key(&ip)).unwrap_or(false)
 }
 
 impl Drop for MapSync {
@@ -283,11 +472,17 @@ impl Drop for MapSync {
 }
 
 /// reads one '\n'-terminated line a byte at a time, so nothing past the line
-/// is consumed from the stream
-fn read_line(stream: &mut TcpStream, max: usize) -> std::io::Result<String> {
+/// is consumed from the stream. the whole line has to arrive by `deadline`.
+fn read_line(stream: &mut TcpStream, max: usize, deadline: Instant) -> std::io::Result<String> {
     let mut line = Vec::new();
     let mut byte = [0u8; 1];
     loop {
+        if Instant::now() > deadline {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "line took too long",
+            ));
+        }
         stream.read_exact(&mut byte)?;
         if byte[0] == b'\n' {
             break;
@@ -302,15 +497,21 @@ fn read_line(stream: &mut TcpStream, max: usize) -> std::io::Result<String> {
 
 fn serve(
     mut stream: TcpStream,
+    peer: IpAddr,
     provider: &MapProvider,
     files: &MapFileProvider,
     transfers: &AtomicUsize,
+    limits: &PeerLimits,
 ) -> std::io::Result<()> {
     // accepted sockets can inherit the listener's non-blocking mode on windows
     stream.set_nonblocking(false)?;
     stream.set_read_timeout(Some(IO_TIMEOUT))?;
     stream.set_write_timeout(Some(TRANSFER_TIMEOUT))?;
-    let request = read_line(&mut stream, MAX_REQUEST_LINE)?;
+    let request = read_line(
+        &mut stream,
+        MAX_REQUEST_LINE,
+        Instant::now() + REQUEST_DEADLINE,
+    )?;
     if request == REQUEST {
         let mut info = provider();
         info.maps.truncate(MAX_MAPS_PER_PEER);
@@ -322,44 +523,67 @@ fn serve(
         return stream.write_all(&body);
     }
     if let Some(id) = request.strip_prefix(GET_REQUEST) {
-        return serve_file(&mut stream, id, files, transfers);
+        return serve_file(&mut stream, peer, id, files, transfers, limits);
     }
     Ok(())
 }
 
 fn serve_file(
     stream: &mut TcpStream,
+    peer: IpAddr,
     id: &str,
     files: &MapFileProvider,
     transfers: &AtomicUsize,
+    limits: &PeerLimits,
 ) -> std::io::Result<()> {
     let refuse = |stream: &mut TcpStream, reason: &str| {
         let header = serde_json::json!({ "error": reason });
         stream.write_all(format!("{header}\n").as_bytes())
     };
-    // only maps the player imported themselves are ever served -- cdn maps
-    // are fetched from the cdn, and nothing outside the map cache can be named
-    if !is_local_map_id(id) {
+    // valid_map_id keeps the id to plain filename characters, so nothing
+    // outside the map cache can be named
+    if !valid_map_id(id) {
         return refuse(stream, "not a shareable map");
     }
     let Some(path) = files(id) else {
         return refuse(stream, "map not found");
     };
+    if !limits.try_start_transfer(peer) {
+        return refuse(stream, "too many downloads, try again later");
+    }
     if transfers.fetch_add(1, Ordering::Relaxed) >= MAX_TRANSFERS {
         transfers.fetch_sub(1, Ordering::Relaxed);
+        limits.end_transfer(peer);
         return refuse(stream, "busy");
     }
     let result = (|| {
         let mut file = std::fs::File::open(path)?;
         let size = file.metadata()?.len();
-        if size == 0 || size > MAX_MAP_BYTES {
+        if size > MAX_MAP_BYTES {
             return refuse(stream, "map too large to share");
+        }
+        // only ever hand out unreal packages (.upk/.udk share the header),
+        // whatever else might end up in the cache
+        let mut magic = [0u8; 4];
+        if size < MIN_SHARED_BYTES || file.read_exact(&mut magic).is_err() || magic != UPK_MAGIC {
+            return refuse(stream, "not a map package");
         }
         let header = serde_json::json!({ "size": size });
         stream.write_all(format!("{header}\n").as_bytes())?;
-        std::io::copy(&mut file, stream).map(|_| ())
+        stream.write_all(&magic)?;
+        let mut guard = TransferGuard::new(size);
+        let mut buffer = [0u8; 65536];
+        loop {
+            let count = file.read(&mut buffer)?;
+            if count == 0 {
+                return Ok(());
+            }
+            stream.write_all(&buffer[..count])?;
+            guard.check(count as u64).map_err(std::io::Error::other)?;
+        }
     })();
     transfers.fetch_sub(1, Ordering::Relaxed);
+    limits.end_transfer(peer);
     result
 }
 
@@ -402,10 +626,11 @@ pub fn fetch_peer_info(peer: IpAddr, port: u16) -> Result<PeerInfoReply, String>
     })
 }
 
-/// downloads a `local_` map from a peer into `dest`. the file only lands at
-/// `dest` if it is no bigger than `max_bytes` and its sha256 matches the hash
-/// baked into the id -- so a peer can't hand over anything other than the
-/// exact file the id names. the partial file is deleted on any failure.
+/// downloads a map from a peer into `dest`. the file only lands at `dest` if
+/// it is no bigger than `max_bytes` and starts like an unreal package. a
+/// `local_` map must also match the sha256 baked into its id, so a peer can't
+/// hand over anything other than the exact file the id names. cdn maps have
+/// no hash to check. the partial file is deleted on any failure.
 pub fn fetch_map_file(
     peer: IpAddr,
     port: u16,
@@ -414,8 +639,8 @@ pub fn fetch_map_file(
     max_bytes: u64,
     progress: &TransferProgress,
 ) -> Result<(), String> {
-    if !is_local_map_id(id) {
-        return Err("only maps imported by a player can be fetched from a peer".to_string());
+    if !valid_map_id(id) {
+        return Err("not a valid map id".to_string());
     }
     let partial = dest.with_extension("part");
     let result = download(peer, port, id, &partial, max_bytes, progress);
@@ -431,6 +656,14 @@ pub fn fetch_map_file(
     }
 }
 
+fn starts_with_upk_magic(path: &Path) -> bool {
+    let mut magic = [0u8; 4];
+    std::fs::File::open(path)
+        .and_then(|mut file| file.read_exact(&mut magic))
+        .is_ok()
+        && magic == UPK_MAGIC
+}
+
 fn download(
     peer: IpAddr,
     port: u16,
@@ -443,7 +676,12 @@ fn download(
     stream
         .write_all(format!("{GET_REQUEST}{id}\n").as_bytes())
         .map_err(|error| error.to_string())?;
-    let header = read_line(&mut stream, MAX_HEADER_LINE).map_err(|error| error.to_string())?;
+    let header = read_line(
+        &mut stream,
+        MAX_HEADER_LINE,
+        Instant::now() + TRANSFER_TIMEOUT,
+    )
+    .map_err(|error| error.to_string())?;
     let header: serde_json::Value =
         serde_json::from_str(&header).map_err(|error| error.to_string())?;
     if let Some(error) = header.get("error").and_then(|v| v.as_str()) {
@@ -453,7 +691,7 @@ fn download(
         .get("size")
         .and_then(|v| v.as_u64())
         .ok_or("peer sent no file size")?;
-    if size == 0 || size > max_bytes {
+    if size < MIN_SHARED_BYTES || size > max_bytes {
         return Err(format!("map size {size} bytes is outside the allowed limit"));
     }
     progress.total.store(size, Ordering::Relaxed);
@@ -463,6 +701,7 @@ fn download(
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 65536];
     let mut received = 0u64;
+    let mut guard = TransferGuard::new(size);
     while received < size {
         let want = buffer.len().min((size - received) as usize);
         let count = stream
@@ -476,10 +715,15 @@ fn download(
             .map_err(|error| error.to_string())?;
         received += count as u64;
         progress.done.store(received, Ordering::Relaxed);
+        guard.check(count as u64)?;
     }
     file.flush().map_err(|error| error.to_string())?;
     drop(file);
-    if local_map_id(&hex::encode(hasher.finalize())) != id {
+    // only unreal packages (.upk/.udk) are accepted, imported or not
+    if !starts_with_upk_magic(partial) {
+        return Err("received file is not a map".to_string());
+    }
+    if is_local_map_id(id) && local_map_id(&hex::encode(hasher.finalize())) != id {
         return Err("received file does not match its map id".to_string());
     }
     Ok(())
@@ -514,6 +758,13 @@ mod tests {
         dir
     }
 
+    /// bytes that pass the unreal package check
+    fn package(len: usize, fill: u8) -> Vec<u8> {
+        let mut bytes = UPK_MAGIC.to_vec();
+        bytes.resize(len, fill);
+        bytes
+    }
+
     /// server that shares one file under whatever id the test gives it
     fn serve_file_as(id: &str, path: PathBuf) -> (MapSync, u16) {
         let id = id.to_string();
@@ -543,18 +794,18 @@ mod tests {
     }
 
     #[test]
-    fn labels_prefer_the_in_game_name() {
+    fn labels_prefer_the_in_game_name_and_never_show_the_ip() {
         let mut offer = PeerOffer {
             ip: "10.242.77.3".parse().unwrap(),
             player_name: "Squishy".into(),
             hostname: "hebnix-abc".into(),
             maps: vec![],
         };
-        assert_eq!(offer.label(), "Squishy (10.242.77.3)");
+        assert_eq!(offer.label(), "Squishy");
         offer.player_name.clear();
-        assert_eq!(offer.label(), "hebnix-abc (10.242.77.3)");
+        assert_eq!(offer.label(), "hebnix-abc");
         offer.hostname.clear();
-        assert_eq!(offer.label(), "10.242.77.3");
+        assert_eq!(offer.label(), "Unknown player");
     }
 
     #[test]
@@ -584,7 +835,7 @@ mod tests {
     fn a_local_map_can_be_fetched_and_is_verified() {
         let dir = temp_dir("ok");
         let source = dir.join("source.upk");
-        let content = vec![7u8; 200_000];
+        let content = package(200_000, 7);
         std::fs::write(&source, &content).unwrap();
         let id = local_map_id(&hash_file(&source).unwrap());
         let (_server, port) = serve_file_as(&id, source);
@@ -598,10 +849,32 @@ mod tests {
     }
 
     #[test]
+    fn a_cdn_map_can_be_fetched_if_it_looks_like_a_package() {
+        let dir = temp_dir("cdn");
+        let good = dir.join("good.upk");
+        let content = package(5000, 1);
+        std::fs::write(&good, &content).unwrap();
+        let (_server, port) = serve_file_as("123", good);
+        let dest = dir.join("got.upk");
+        let progress = TransferProgress::default();
+        fetch_map_file(loopback(), port, "123", &dest, MAX_MAP_BYTES, &progress).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), content);
+
+        let bad = dir.join("bad.upk");
+        std::fs::write(&bad, b"not a package at all").unwrap();
+        let (_server, port) = serve_file_as("456", bad);
+        let dest = dir.join("bad_got.upk");
+        let error = fetch_map_file(loopback(), port, "456", &dest, MAX_MAP_BYTES, &progress);
+        assert!(error.is_err());
+        assert!(!dest.exists());
+        assert!(!dest.with_extension("part").exists());
+    }
+
+    #[test]
     fn a_file_that_does_not_match_its_id_is_rejected() {
         let dir = temp_dir("mismatch");
         let source = dir.join("source.upk");
-        std::fs::write(&source, b"real content").unwrap();
+        std::fs::write(&source, package(4096, 3)).unwrap();
         // peer serves this file under an id that names different content
         let wrong_id = local_map_id(&"0".repeat(64));
         let (_server, port) = serve_file_as(&wrong_id, source);
@@ -619,7 +892,7 @@ mod tests {
     fn oversized_maps_are_rejected() {
         let dir = temp_dir("big");
         let source = dir.join("source.upk");
-        std::fs::write(&source, vec![1u8; 4096]).unwrap();
+        std::fs::write(&source, package(4096, 1)).unwrap();
         let id = local_map_id(&hash_file(&source).unwrap());
         let (_server, port) = serve_file_as(&id, source);
 
@@ -631,19 +904,84 @@ mod tests {
     }
 
     #[test]
-    fn only_local_ids_are_served() {
-        let dir = temp_dir("refuse");
+    fn files_that_are_not_map_packages_are_never_served() {
+        let dir = temp_dir("notpkg");
         let source = dir.join("source.upk");
-        std::fs::write(&source, b"data").unwrap();
-        // even a provider that would happily return a file must not be asked
-        // for a cdn-style or path-like id
+        std::fs::write(&source, vec![b'M'; 4096]).unwrap();
         let (_server, port) = serve_file_as("12", source);
         let mut stream = TcpStream::connect((loopback(), port)).unwrap();
         stream.write_all(b"HEBNIX-GET 1 12\n").unwrap();
         let mut reply = String::new();
         stream.read_to_string(&mut reply).unwrap();
-        assert!(reply.contains("error"), "{reply}");
+        assert!(reply.contains("not a map package"), "{reply}");
+    }
 
+    #[test]
+    fn a_blocked_player_is_refused_until_unblocked() {
+        let provider: MapProvider = Arc::new(LocalInfo::default);
+        let (server, port) = MapSync::start_server(loopback(), 0, provider, no_files()).unwrap();
+        assert!(fetch_peer_info(loopback(), port).is_ok());
+        server.block(loopback(), "Griefer".into());
+        assert!(fetch_peer_info(loopback(), port).is_err());
+        assert_eq!(server.blocked(), vec![(loopback(), "Griefer".to_string())]);
+        server.unblock(loopback());
+        assert!(server.blocked().is_empty());
+        assert!(fetch_peer_info(loopback(), port).is_ok());
+    }
+
+    #[test]
+    fn connections_are_limited_per_player() {
+        let limits = PeerLimits::default();
+        let ip = loopback();
+        let other: IpAddr = "10.242.77.9".parse().unwrap();
+        // two open at once, the third waits for one to close
+        assert!(limits.try_open(ip));
+        assert!(limits.try_open(ip));
+        assert!(!limits.try_open(ip));
+        assert!(limits.try_open(other));
+        limits.close(ip);
+        limits.close(ip);
+        // the burst runs out after CONNECT_BURST quick connections
+        let mut opened = 2;
+        while limits.try_open(ip) {
+            limits.close(ip);
+            opened += 1;
+            assert!(opened <= 10, "burst never ran out");
+        }
+        assert_eq!(opened, CONNECT_BURST as usize);
+    }
+
+    #[test]
+    fn downloads_are_limited_per_player() {
+        let limits = PeerLimits::default();
+        let ip = loopback();
+        assert!(limits.try_start_transfer(ip));
+        // one at a time
+        assert!(!limits.try_start_transfer(ip));
+        limits.end_transfer(ip);
+        for _ in 1..GETS_PER_WINDOW {
+            assert!(limits.try_start_transfer(ip));
+            limits.end_transfer(ip);
+        }
+        // and only a few per window
+        assert!(!limits.try_start_transfer(ip));
+    }
+
+    #[test]
+    fn transfer_budget_grows_with_size_but_is_capped() {
+        assert_eq!(transfer_budget(0), TRANSFER_GRACE);
+        assert!(transfer_budget(100 * 1024 * 1024) > transfer_budget(10 * 1024 * 1024));
+        assert_eq!(transfer_budget(MAX_MAP_BYTES * 100), MAX_TRANSFER_TIME);
+    }
+
+    #[test]
+    fn only_valid_ids_are_served() {
+        let dir = temp_dir("refuse");
+        let source = dir.join("source.upk");
+        std::fs::write(&source, b"data").unwrap();
+        // even a provider that would happily return a file must not be asked
+        // for a path-like id
+        let (_server, port) = serve_file_as("12", source);
         let mut stream = TcpStream::connect((loopback(), port)).unwrap();
         stream.write_all(b"HEBNIX-GET 1 local_../../x\n").unwrap();
         let mut reply = String::new();

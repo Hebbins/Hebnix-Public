@@ -741,6 +741,7 @@ impl HebnixApp {
         }
 
         let mut workshop = WorkshopState::new(&base_dir);
+        workshop.set_share_files(config.settings.p2p_file_sharing);
         workshop.fetch_catalog(tx.clone(), cc.egui_ctx.clone());
 
         let last_size = (config.window.width, config.window.height);
@@ -4455,6 +4456,21 @@ impl HebnixApp {
                                     self.save_config();
                                 }
                             });
+                            ui.horizontal(|ui| {
+                                ui.add_sized([130.0, 20.0], egui::Label::new("P2P File Sharing:"));
+                                if ui.checkbox(&mut self.config.settings.p2p_file_sharing, "").changed() {
+                                    self.workshop
+                                        .set_share_files(self.config.settings.p2p_file_sharing);
+                                    self.save_config();
+                                }
+                            });
+                            ui.label(
+                                egui::RichText::new(
+                                    "Turning this off stops other players in Workshop multiplayer from                                      downloading maps from your PC. Custom maps that aren't on the Hebnix                                      Workshop can then no longer be downloaded by other players.",
+                                )
+                                .size(11.0)
+                                .color(egui::Color32::GRAY),
+                            );
                             ui.horizontal(|ui| {
                                 ui.add_sized([130.0, 20.0], egui::Label::new("Suppress Left Alerts:"));
                                 if ui.checkbox(&mut self.config.settings.suppress_left_alerts, "").changed() {

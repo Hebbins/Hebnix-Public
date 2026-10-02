@@ -31,6 +31,11 @@ use serde::Deserialize;
 use crate::messages::AppMsg;
 
 #[cfg(windows)]
+use winreg::RegKey;
+#[cfg(windows)]
+use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WRITE};
+
+#[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 const SERVICE_NAME: &str = "HebnixTailscale";
@@ -40,6 +45,11 @@ const SERVICE_NAME: &str = "HebnixTailscale";
 // matches it and doesn't collide with a normal tailscale install.
 const SERVICE_PIPE: &str = r"\\.\pipe\ProtectedPrefix\Administrators\HebnixTailscale\tailscaled";
 const SERVICE_START_TIMEOUT: Duration = Duration::from_secs(10);
+/// tailscaled knob that turns off direct (udp) connections, so all traffic
+/// goes through tailscale's DERP relays and other players never learn this
+/// machine's public address. costs some ping. set in the service's
+/// environment, so it only applies after a service restart.
+const RELAY_ONLY_KNOB: &str = "TS_DEBUG_ALWAYS_USE_DERP";
 const PEER_POLL_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,13 +134,41 @@ impl std::fmt::Debug for TsnetSidecarHandle {
     }
 }
 
+/// the files that make up the multiplayer network helper
+const SIDECAR_EXES: [&str; 2] = ["tailscaled.exe", "tailscale.exe"];
+const SIDECAR_DLL: &str = "wintun.dll";
+
+/// picks which folder to run the network helper from. the first folder that
+/// has the whole set wins, else the first with both programs (wintun.dll can
+/// then come from wherever windows finds it). `dirs` is in priority order.
+pub fn find_sidecar_dir(dirs: &[PathBuf]) -> Result<PathBuf, String> {
+    let has = |dir: &PathBuf, files: &[&str]| files.iter().all(|file| dir.join(file).is_file());
+    let full = [SIDECAR_EXES[0], SIDECAR_EXES[1], SIDECAR_DLL];
+    dirs.iter()
+        .find(|dir| has(dir, &full))
+        .or_else(|| dirs.iter().find(|dir| has(dir, &SIDECAR_EXES)))
+        .cloned()
+        .ok_or_else(|| {
+            let places: Vec<String> = dirs.iter().map(|dir| dir.display().to_string()).collect();
+            format!(
+                "the multiplayer network components are missing, looked in: {}",
+                places.join(", ")
+            )
+        })
+}
+
 impl TsnetSidecarHandle {
     /// Ensures the `HebnixTailscale` service is installed (pointed at the
     /// `tailscaled.exe`/`wintun.dll` next to `exe_dir`) and running, then
     /// starts a background peer-status poller. Requires administrator
     /// rights (same as the firewall-rule and, previously, TAP-driver setup
     /// this app already needed).
-    pub fn spawn(exe_dir: &Path, state_dir: &Path, tx: Sender<AppMsg>) -> Result<Self, String> {
+    pub fn spawn(
+        exe_dir: &Path,
+        state_dir: &Path,
+        relay_only: bool,
+        tx: Sender<AppMsg>,
+    ) -> Result<Self, String> {
         let tailscaled_exe = exe_dir.join("tailscaled.exe");
         let tailscale_cli = exe_dir.join("tailscale.exe");
         if !tailscaled_exe.is_file() || !tailscale_cli.is_file() {
@@ -140,7 +178,7 @@ impl TsnetSidecarHandle {
             ));
         }
 
-        ensure_service(&tailscaled_exe, state_dir)?;
+        ensure_service(&tailscaled_exe, state_dir, relay_only)?;
 
         let poll_stop = Arc::new(AtomicBool::new(false));
         spawn_peer_poller(tailscale_cli.clone(), tx.clone(), poll_stop.clone());
@@ -283,6 +321,11 @@ fn bring_up(cli: &Path, auth_key: &str, hostname: &str, control_url: &str) -> Re
         cli,
         &[
             "up",
+            // the service keeps its saved prefs between runs, and `up` refuses
+            // to change them unless every non-default flag is repeated (it
+            // failed on a leftover --exit-node-allow-lan-access). this is our
+            // own service, so just start from defaults every time.
+            "--reset",
             &format!("--login-server={control_url}"),
             &format!("--authkey={auth_key}"),
             &format!("--hostname={hostname}"),
@@ -346,7 +389,7 @@ fn spawn_peer_poller(cli: PathBuf, tx: Sender<AppMsg>, stop: Arc<AtomicBool>) {
 /// pointed at `tailscaled_exe` with its own state directory and named pipe
 /// -- kept entirely separate from any real Tailscale install so the two
 /// can't collide.
-fn ensure_service(tailscaled_exe: &Path, state_dir: &Path) -> Result<(), String> {
+fn ensure_service(tailscaled_exe: &Path, state_dir: &Path, relay_only: bool) -> Result<(), String> {
     std::fs::create_dir_all(state_dir)
         .map_err(|error| format!("could not create the multiplayer network's state directory: {error}"))?;
 
@@ -376,7 +419,17 @@ fn ensure_service(tailscaled_exe: &Path, state_dir: &Path) -> Result<(), String>
         let _ = run_sc(&["config", SERVICE_NAME, "binPath=", &bin_path]);
     }
 
-    if !state_is_running(&query_state()?) {
+    let changed = set_relay_only(relay_only)
+        .map_err(|error| format!("could not set the hide-my-ip option: {error}"))?;
+    let mut running = state_is_running(&query_state()?);
+    if changed && running {
+        // the knob is only read when tailscaled starts
+        let _ = run_sc(&["stop", SERVICE_NAME]);
+        wait_for_stopped(SERVICE_START_TIMEOUT)
+            .map_err(|_| "the multiplayer network service did not stop in time".to_string())?;
+        running = false;
+    }
+    if !running {
         run_sc(&["start", SERVICE_NAME])
             .map_err(|error| format!("could not start the multiplayer network service: {error}"))?;
         wait_for_running(SERVICE_START_TIMEOUT)
@@ -419,6 +472,124 @@ fn wait_for_running(timeout: Duration) -> Result<(), String> {
         std::thread::sleep(Duration::from_millis(200));
     }
     Err("timed out".to_string())
+}
+
+fn wait_for_stopped(timeout: Duration) -> Result<(), String> {
+    let start = std::time::Instant::now();
+    while start.elapsed() < timeout {
+        let text = query_state()?;
+        let stopped = match service_state_code(&text) {
+            Some(code) => code == 1,
+            None => text.contains("STOPPED"),
+        };
+        if stopped {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    Err("timed out".to_string())
+}
+
+/// the service's environment with the relay-only knob added or removed
+fn environment_with_relay_only(current: Vec<String>, relay_only: bool) -> Vec<String> {
+    let prefix = format!("{RELAY_ONLY_KNOB}=");
+    let mut env: Vec<String> = current
+        .into_iter()
+        .filter(|entry| !entry.starts_with(&prefix))
+        .collect();
+    if relay_only {
+        env.push(format!("{prefix}true"));
+    }
+    env
+}
+
+/// writes the relay-only knob into the service's environment, true if that
+/// changed anything
+#[cfg(windows)]
+fn set_relay_only(relay_only: bool) -> Result<bool, String> {
+    let key = RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey_with_flags(
+            format!(r"SYSTEM\CurrentControlSet\Services\{SERVICE_NAME}"),
+            KEY_READ | KEY_WRITE,
+        )
+        .map_err(|error| error.to_string())?;
+    let current: Vec<String> = key.get_value("Environment").unwrap_or_default();
+    let wanted = environment_with_relay_only(current.clone(), relay_only);
+    if wanted == current {
+        return Ok(false);
+    }
+    if wanted.is_empty() {
+        key.delete_value("Environment").map_err(|error| error.to_string())?;
+    } else {
+        key.set_value("Environment", &wanted)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(true)
+}
+
+#[cfg(not(windows))]
+fn set_relay_only(_relay_only: bool) -> Result<bool, String> {
+    Ok(false)
+}
+
+/// hides auth keys and ip addresses in text that ends up on screen, like
+/// tailscale's own error messages (which echo the whole `up` command back)
+pub fn redact(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut word = String::new();
+    for c in text.chars() {
+        if c.is_whitespace() {
+            out.push_str(&redact_word(&word));
+            word.clear();
+            out.push(c);
+        } else {
+            word.push(c);
+        }
+    }
+    out.push_str(&redact_word(&word));
+    out
+}
+
+fn redact_word(word: &str) -> String {
+    for flag in ["--auth-key=", "--authkey="] {
+        if word.starts_with(flag) {
+            return format!("{flag}<hidden>");
+        }
+    }
+    for key in ["hskey-", "tskey-"] {
+        if let Some(at) = word.find(key) {
+            return format!("{}<hidden>", &word[..at]);
+        }
+    }
+    mask_ipv4(word)
+}
+
+/// swaps anything shaped like an ipv4 address for x.x.x.x
+fn mask_ipv4(word: &str) -> String {
+    let mut out = String::with_capacity(word.len());
+    let mut run = String::new();
+    let flush = |run: &mut String, out: &mut String| {
+        if run.trim_matches('.').parse::<std::net::Ipv4Addr>().is_ok() {
+            let lead = run.len() - run.trim_start_matches('.').len();
+            let tail = run.len() - run.trim_end_matches('.').len();
+            out.push_str(&".".repeat(lead));
+            out.push_str("x.x.x.x");
+            out.push_str(&".".repeat(tail));
+        } else {
+            out.push_str(run);
+        }
+        run.clear();
+    };
+    for c in word.chars() {
+        if c.is_ascii_digit() || c == '.' {
+            run.push(c);
+        } else {
+            flush(&mut run, &mut out);
+            out.push(c);
+        }
+    }
+    flush(&mut run, &mut out);
+    out
 }
 
 fn query_state() -> Result<String, String> {
@@ -471,7 +642,7 @@ fn run_tailscale(cli: &Path, args: &[&str]) -> Result<String, String> {
         Err(if message.is_empty() {
             format!("tailscale exited with an error ({:?})", output.status)
         } else {
-            message.to_string()
+            redact(message)
         })
     }
 }
@@ -481,7 +652,70 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    fn sidecar_dir_with(name: &str, files: &[&str]) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("hebnix_sidecar_{name}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for file in files {
+            std::fs::write(dir.join(file), b"x").unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn the_sidecar_is_found_in_either_folder() {
+        let all = ["tailscaled.exe", "tailscale.exe", "wintun.dll"];
+        let lan = sidecar_dir_with("lan", &all);
+        let root = sidecar_dir_with("root", &all);
+        let empty = sidecar_dir_with("empty", &[]);
+        let partial = sidecar_dir_with("partial", &["wintun.dll"]);
+        let no_dll = sidecar_dir_with("nodll", &["tailscaled.exe", "tailscale.exe"]);
+
+        // priority order decides when both have everything
+        assert_eq!(find_sidecar_dir(&[lan.clone(), root.clone()]).unwrap(), lan);
+        assert_eq!(find_sidecar_dir(&[root.clone(), lan.clone()]).unwrap(), root);
+        // a folder with only some files is skipped, so the root still works
+        assert_eq!(find_sidecar_dir(&[partial.clone(), root.clone()]).unwrap(), root);
+        assert_eq!(find_sidecar_dir(&[empty.clone(), root.clone()]).unwrap(), root);
+        // the folder with the full set beats an earlier one missing the dll
+        assert_eq!(find_sidecar_dir(&[no_dll.clone(), root.clone()]).unwrap(), root);
+        // but a folder missing only the dll still works if it's all there is
+        assert_eq!(find_sidecar_dir(&[empty.clone(), no_dll.clone()]).unwrap(), no_dll);
+        let error = find_sidecar_dir(&[empty, partial]).unwrap_err();
+        assert!(error.contains("missing"), "{error}");
+    }
+
     const RUNNING: &str = "SERVICE_NAME: HebnixTailscale\n        TYPE               : 10  WIN32_OWN_PROCESS\n        STATE              : 4  RUNNING\n                                (STOPPABLE, NOT_PAUSABLE, ACCEPTS_SHUTDOWN)\n        WIN32_EXIT_CODE    : 0  (0x0)\n        SERVICE_EXIT_CODE  : 0  (0x0)\n";
+
+    #[test]
+    fn redact_hides_keys_and_addresses() {
+        let text = "Error: changing settings\n\n\ttailscale up --accept-dns=false \
+                    --auth-key=hskey-auth-abc123 --hostname=hebnix-3cd2be97 \
+                    --login-server=https://hs.example.com --timeout=30s\n\
+                    peer 10.242.77.3:41641 and 203.0.113.5 via v1.2.3";
+        let out = redact(text);
+        assert!(!out.contains("hskey"), "{out}");
+        assert!(out.contains("--auth-key=<hidden>"), "{out}");
+        assert!(!out.contains("10.242.77.3"), "{out}");
+        assert!(!out.contains("203.0.113.5"), "{out}");
+        assert!(out.contains("x.x.x.x:41641"), "{out}");
+        // non-addresses and layout survive
+        assert!(out.contains("v1.2.3"), "{out}");
+        assert!(out.contains("--timeout=30s"), "{out}");
+        assert!(out.contains("\n\n\t"), "{out}");
+        assert_eq!(redact("key tskey-abc, ok"), "key <hidden> ok");
+    }
+
+    #[test]
+    fn relay_only_knob_is_added_and_removed_cleanly() {
+        let base = vec!["OTHER=1".to_string()];
+        let on = environment_with_relay_only(base.clone(), true);
+        assert_eq!(on, vec!["OTHER=1", "TS_DEBUG_ALWAYS_USE_DERP=true"]);
+        // turning it on twice doesn't stack
+        assert_eq!(environment_with_relay_only(on.clone(), true), on);
+        assert_eq!(environment_with_relay_only(on, false), base);
+        assert!(environment_with_relay_only(vec![], false).is_empty());
+    }
 
     #[test]
     fn the_service_state_is_read_from_its_number() {
@@ -526,7 +760,7 @@ mod tests {
         std::fs::create_dir_all(&state_dir).unwrap();
 
         let (tx, rx) = crossbeam_channel::unbounded();
-        let mut handle = TsnetSidecarHandle::spawn(Path::new(&bin_dir), &state_dir, tx)
+        let mut handle = TsnetSidecarHandle::spawn(Path::new(&bin_dir), &state_dir, false, tx)
             .expect("sidecar failed to spawn / install the service");
 
         handle.request_status().expect("failed to send status command");
