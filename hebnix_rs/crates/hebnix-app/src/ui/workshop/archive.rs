@@ -66,7 +66,10 @@ impl ArchiveMap {
         search.is_empty()
             || self.title.to_lowercase().contains(&search)
             || self.author.to_lowercase().contains(&search)
-            || self.categories().iter().any(|c| c.to_lowercase().contains(&search))
+            || self
+                .categories()
+                .iter()
+                .any(|c| c.to_lowercase().contains(&search))
     }
 }
 
@@ -139,7 +142,11 @@ fn download_and_import(
 ) -> Result<LocalMap, String> {
     log(&format!("Downloading {}...", map.title));
     let download = work_dir.join(file_name_from_url(&map.download_url));
-    download_to(&map.download_url, &download, crate::multiplayer_lan::MAX_MAP_BYTES)?;
+    download_to(
+        &map.download_url,
+        &download,
+        crate::multiplayer_lan::MAX_MAP_BYTES,
+    )?;
 
     let mut meta = ImportMeta {
         name: map.title.clone(),
@@ -152,7 +159,10 @@ fn download_and_import(
         log("Unpacking the zip...");
         let contents = extract_map_zip(&download, &work_dir.join("zip"))?;
         if !contents.skipped.is_empty() {
-            log(&format!("Skipped {} unrelated file(s) in the zip.", contents.skipped.len()));
+            log(&format!(
+                "Skipped {} unrelated file(s) in the zip.",
+                contents.skipped.len()
+            ));
         }
         if meta.name.trim().is_empty() {
             meta.name = contents.meta.name;
@@ -182,7 +192,9 @@ fn download_and_import(
         log("Downloading the preview image...");
         let preview = work_dir.join("preview");
         // an image that won't download or decode just means no banner
-        if download_to(&map.preview_url, &preview, MAX_IMAGE_BYTES).is_ok() && usable_banner(&preview) {
+        if download_to(&map.preview_url, &preview, MAX_IMAGE_BYTES).is_ok()
+            && usable_banner(&preview)
+        {
             banner = Some(preview);
         }
     }
@@ -231,7 +243,13 @@ impl ArchiveBrowser {
         });
     }
 
-    fn start(&self, map: ArchiveMap, cache_dir: PathBuf, runtime_dir: PathBuf, ctx: &egui::Context) {
+    fn start(
+        &self,
+        map: ArchiveMap,
+        cache_dir: PathBuf,
+        runtime_dir: PathBuf,
+        ctx: &egui::Context,
+    ) {
         if self.downloading.swap(true, Ordering::Relaxed) {
             return;
         }
@@ -268,7 +286,12 @@ impl ArchiveBrowser {
 
     /// draws the archive section. returns a map once it has been downloaded
     /// and imported.
-    pub fn render(&mut self, ui: &mut egui::Ui, cache_dir: &Path, runtime_dir: &Path) -> Option<LocalMap> {
+    pub fn render(
+        &mut self,
+        ui: &mut egui::Ui,
+        cache_dir: &Path,
+        runtime_dir: &Path,
+    ) -> Option<LocalMap> {
         let loading = self.loading.load(Ordering::Relaxed);
         let downloading = self.downloading.load(Ordering::Relaxed);
 
@@ -287,7 +310,10 @@ impl ArchiveBrowser {
         let loaded = self.shared.lock().is_ok_and(|s| s.index.is_some());
         ui.horizontal(|ui| {
             if !self.show_list {
-                if ui.add_enabled(!loading, egui::Button::new("Show archive maps")).clicked() {
+                if ui
+                    .add_enabled(!loading, egui::Button::new("Show archive maps"))
+                    .clicked()
+                {
                     self.show_list = true;
                     if !loaded {
                         self.load(ui.ctx());
@@ -297,7 +323,10 @@ impl ArchiveBrowser {
                 if ui.button("Hide list").clicked() {
                     self.show_list = false;
                 }
-                if ui.add_enabled(!loading, egui::Button::new("Refresh list")).clicked() {
+                if ui
+                    .add_enabled(!loading, egui::Button::new("Refresh list"))
+                    .clicked()
+                {
                     self.load(ui.ctx());
                 }
                 ui.add(
@@ -315,7 +344,8 @@ impl ArchiveBrowser {
             match &shared.index {
                 Some(Ok(_)) if !self.show_list => {}
                 Some(Ok(maps)) => {
-                    let shown: Vec<&ArchiveMap> = maps.iter().filter(|m| m.matches(&self.search)).collect();
+                    let shown: Vec<&ArchiveMap> =
+                        maps.iter().filter(|m| m.matches(&self.search)).collect();
                     ui.small(format!("{} of {} maps", shown.len(), maps.len()));
                     egui::ScrollArea::vertical()
                         .id_salt("archive_maps")
@@ -356,7 +386,10 @@ impl ArchiveBrowser {
                 Some(Ok(map)) => {
                     ui.colored_label(
                         egui::Color32::LIGHT_GREEN,
-                        format!("Imported {}. Find it under Browse Maps, in View Downloaded.", map.name),
+                        format!(
+                            "Imported {}. Find it under Browse Maps, in View Downloaded.",
+                            map.name
+                        ),
                     );
                     if !downloading && !shared.delivered {
                         imported = Some(map.clone());
@@ -371,7 +404,12 @@ impl ArchiveBrowser {
         }
 
         if let Some(map) = download {
-            self.start(map, cache_dir.to_path_buf(), runtime_dir.to_path_buf(), ui.ctx());
+            self.start(
+                map,
+                cache_dir.to_path_buf(),
+                runtime_dir.to_path_buf(),
+                ui.ctx(),
+            );
         }
         imported
     }
@@ -400,7 +438,10 @@ mod tests {
         assert_eq!(maps[1].categories(), vec!["fun", "other"]);
         assert!(maps[1].matches("OTHER"));
         assert!(!maps[0].matches("bees"));
-        assert_eq!(parse_workshop_id(&maps[0].steam_url).as_deref(), Some("1906378036"));
+        assert_eq!(
+            parse_workshop_id(&maps[0].steam_url).as_deref(),
+            Some("1906378036")
+        );
     }
 
     /// hits the real archive: cargo test -- --ignored archive_live
@@ -408,23 +449,34 @@ mod tests {
     #[ignore]
     fn archive_live_download() {
         let maps = fetch_index().unwrap();
-        let map = maps.iter().find(|m| m.title.contains("Aim")).unwrap_or(&maps[0]).clone();
+        let map = maps
+            .iter()
+            .find(|m| m.title.contains("Aim"))
+            .unwrap_or(&maps[0])
+            .clone();
         let root = std::env::temp_dir().join(format!("hebnix_archive_live_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let (cache, runtime, work) = (root.join("cache"), root.join("runtime"), root.join("work"));
         for dir in [&cache, &runtime, &work] {
             std::fs::create_dir_all(dir).unwrap();
         }
-        let imported = download_and_import(&map, &cache, &runtime, &work, &|line| println!("{line}")).unwrap();
+        let imported =
+            download_and_import(&map, &cache, &runtime, &work, &|line| println!("{line}")).unwrap();
         println!("{imported:?}");
         assert!(cache.join(format!("{}.upk", imported.id)).is_file());
-        assert!(!imported.banner_path.is_empty(), "preview should have been stored");
+        assert!(
+            !imported.banner_path.is_empty(),
+            "preview should have been stored"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
     fn names_the_download_after_the_url() {
-        assert_eq!(file_name_from_url("https://a.example/x/Map.udk?v=2"), "Map.udk");
+        assert_eq!(
+            file_name_from_url("https://a.example/x/Map.udk?v=2"),
+            "Map.udk"
+        );
         assert_eq!(file_name_from_url("https://a.example/"), "map.upk");
     }
 }

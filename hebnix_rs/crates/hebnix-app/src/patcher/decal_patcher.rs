@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use crate::config::{Config, PatchSource};
 use crate::messages::AppMsg;
-use crate::patcher::{catalog::PatchCatalog, patch_source_selector};
 use crate::patch_core::upk;
+use crate::patcher::{catalog::PatchCatalog, patch_source_selector};
 
 // UPK magic constant
 const UPK_MAGIC: u32 = 0x9E2A83C1;
@@ -3205,14 +3205,16 @@ impl DecalPatcherState {
                                 let _ = config.save(&self.base_dir);
                             }
                             Err(error) => {
-                                let _ = tx.send(AppMsg::Log(format!(
-                                    "[Decals] Import failed: {error}"
-                                )));
+                                let _ = tx
+                                    .send(AppMsg::Log(format!("[Decals] Import failed: {error}")));
                             }
                         }
                     }
                 }
-                if ui.checkbox(&mut self.show_applied, "Show Applied").changed() {
+                if ui
+                    .checkbox(&mut self.show_applied, "Show Applied")
+                    .changed()
+                {
                     self.page = 0;
                 }
             });
@@ -3270,9 +3272,8 @@ impl DecalPatcherState {
                             if let Err(error) =
                                 self.restore_all_decals(cooked_pc, backups_dir, tx, ctx)
                             {
-                                let _ = tx.send(AppMsg::Log(format!(
-                                    "[Decals] Restore failed: {error}"
-                                )));
+                                let _ = tx
+                                    .send(AppMsg::Log(format!("[Decals] Restore failed: {error}")));
                             }
                             close = true;
                         }
@@ -3304,7 +3305,10 @@ impl DecalPatcherState {
                                 ui.horizontal(|ui| {
                                     ui.vertical(|ui| {
                                         ui.strong(replacement);
-                                        ui.weak(format!("patched into {}", self.target_display_name(target)));
+                                        ui.weak(format!(
+                                            "patched into {}",
+                                            self.target_display_name(target)
+                                        ));
                                     });
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
@@ -3313,9 +3317,8 @@ impl DecalPatcherState {
                                                 .add_enabled(!busy, egui::Button::new("Restore"))
                                                 .clicked()
                                             {
-                                                restore = target
-                                                    .split_once('|')
-                                                    .map(|(car, skin)| {
+                                                restore =
+                                                    target.split_once('|').map(|(car, skin)| {
                                                         (car.to_string(), skin.to_string())
                                                     });
                                             }
@@ -3329,17 +3332,10 @@ impl DecalPatcherState {
                 ui.add_space(4.0);
             }
             if let Some((car, skin)) = restore {
-                if let Err(error) = self.restore_decal_from_skin(
-                    &car,
-                    &skin,
-                    cooked_pc,
-                    backups_dir,
-                    tx,
-                    ctx,
-                ) {
-                    let _ = tx.send(AppMsg::Log(format!(
-                        "[Decals] Restore failed: {error}"
-                    )));
+                if let Err(error) =
+                    self.restore_decal_from_skin(&car, &skin, cooked_pc, backups_dir, tx, ctx)
+                {
+                    let _ = tx.send(AppMsg::Log(format!("[Decals] Restore failed: {error}")));
                 }
             }
             ui.add_space(8.0);
@@ -3579,15 +3575,9 @@ impl DecalPatcherState {
             });
 
         if let Some((decal, car, skin)) = apply {
-            if let Err(error) = self.apply_decal_to_skin(
-                &decal,
-                &car,
-                &skin,
-                cooked_pc,
-                backups_dir,
-                tx,
-                ctx,
-            ) {
+            if let Err(error) =
+                self.apply_decal_to_skin(&decal, &car, &skin, cooked_pc, backups_dir, tx, ctx)
+            {
                 let _ = tx.send(AppMsg::Log(format!("[Decals] Apply failed: {error}")));
             }
         }
@@ -3606,9 +3596,8 @@ impl DecalPatcherState {
                     ui.horizontal(|ui| {
                         if ui.button("Delete").clicked() {
                             if let Err(error) = self.delete_decal(&decal.name, tx, config) {
-                                let _ = tx.send(AppMsg::Log(format!(
-                                    "[Decals] Delete failed: {error}"
-                                )));
+                                let _ = tx
+                                    .send(AppMsg::Log(format!("[Decals] Delete failed: {error}")));
                             }
                             close = true;
                         }

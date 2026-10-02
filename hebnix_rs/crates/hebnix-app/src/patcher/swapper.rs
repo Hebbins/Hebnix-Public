@@ -363,12 +363,25 @@ impl SwapperState {
 
     fn thumbnail_status(&mut self, ui: &mut egui::Ui, category: SwapCategory) {
         let prefix = format!("{}|", category.slug());
-        let failures: Vec<_> = self.failed_thumbnails.keys().filter(|key|key.starts_with(&prefix)).cloned().collect();
-        if failures.is_empty() { return; }
+        let failures: Vec<_> = self
+            .failed_thumbnails
+            .keys()
+            .filter(|key| key.starts_with(&prefix))
+            .cloned()
+            .collect();
+        if failures.is_empty() {
+            return;
+        }
         ui.horizontal(|ui| {
-            ui.weak(format!("{} previews unavailable; items remain selectable", failures.len()));
+            ui.weak(format!(
+                "{} previews unavailable; items remain selectable",
+                failures.len()
+            ));
             if ui.small_button("Retry previews").clicked() {
-                for key in failures { self.failed_thumbnails.remove(&key); self.thumbnails.remove(&key); }
+                for key in failures {
+                    self.failed_thumbnails.remove(&key);
+                    self.thumbnails.remove(&key);
+                }
             }
         });
     }
@@ -970,7 +983,7 @@ impl SwapperState {
                             });
                     let mut image_for = |path: Option<PathBuf>, role: &str| {
                         let Some(path) = path else {
-                            return fallback.clone();
+                            return Some(fallback.clone());
                         };
                         let key = format!("active|{role}|{}|{}", swap.category, path.display());
                         if !self.thumbnails.contains_key(&key) {
@@ -982,10 +995,11 @@ impl SwapperState {
                                 columns[column].ctx().clone(),
                             ));
                         }
-                        self.thumbnails
-                            .get(&key)
-                            .and_then(Clone::clone)
-                            .unwrap_or_else(|| fallback.clone())
+                        self.thumbnails.get(&key).and_then(Clone::clone).or_else(|| {
+                            self.failed_thumbnails
+                                .contains_key(&key)
+                                .then(|| fallback.clone())
+                        })
                     };
                     let image = image_for(source_path, "source");
                     let target_image = image_for(target_path, "target");
@@ -997,36 +1011,43 @@ impl SwapperState {
                         .unwrap_or(&swap.target_name);
                     egui::Frame::group(columns[column].style()).show(&mut columns[column], |ui| {
                         ui.vertical_centered(|ui| {
+                            let thumbnail = |ui: &mut egui::Ui,
+                                             uri: String,
+                                             bytes: Option<Arc<[u8]>>,
+                                             size: egui::Vec2| {
+                                if let Some(bytes) = bytes {
+                                    ui.add(egui::Image::from_bytes(uri, bytes).fit_to_exact_size(size));
+                                } else {
+                                    ui.add_sized(size, egui::Spinner::new());
+                                }
+                            };
                             if category == Some(SwapCategory::Skins) {
                                 ui.horizontal(|ui| {
-                                    ui.add(
-                                        egui::Image::from_bytes(
-                                            format!("bytes://active/target/{}", swap.target_upk),
-                                            target_image,
-                                        )
-                                        .fit_to_exact_size(egui::vec2(48.0, 48.0)),
+                                    thumbnail(
+                                        ui,
+                                        format!("bytes://active/target/{}", swap.target_upk),
+                                        target_image,
+                                        egui::vec2(48.0, 48.0),
                                     );
-                                    ui.label("→");
-                                    ui.add(
-                                        egui::Image::from_bytes(
-                                            format!("bytes://active/source/{}", swap.target_upk),
-                                            image,
-                                        )
-                                        .fit_to_exact_size(egui::vec2(48.0, 48.0)),
+                                    ui.label("›");
+                                    thumbnail(
+                                        ui,
+                                        format!("bytes://active/source/{}", swap.target_upk),
+                                        image,
+                                        egui::vec2(48.0, 48.0),
                                     );
                                 });
                                 ui.strong(format!(
-                                    "{target_name} → {source_name} ({})",
+                                    "{target_name} › {source_name} ({})",
                                     swap.paint.description()
                                 ));
-                                ui.weak("Original → replacement");
+                                ui.weak("Original › replacement");
                             } else {
-                                ui.add(
-                                    egui::Image::from_bytes(
-                                        format!("bytes://active/{}", swap.target_upk),
-                                        image,
-                                    )
-                                    .fit_to_exact_size(egui::vec2(120.0, 76.0)),
+                                thumbnail(
+                                    ui,
+                                    format!("bytes://active/{}", swap.target_upk),
+                                    image,
+                                    egui::vec2(120.0, 76.0),
                                 );
                                 ui.strong(source_name);
                                 ui.weak(format!("Replaced {target_name}"));

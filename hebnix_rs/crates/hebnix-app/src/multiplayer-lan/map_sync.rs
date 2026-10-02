@@ -454,7 +454,9 @@ fn download(
         .and_then(|v| v.as_u64())
         .ok_or("peer sent no file size")?;
     if size == 0 || size > max_bytes {
-        return Err(format!("map size {size} bytes is outside the allowed limit"));
+        return Err(format!(
+            "map size {size} bytes is outside the allowed limit"
+        ));
     }
     progress.total.store(size, Ordering::Relaxed);
     progress.done.store(0, Ordering::Relaxed);
@@ -508,7 +510,8 @@ mod tests {
     }
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("hebnix_map_sync_{name}_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("hebnix_map_sync_{name}_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -607,9 +610,15 @@ mod tests {
         let (_server, port) = serve_file_as(&wrong_id, source);
 
         let dest = dir.join("got.upk");
-        let error =
-            fetch_map_file(loopback(), port, &wrong_id, &dest, MAX_MAP_BYTES, &TransferProgress::default())
-                .unwrap_err();
+        let error = fetch_map_file(
+            loopback(),
+            port,
+            &wrong_id,
+            &dest,
+            MAX_MAP_BYTES,
+            &TransferProgress::default(),
+        )
+        .unwrap_err();
         assert!(error.contains("does not match"), "{error}");
         assert!(!dest.exists());
         assert!(!dest.with_extension("part").exists());
@@ -624,8 +633,15 @@ mod tests {
         let (_server, port) = serve_file_as(&id, source);
 
         let dest = dir.join("got.upk");
-        let error = fetch_map_file(loopback(), port, &id, &dest, 1024, &TransferProgress::default())
-            .unwrap_err();
+        let error = fetch_map_file(
+            loopback(),
+            port,
+            &id,
+            &dest,
+            1024,
+            &TransferProgress::default(),
+        )
+        .unwrap_err();
         assert!(error.contains("limit"), "{error}");
         assert!(!dest.exists());
     }

@@ -18,7 +18,7 @@ use crate::plugins::PluginManager;
 use crate::tray::Tray;
 use crate::{dpi_fix, statsapi_ini, theme, winutil};
 
-pub const APP_VERSION: &str = "2.1.11";
+pub const APP_VERSION: &str = "2.2.0";
 pub const DEFAULT_WIDTH: f32 = 760.0;
 pub const DEFAULT_HEIGHT: f32 = 520.0;
 pub const MIN_WIDTH: f32 = 520.0;
@@ -663,9 +663,8 @@ impl LiteApp {
                 AppMsg::ThemeInstallDone { result } => match result {
                     Ok((name, author)) => {
                         self.theme_options = theme::list_themes(&self.themes_dir);
-                        self.console.write(format!(
-                            "[Console] Installed Theme {name} by {author}"
-                        ));
+                        self.console
+                            .write(format!("[Console] Installed Theme {name} by {author}"));
                     }
                     Err(error) => self
                         .console
@@ -1126,10 +1125,14 @@ impl LiteApp {
                                 ui.with_layout(
                                     egui::Layout::right_to_left(egui::Align::Center),
                                     |ui| {
-                                        if ui.add(egui::Button::new(
-                                            egui::RichText::new("🗑")
-                                                .color(Color32::from_rgb(0xe7, 0x4c, 0x3c)),
-                                        )).on_hover_text("Delete plugin").clicked() {
+                                        if ui
+                                            .add(egui::Button::new(
+                                                egui::RichText::new("🗑")
+                                                    .color(Color32::from_rgb(0xe7, 0x4c, 0x3c)),
+                                            ))
+                                            .on_hover_text("Delete plugin")
+                                            .clicked()
+                                        {
                                             deletes.push(plugin.slug.clone());
                                         }
                                         if plugin.load_error.is_none()
@@ -2182,7 +2185,13 @@ impl LiteApp {
         });
         ui.weak("Warns when PacketSendRate is not 20.");
         ui.add_space(8.0);
-        if ui.add_enabled(!self.epic_repair.running, egui::Button::new("Fix Epic Connection")).clicked() {
+        if ui
+            .add_enabled(
+                !self.epic_repair.running,
+                egui::Button::new("Fix Epic Connection"),
+            )
+            .clicked()
+        {
             self.epic_repair.begin(ui.ctx());
         }
     }

@@ -30,9 +30,7 @@ const MAGIC_DNS_IP: &str = "100.100.100.100";
 const PROBE_TIMEOUT: Duration = Duration::from_millis(300);
 
 fn dns_policy_config_path() -> String {
-    format!(
-        r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient\DnsPolicyConfig\{NRPT_RULE_ID}"
-    )
+    format!(r"SOFTWARE\Policies\Microsoft\Windows NT\DNSClient\DnsPolicyConfig\{NRPT_RULE_ID}")
 }
 
 /// true if something is actually listening at MagicDNS's address (port 53,
@@ -77,7 +75,9 @@ pub fn clean_stale_nrpt_rule(log: impl Fn(&str)) {
                      You can remove it yourself with: Remove-DnsClientNrptRule -DisplayName \"{NRPT_RULE_ID}\""
                 ));
             } else {
-                log("[Core] Removed the stale DNS policy rule. DNS resolution should be back to normal.");
+                log(
+                    "[Core] Removed the stale DNS policy rule. DNS resolution should be back to normal.",
+                );
             }
         }
         Err(error) => {

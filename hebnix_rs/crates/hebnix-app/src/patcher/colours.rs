@@ -168,7 +168,6 @@ pub struct ColoursState {
     loaded_backups_dir: Option<PathBuf>,
     ball_source: usize,
     ball_donor: usize,
-    ball_colours: bool,
     ball_swaps: Vec<super::ball_visual::SavedSwap>,
     ball_state_error: Option<String>,
 }
@@ -185,7 +184,6 @@ impl ColoursState {
             loaded_backups_dir: None,
             ball_source: 0,
             ball_donor: 1,
-            ball_colours: true,
             ball_swaps: Vec::new(),
             ball_state_error: None,
         }
@@ -379,31 +377,16 @@ impl ColoursState {
                                 }
                             });
                     });
-                    let colour_support =
-                        super::ball_visual::colour_texture(self.ball_source, self.ball_donor)
-                            .is_some();
-                    ui.add_enabled_ui(colour_support, |ui| {
-                        ui.checkbox(
-                            &mut self.ball_colours,
-                            "Include replacement colours (experimental)",
-                        );
-                    });
-                    if colour_support {
-                        ui.weak(
-                            "Copies the colour texture; special shaders and effects stay original.",
-                        );
-                    } else {
-                        ui.weak(
-                            "Colours are available for Normal → selected balls. This pair swaps shape only.",
-                        );
-                    }
+                    ui.weak(
+                        "Uses the selected ball's material and skin. Physics and hitbox stay original.",
+                    );
                     let active = self
                         .ball_swaps
                         .iter()
                         .find(|swap| swap.source == self.ball_source);
                     if let Some(swap) = active {
                         ui.label(format!(
-                            "Applied: {} → {}",
+                            "Applied: {} › {}",
                             super::ball_visual::BALLS[swap.source].0,
                             super::ball_visual::BALLS[swap.donor].0
                         ));
@@ -425,7 +408,7 @@ impl ColoursState {
                             requested = Some(ColourAction::ApplyBall {
                                 source: self.ball_source,
                                 donor: self.ball_donor,
-                                colours: self.ball_colours && colour_support,
+                                colours: false,
                             });
                         }
                         if ui

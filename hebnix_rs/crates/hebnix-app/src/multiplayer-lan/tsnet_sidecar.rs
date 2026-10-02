@@ -17,8 +17,8 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use crossbeam_channel::Sender;
@@ -152,7 +152,12 @@ impl TsnetSidecarHandle {
         })
     }
 
-    pub fn request_up(&self, auth_key: String, hostname: String, control_url: String) -> Result<(), String> {
+    pub fn request_up(
+        &self,
+        auth_key: String,
+        hostname: String,
+        control_url: String,
+    ) -> Result<(), String> {
         let cli = self.tailscale_cli.clone();
         let tx = self.tx.clone();
         std::thread::spawn(move || {
@@ -273,12 +278,20 @@ fn peer_ipv4(allowed_ips: &[String], tailscale_ips: Vec<String>) -> Option<Strin
         .iter()
         .find_map(|route| {
             let address = route.split('/').next().unwrap_or(route);
-            address.parse::<std::net::Ipv4Addr>().is_ok().then(|| address.to_string())
+            address
+                .parse::<std::net::Ipv4Addr>()
+                .is_ok()
+                .then(|| address.to_string())
         })
         .or_else(|| pick_ipv4(tailscale_ips))
 }
 
-fn bring_up(cli: &Path, auth_key: &str, hostname: &str, control_url: &str) -> Result<String, String> {
+fn bring_up(
+    cli: &Path,
+    auth_key: &str,
+    hostname: &str,
+    control_url: &str,
+) -> Result<String, String> {
     run_tailscale(
         cli,
         &[
@@ -302,13 +315,15 @@ fn bring_up(cli: &Path, auth_key: &str, hostname: &str, control_url: &str) -> Re
         ],
     )?;
     let status = fetch_status(cli)?;
-    pick_ipv4(status.tailscale_ips)
-        .ok_or_else(|| "connected, but the multiplayer network did not assign an address".to_string())
+    pick_ipv4(status.tailscale_ips).ok_or_else(|| {
+        "connected, but the multiplayer network did not assign an address".to_string()
+    })
 }
 
 fn fetch_status(cli: &Path) -> Result<RawStatus, String> {
     let raw = run_tailscale(cli, &["status", "--json"])?;
-    serde_json::from_str(&raw).map_err(|error| format!("could not understand the multiplayer network's status: {error}"))
+    serde_json::from_str(&raw)
+        .map_err(|error| format!("could not understand the multiplayer network's status: {error}"))
 }
 
 fn spawn_peer_poller(cli: PathBuf, tx: Sender<AppMsg>, stop: Arc<AtomicBool>) {
@@ -347,8 +362,9 @@ fn spawn_peer_poller(cli: PathBuf, tx: Sender<AppMsg>, stop: Arc<AtomicBool>) {
 /// -- kept entirely separate from any real Tailscale install so the two
 /// can't collide.
 fn ensure_service(tailscaled_exe: &Path, state_dir: &Path) -> Result<(), String> {
-    std::fs::create_dir_all(state_dir)
-        .map_err(|error| format!("could not create the multiplayer network's state directory: {error}"))?;
+    std::fs::create_dir_all(state_dir).map_err(|error| {
+        format!("could not create the multiplayer network's state directory: {error}")
+    })?;
 
     let bin_path = format!(
         "\"{}\" --statedir=\"{}\" --socket={SERVICE_PIPE} --port=0",
@@ -369,7 +385,9 @@ fn ensure_service(tailscaled_exe: &Path, state_dir: &Path) -> Result<(), String>
         // sc.exe's message is translated on non-English Windows, but the
         // error number (1073, service already exists) is always there
         if !error.contains("1073") && !error.contains("already exists") {
-            return Err(format!("could not install the multiplayer network service: {error}"));
+            return Err(format!(
+                "could not install the multiplayer network service: {error}"
+            ));
         }
         // Already installed from a previous run -- keep its binPath current
         // in case Hebnix was reinstalled to a different folder.
@@ -396,7 +414,10 @@ fn service_state_code(text: &str) -> Option<u8> {
         // the state is a single digit; the TYPE line above it is 10/20/...
         // and the exit codes below it are 0 in a healthy service
         if digits.len() == 1 {
-            digits.parse::<u8>().ok().filter(|code| (1..=7).contains(code))
+            digits
+                .parse::<u8>()
+                .ok()
+                .filter(|code| (1..=7).contains(code))
         } else {
             None
         }
@@ -423,7 +444,10 @@ fn wait_for_running(timeout: Duration) -> Result<(), String> {
 
 fn query_state() -> Result<String, String> {
     let mut command = Command::new("sc.exe");
-    command.args(["query", SERVICE_NAME]).stdout(Stdio::piped()).stderr(Stdio::piped());
+    command
+        .args(["query", SERVICE_NAME])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
     let output = command
@@ -434,7 +458,10 @@ fn query_state() -> Result<String, String> {
 
 fn run_sc(args: &[&str]) -> Result<String, String> {
     let mut command = Command::new("sc.exe");
-    command.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    command
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
     let output = command
@@ -488,7 +515,9 @@ mod tests {
         assert_eq!(service_state_code(RUNNING), Some(4));
         assert!(state_is_running(RUNNING));
         // translated labels and a stopped service
-        let spanish = RUNNING.replace("TYPE  ", "TIPO  ").replace("STATE ", "ESTADO");
+        let spanish = RUNNING
+            .replace("TYPE  ", "TIPO  ")
+            .replace("STATE ", "ESTADO");
         assert!(state_is_running(&spanish));
         let stopped = RUNNING.replace("4  RUNNING", "1  STOPPED");
         assert_eq!(service_state_code(&stopped), Some(1));
@@ -529,19 +558,27 @@ mod tests {
         let mut handle = TsnetSidecarHandle::spawn(Path::new(&bin_dir), &state_dir, tx)
             .expect("sidecar failed to spawn / install the service");
 
-        handle.request_status().expect("failed to send status command");
+        handle
+            .request_status()
+            .expect("failed to send status command");
 
         let message = rx
             .recv_timeout(Duration::from_secs(5))
             .expect("no response from sidecar within 5s");
         match message {
             AppMsg::TsnetStatus { state, .. } => {
-                assert_ne!(state, TsState::Connected, "fresh sidecar should not already be connected");
+                assert_ne!(
+                    state,
+                    TsState::Connected,
+                    "fresh sidecar should not already be connected"
+                );
             }
             other => panic!("expected TsnetStatus, got {other:?}"),
         }
 
-        handle.request_shutdown().expect("failed to send shutdown command");
+        handle
+            .request_shutdown()
+            .expect("failed to send shutdown command");
         assert!(
             handle.wait_for_exit(Duration::from_secs(10)),
             "service did not stop after shutdown command"
