@@ -1,24 +1,30 @@
-use super::nat::{self, HostReachability};
-use super::tap::{arp_announcement, arp_reply_for_local, mac_address};
-use super::{
-    CreateRoomRequest, DirectHost, HOST_ADDRESS_BYTES, PACKET_PUMP_INTERVAL, RoomClient,
-    RoomCredentials, SESSION_HEARTBEAT_INTERVAL, TapSession, TunnelStats, record_received_udp,
-    record_sent_udp,
-};
+use std::net::SocketAddr;
 use std::sync::{
     Arc,
-    mpsc::{self, Sender},
+    atomic::Ordering,
+    mpsc::{self, Sender as StdSender},
 };
 use std::thread::{self, JoinHandle};
+
+use crossbeam_channel::Sender;
+
+use crate::messages::AppMsg;
+use super::beacon::BeaconRelay;
+use super::map_sync::{MapFileProvider, MapProvider, MapSync, PeerOffer};
+use super::{PACKET_PUMP_INTERVAL, PEER_REFRESH_INTERVAL, TsnetSidecarHandle, TunnelStats};
+
 pub struct HostSession {
-    pub credentials: RoomCredentials,
     pub stats: Arc<TunnelStats>,
-    /// how guests can reach the tunnel port (UPnP / STUN / CGNAT findings)
-    pub reachability: HostReachability,
-    client: RoomClient,
-    stop_sender: Sender<()>,
+    stop_sender: StdSender<()>,
     worker: Option<JoinHandle<()>>,
+    // kept alive only so the tailnet connection stays up for as long as
+    // hosting does; also polled by the worker thread below for the live
+    // peer list the relay sends to
+    _sidecar: Arc<TsnetSidecarHandle>,
+    // None if its port couldn't be bound; the relay works without it
+    map_sync: Option<MapSync>,
 }
+
 impl std::fmt::Debug for HostSession {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -26,145 +32,186 @@ impl std::fmt::Debug for HostSession {
             .finish_non_exhaustive()
     }
 }
+
 impl HostSession {
+    /// `host_tailnet_ip` is this machine's own address on the tailnet
+    /// (learned from the sidecar before this is called). No room/PIN needed
+    /// any more -- the relay just forwards to every peer currently on the
+    /// tailnet (polled from the sidecar on the same cadence a room heartbeat
+    /// used to run on), and Rocket League's own native LAN browser plus its
+    /// own match password are what a guest actually uses to find and join.
     pub fn start(
-        client: RoomClient,
-        mut request: CreateRoomRequest,
-        tunnel: TapSession,
+        sidecar: Arc<TsnetSidecarHandle>,
+        host_tailnet_ip: String,
+        map_provider: MapProvider,
+        map_files: MapFileProvider,
+        tx: Sender<AppMsg>,
     ) -> Result<Self, String> {
-        let tunnel_port = request.port;
-        let tunnel_pin = format!("pending-{tunnel_port}");
-        let udp_tunnel = DirectHost::bind(tunnel_port, tunnel_pin, "")?;
-        // publish the port guests can actually reach, which differs from the
-        // local one when a router mapping or the NAT changed it
-        let (reachability, mut keepalive) = nat::establish(udp_tunnel.socket(), tunnel_port);
-        request.port = reachability.public_port;
-        let (room, credentials) = client.create_room(&request)?;
-        let local_mac = mac_address()?;
-        let (stop_sender, stop_receiver) = mpsc::channel();
-        let refresh_client = client.clone();
-        let pin = credentials.pin.clone();
-        let host_secret = credentials.host_secret.clone();
-        let join_token = room.join_token.clone();
-        let stats = udp_tunnel.stats();
-        let worker_stats = stats.clone();
-        let worker = thread::spawn(move || {
-            let mut udp = udp_tunnel.with_credentials(pin.clone(), join_token, local_mac);
-            if let Ok(announcement) = arp_announcement(super::HOST_ADDRESS) {
-                let _ = udp.relay(&announcement);
+        let host_octets = parse_ipv4(&host_tailnet_ip)?;
+        let host_ip: std::net::IpAddr = host_tailnet_ip
+            .parse()
+            .map_err(|_| format!("invalid tailnet address: {host_tailnet_ip}"))?;
+        let relay = BeaconRelay::bind(host_ip)?;
+        let map_sync = match MapSync::start(sidecar.clone(), host_ip, map_provider, map_files) {
+            Ok(sync) => Some(sync),
+            Err(error) => {
+                let _ = tx.send(AppMsg::Log(format!("[Core] Map sync unavailable: {error}")));
+                None
             }
-            let mut next_heartbeat = std::time::Instant::now() + SESSION_HEARTBEAT_INTERVAL;
+        };
+        let stats = Arc::new(TunnelStats::default());
+        let (stop_sender, stop_receiver) = mpsc::channel();
+        let worker_stats = stats.clone();
+        let worker_sidecar = sidecar.clone();
+        let _ = tx.send(AppMsg::Log(format!(
+            "[Core] Beacon relay bound to {host_ip}, watching UDP {:?}",
+            super::RL_DISCOVERY_PORTS
+        )));
+        let worker = thread::spawn(move || {
+            // refreshed from the tailnet's own peer list, not a room -
+            // relaying to everyone currently connected is the point. Just
+            // the IPs -- the destination port varies per packet, matching
+            // whichever discovery port it was captured on (see beacon.rs).
+            // Fetched once immediately rather than waiting for the first
+            // PEER_REFRESH_INTERVAL tick, so an already-connected peer isn't
+            // missed by beacons captured right at session start.
+            let mut guest_ips: Vec<std::net::IpAddr> = worker_sidecar
+                .peers_now()
+                .map(|peers| {
+                    peers
+                        .into_iter()
+                        .filter(|peer| peer.online)
+                        .filter_map(|peer| peer.tailnet_ip.parse().ok())
+                        .collect()
+                })
+                .unwrap_or_default();
+            worker_stats.connected.store(!guest_ips.is_empty(), Ordering::Relaxed);
+            let mut next_refresh = std::time::Instant::now() + PEER_REFRESH_INTERVAL;
             loop {
                 if stop_receiver.try_recv().is_ok() {
+                    // unblocks the beacon capture thread's WinDivert read
+                    // directly, without touching the WinDivert service - see
+                    // RawCapture's doc comment in beacon.rs
+                    relay.stop_capture();
                     break;
                 }
-                if let Some(packet) = tunnel.try_receive() {
-                    let packet = rewrite_lan_beacon_endpoint(packet, HOST_ADDRESS_BYTES);
-                    record_sent_udp(&worker_stats, &packet);
-                    let _ = udp.relay(&packet);
-                }
-                if let Ok(Some(packet)) = udp.poll() {
-                    record_received_udp(&worker_stats, &packet);
-                    match arp_reply_for_local(&packet, super::HOST_ADDRESS) {
-                        Ok(Some(reply)) => {
-                            let _ = udp.relay(&reply);
+                if let Some((payload, source, port)) = relay.try_receive() {
+                    let _ = tx.send(AppMsg::Log(format!(
+                        "[Core] Beacon relay captured {} bytes on UDP {port} from {source} - {} known peer(s) to relay to",
+                        payload.len(),
+                        guest_ips.len()
+                    )));
+                    let rewritten = rewrite_lan_beacon_payload(payload, host_octets);
+                    for &guest_ip in &guest_ips {
+                        // don't echo the beacon back to whoever it came from
+                        // -- WinDivert's sniff filter matches both directions
+                        // (ip.SrcAddr OR ip.DstAddr == this host), so a
+                        // packet this relay just *sent* to a peer shows up
+                        // again as a "captured" packet from that peer's
+                        // address once it lands on the wire, and would
+                        // otherwise get bounced straight back to them
+                        if guest_ip == source.ip() {
+                            continue;
                         }
-                        _ => {
-                            if tunnel.send(&packet).is_ok() {
-                                worker_stats
-                                    .delivered
-                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let guest = SocketAddr::new(guest_ip, port);
+                        match relay.send_to(&rewritten, guest) {
+                            Ok(()) => {
+                                worker_stats.sent.fetch_add(1, Ordering::Relaxed);
+                                if let Ok(mut value) = worker_stats.last_beacon_relayed.lock() {
+                                    *value = format!("beacon → {guest}");
+                                }
+                            }
+                            Err(error) => {
+                                let _ = tx.send(AppMsg::Log(format!(
+                                    "[Core] Beacon relay failed to send to {guest}: {error}"
+                                )));
                             }
                         }
                     }
                 }
-                keepalive.tick(udp.socket());
-                if std::time::Instant::now() >= next_heartbeat {
-                    let _ = refresh_client.heartbeat(&pin, &host_secret);
-                    next_heartbeat += SESSION_HEARTBEAT_INTERVAL;
+                if std::time::Instant::now() >= next_refresh {
+                    if let Ok(peers) = worker_sidecar.peers_now() {
+                        guest_ips = peers
+                            .into_iter()
+                            .filter(|peer| peer.online)
+                            .filter_map(|peer| peer.tailnet_ip.parse().ok())
+                            .collect();
+                        worker_stats
+                            .connected
+                            .store(!guest_ips.is_empty(), Ordering::Relaxed);
+                    }
+                    next_refresh += PEER_REFRESH_INTERVAL;
                 }
                 thread::sleep(PACKET_PUMP_INTERVAL);
             }
         });
         Ok(Self {
-            credentials,
             stats,
-            reachability,
-            client,
             stop_sender,
             worker: Some(worker),
+            _sidecar: sidecar,
+            map_sync,
         })
     }
+
+    /// workshop maps online peers say they have installed
+    pub fn peer_offers(&self) -> Vec<PeerOffer> {
+        self.map_sync.as_ref().map(MapSync::offers).unwrap_or_default()
+    }
+
     pub fn suspend(&mut self) {
+        // the worker thread calls relay.stop_capture() itself once it sees
+        // this, which cancels the beacon capture thread's blocked WinDivert
+        // read directly (see RawCapture in beacon.rs) and drops the handle,
+        // releasing the lock on WinDivert64.sys/WinDivert.dll so a later
+        // build can overwrite them. The WinDivert *service* itself is never
+        // stopped or uninstalled here any more - that used to be how the
+        // capture thread's read got unblocked (stopping the service
+        // cancelled the pending call as a side effect), but repeated
+        // start/stop cycles left it in a corrupted state (disabled, marked
+        // for deletion, stuck stop-pending). It's left alone now, same as
+        // HebnixTailscale is deliberately left running.
         let _ = self.stop_sender.send(());
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
         }
     }
+
     pub fn stop(&mut self) -> Result<(), String> {
         self.suspend();
-        self.client
-            .close_room(&self.credentials.pin, &self.credentials.host_secret)
+        Ok(())
     }
 }
-pub(crate) fn rewrite_lan_beacon_endpoint(mut frame: Vec<u8>, address: [u8; 4]) -> Vec<u8> {
-    if frame.len() < 42 || frame[12..14] != [0x08, 0x00] || frame[23] != 17 {
-        return frame;
-    }
-    let ip_start = 14;
-    let ip_header_len = usize::from(frame[ip_start] & 0x0f) * 4;
-    let udp_start = ip_start + ip_header_len;
-    if ip_header_len < 20 || frame.len() < udp_start + 8 {
-        return frame;
-    }
-    let udp_len = usize::from(u16::from_be_bytes([
-        frame[udp_start + 4],
-        frame[udp_start + 5],
-    ]));
-    if udp_len < 8 || frame.len() < udp_start + udp_len {
-        return frame;
-    }
-    let payload_start = udp_start + 8;
-    let payload_end = udp_start + udp_len;
-    let address_bytes = address;
-    let address = format!(
+
+fn parse_ipv4(address: &str) -> Result<[u8; 4], String> {
+    address
+        .parse::<std::net::Ipv4Addr>()
+        .map(|value| value.octets())
+        .map_err(|_| format!("invalid tailnet address: {address}"))
+}
+
+/// Rewrites the host's real LAN ip:port embedded in Rocket League's LAN
+/// discovery beacon to point at `address` (a tailnet IP) instead, so a
+/// guest that can't reach the host's actual LAN address gets pointed at one
+/// it can. Operates on the raw UDP payload only -- no more IP/UDP header or
+/// checksum work needed, since this is now sent via an ordinary
+/// `UdpSocket::send_to` rather than spliced into a captured Ethernet frame.
+pub(crate) fn rewrite_lan_beacon_payload(mut payload: Vec<u8>, address: [u8; 4]) -> Vec<u8> {
+    let address_string = format!(
         "{}.{}.{}.{}",
         address[0], address[1], address[2], address[3]
     );
-    let delta = if let Some((offset, source_len, replacement)) =
-        find_unreal_lan_endpoint(&frame[payload_start..payload_end], &address)
+    if let Some((offset, source_len, replacement)) =
+        find_unreal_lan_endpoint(&payload, &address_string)
     {
-        let start = payload_start + offset;
-        let delta = replacement.len() as isize - source_len as isize;
-        frame.splice(start..start + source_len, replacement);
-        delta
-    } else if replace_binary_lan_endpoint(&mut frame[payload_start..payload_end], address_bytes)
-        || replace_equal_length_ascii_endpoint(&mut frame[payload_start..payload_end], &address)
-    {
-        0
+        payload.splice(offset..offset + source_len, replacement);
     } else {
-        return frame;
-    };
-    let old_ip_len = usize::from(u16::from_be_bytes([frame[16], frame[17]]));
-    let Some(new_ip_len) = old_ip_len.checked_add_signed(delta) else {
-        return frame;
-    };
-    let Some(new_udp_len) = udp_len.checked_add_signed(delta) else {
-        return frame;
-    };
-    if new_ip_len > usize::from(u16::MAX) || new_udp_len > usize::from(u16::MAX) {
-        return frame;
+        let _ = replace_binary_lan_endpoint(&mut payload, address)
+            || replace_equal_length_ascii_endpoint(&mut payload, &address_string);
     }
-    frame[16..18].copy_from_slice(&(new_ip_len as u16).to_be_bytes());
-    frame[udp_start + 4..udp_start + 6].copy_from_slice(&(new_udp_len as u16).to_be_bytes());
-    frame[24..26].fill(0);
-    let ip_checksum = checksum(&frame[ip_start..ip_start + ip_header_len]);
-    frame[24..26].copy_from_slice(&ip_checksum.to_be_bytes());
-    frame[udp_start + 6..udp_start + 8].fill(0);
-    let udp_checksum = udp_checksum(&frame, udp_start, new_udp_len);
-    frame[udp_start + 6..udp_start + 8].copy_from_slice(&udp_checksum.to_be_bytes());
-    frame
+    payload
 }
+
 fn find_unreal_lan_endpoint(
     payload: &[u8],
     replacement_ip: &str,
@@ -180,7 +227,7 @@ fn find_unreal_lan_endpoint(
                         return Some((
                             offset,
                             4 + length,
-                            unreal_ansi_string(&format!("{replacement_ip}:7777")),
+                            unreal_ansi_string(&format!("{replacement_ip}:{}", super::RL_LAN_PORT)),
                         ));
                     }
                 }
@@ -199,7 +246,7 @@ fn find_unreal_lan_endpoint(
                         return Some((
                             offset,
                             4 + chars * 2,
-                            unreal_utf16_string(&format!("{replacement_ip}:7777")),
+                            unreal_utf16_string(&format!("{replacement_ip}:{}", super::RL_LAN_PORT)),
                         ));
                     }
                 }
@@ -208,10 +255,12 @@ fn find_unreal_lan_endpoint(
     }
     None
 }
+
 fn replace_binary_lan_endpoint(payload: &mut [u8], replacement: [u8; 4]) -> bool {
     if payload.len() < 6 {
         return false;
     }
+    let port = super::RL_LAN_PORT;
     for offset in 0..=payload.len() - 6 {
         let candidate = [
             payload[offset],
@@ -223,20 +272,27 @@ fn replace_binary_lan_endpoint(payload: &mut [u8], replacement: [u8; 4]) -> bool
             continue;
         }
         let next = [payload[offset + 4], payload[offset + 5]];
-        if u16::from_be_bytes(next) == 7777 || u16::from_le_bytes(next) == 7777 {
+        if u16::from_be_bytes(next) == port || u16::from_le_bytes(next) == port {
             payload[offset..offset + 4].copy_from_slice(&replacement);
             return true;
         }
     }
     false
 }
+
 fn replace_equal_length_ascii_endpoint(payload: &mut [u8], replacement: &str) -> bool {
-    let replacement = format!("{replacement}:7777");
-    for end in 5..=payload.len() {
-        if payload[end - 5..end] != *b":7777" {
+    let port_suffix = format!(":{}", super::RL_LAN_PORT);
+    let replacement = format!("{replacement}{port_suffix}");
+    let suffix_bytes = port_suffix.as_bytes();
+    let suffix_len = suffix_bytes.len();
+    if payload.len() < suffix_len {
+        return false;
+    }
+    for end in suffix_len..=payload.len() {
+        if payload[end - suffix_len..end] != *suffix_bytes {
             continue;
         }
-        let mut start = end - 5;
+        let mut start = end - suffix_len;
         while start > 0 && (payload[start - 1].is_ascii_digit() || payload[start - 1] == b'.') {
             start -= 1;
         }
@@ -248,18 +304,22 @@ fn replace_equal_length_ascii_endpoint(payload: &mut [u8], replacement: &str) ->
     }
     false
 }
+
 fn is_lan_game_endpoint(value: &str) -> bool {
     let Some((address, port)) = value.rsplit_once(':') else {
         return false;
     };
-    port == "7777" && address.parse::<std::net::Ipv4Addr>().is_ok()
+    port.parse::<u16>().is_ok_and(|port| port == super::RL_LAN_PORT)
+        && address.parse::<std::net::Ipv4Addr>().is_ok()
 }
+
 fn unreal_ansi_string(value: &str) -> Vec<u8> {
     let mut bytes = ((value.len() + 1) as i32).to_le_bytes().to_vec();
     bytes.extend_from_slice(value.as_bytes());
     bytes.push(0);
     bytes
 }
+
 fn unreal_utf16_string(value: &str) -> Vec<u8> {
     let chars = value.encode_utf16().count() + 1;
     let mut bytes = (-(chars as i32)).to_le_bytes().to_vec();
@@ -268,59 +328,35 @@ fn unreal_utf16_string(value: &str) -> Vec<u8> {
     }
     bytes
 }
-fn checksum(bytes: &[u8]) -> u16 {
-    let mut sum = 0u32;
-    for chunk in bytes.chunks(2) {
-        let word = if chunk.len() == 2 {
-            u16::from_be_bytes([chunk[0], chunk[1]])
-        } else {
-            u16::from(chunk[0]) << 8
-        };
-        sum += u32::from(word);
-        while sum > 0xffff {
-            sum = (sum & 0xffff) + (sum >> 16);
-        }
-    }
-    !(sum as u16)
-}
-fn udp_checksum(frame: &[u8], udp_start: usize, udp_len: usize) -> u16 {
-    let mut bytes = Vec::with_capacity(12 + udp_len);
-    bytes.extend_from_slice(&frame[26..34]);
-    bytes.push(0);
-    bytes.push(17);
-    bytes.extend_from_slice(&(udp_len as u16).to_be_bytes());
-    bytes.extend_from_slice(&frame[udp_start..udp_start + udp_len]);
-    let value = checksum(&bytes);
-    if value == 0 { 0xffff } else { value }
-}
+
 impl Drop for HostSession {
     fn drop(&mut self) {
         let _ = self.stop_sender.send(());
     }
 }
+
 #[cfg(test)]
 mod tests {
-    use super::{
-        HOST_ADDRESS_BYTES, find_unreal_lan_endpoint, replace_binary_lan_endpoint,
-        replace_equal_length_ascii_endpoint, unreal_ansi_string,
-    };
+    use super::{find_unreal_lan_endpoint, replace_binary_lan_endpoint, replace_equal_length_ascii_endpoint, unreal_ansi_string};
+
     #[test]
-    fn rewrites_the_physical_lan_endpoint_to_the_tap_host() {
+    fn rewrites_the_physical_lan_endpoint_to_the_tailnet_host() {
         let payload = unreal_ansi_string("192.168.0.119:7777");
-        let (_, _, replacement) = find_unreal_lan_endpoint(&payload, "10.242.77.1")
+        let (_, _, replacement) = find_unreal_lan_endpoint(&payload, "100.64.0.1")
             .expect("the LAN endpoint should be found");
-        assert_eq!(replacement, unreal_ansi_string("10.242.77.1:7777"));
+        assert_eq!(replacement, unreal_ansi_string("100.64.0.1:7777"));
     }
+
     #[test]
     fn rewrites_binary_and_equal_length_lan_endpoints() {
+        let tailnet_octets = [100, 64, 0, 1];
         let mut binary = [172, 31, 64, 1, 0x1e, 0x61];
-        assert!(replace_binary_lan_endpoint(&mut binary, HOST_ADDRESS_BYTES));
-        assert_eq!(&binary[..4], &HOST_ADDRESS_BYTES);
+        assert!(replace_binary_lan_endpoint(&mut binary, tailnet_octets));
+        assert_eq!(&binary[..4], &tailnet_octets);
+        // same byte length as the source address -- this rewrite only fires
+        // on an exact-length match, by design (see replace_equal_length_ascii_endpoint)
         let mut text = b"172.31.64.1:7777".to_vec();
-        assert!(replace_equal_length_ascii_endpoint(
-            &mut text,
-            "10.242.77.1"
-        ));
-        assert_eq!(text, b"10.242.77.1:7777");
+        assert!(replace_equal_length_ascii_endpoint(&mut text, "100.64.77.1"));
+        assert_eq!(text, b"100.64.77.1:7777");
     }
 }

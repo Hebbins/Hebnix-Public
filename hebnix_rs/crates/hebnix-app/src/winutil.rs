@@ -573,6 +573,11 @@ fn clear_epic_multihome() -> Result<(), String> {
         if let Some((path, original)) = contents.split_once('\n') {
             std::fs::write(path, original).map_err(|error| error.to_string())?;
             let _ = std::fs::remove_file(&backup);
+            // same reason as below - the launcher only reads this file on
+            // startup, so it needs restarting for the reverted setting to
+            // actually take effect instead of silently launching with the
+            // stale -multihome argument next time
+            restart_epic_launcher_for_multihome()?;
             return Ok(());
         }
     }
@@ -587,6 +592,7 @@ fn clear_epic_multihome() -> Result<(), String> {
             .join("GameUserSettings.ini"),
         config_root.join("Windows").join("GameUserSettings.ini"),
     ];
+    let mut any_changed = false;
     for path in paths.into_iter().filter(|path| path.is_file()) {
         let original = std::fs::read_to_string(&path).map_err(|error| error.to_string())?;
         let mut lines: Vec<String> = original.lines().map(str::to_owned).collect();
@@ -594,12 +600,13 @@ fn clear_epic_multihome() -> Result<(), String> {
         for line in &mut lines {
             if let Some((key, value)) = line.split_once('=') {
                 if key.ends_with(":Sugar_AdditionalCommands") {
+                    // tailnet IPs aren't a fixed subnet Hebnix can pattern-match
+                    // (headscale assigns them dynamically), so strip any
+                    // -multihome argument outright -- Hebnix is the only thing
+                    // that ever sets one.
                     let remaining = value
                         .split_whitespace()
-                        .filter(|argument| {
-                            !argument.starts_with("-multihome=10.242.77.")
-                                && !argument.starts_with("-multihome=192.10.192.")
-                        })
+                        .filter(|argument| !argument.starts_with("-multihome="))
                         .collect::<Vec<_>>()
                         .join(" ");
                     if remaining != value {
@@ -627,9 +634,18 @@ fn clear_epic_multihome() -> Result<(), String> {
         }
         if changed {
             std::fs::write(&path, lines.join("\r\n")).map_err(|error| error.to_string())?;
+            any_changed = true;
         }
     }
     let _ = std::fs::remove_file(backup);
+    if any_changed {
+        // mirrors apply_epic_multihome's own restart -- the launcher only
+        // reads GameUserSettings.ini on startup, so without this it keeps
+        // running with the stale -multihome argument cached in memory and
+        // launches Rocket League with it again next time regardless of
+        // what's now on disk
+        restart_epic_launcher_for_multihome()?;
+    }
     Ok(())
 }
 

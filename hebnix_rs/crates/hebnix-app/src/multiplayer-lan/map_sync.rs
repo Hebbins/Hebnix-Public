@@ -1,0 +1,653 @@
+// tells tailnet peers which workshop map is in which slot, so a guest can see
+// that they're missing the host's map and offer to install it. maps from the
+// workshop cdn are only ever described by id (the guest downloads them from
+// the cdn itself). maps a player imported themselves (`local_<hash>` ids)
+// aren't on the cdn, so those can also be fetched from the peer -- see
+// fetch_map_file for how that stays safe. every value read off the wire is
+// untrusted and gets validated before it's used for anything.
+
+use std::io::{Read, Write};
+use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
+use std::path::{Path, PathBuf};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+};
+use std::thread;
+use std::time::Duration;
+
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+use super::TsnetSidecarHandle;
+
+pub const MAP_SYNC_PORT: u16 = 14790;
+/// ids of maps a player imported themselves start with this, followed by the
+/// first LOCAL_ID_HASH_CHARS hex characters of the file's sha256
+pub const LOCAL_ID_PREFIX: &str = "local_";
+const LOCAL_ID_HASH_CHARS: usize = 24;
+/// hard cap on a map file received from a peer
+pub const MAX_MAP_BYTES: u64 = 512 * 1024 * 1024;
+
+const REQUEST: &str = "HEBNIX-MAPS 1";
+const GET_REQUEST: &str = "HEBNIX-GET 1 ";
+const MAX_REQUEST_LINE: usize = 96;
+const MAX_HEADER_LINE: usize = 256;
+const MAX_REPLY_BYTES: u64 = 16 * 1024;
+const MAX_MAPS_PER_PEER: usize = 8;
+const MAX_NAME_CHARS: usize = 64;
+const MAX_DESCRIPTION_CHARS: usize = 500;
+const MAX_CONNECTIONS: usize = 16;
+const MAX_TRANSFERS: usize = 2;
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
+const IO_TIMEOUT: Duration = Duration::from_secs(3);
+const TRANSFER_TIMEOUT: Duration = Duration::from_secs(15);
+const POLL_INTERVAL: Duration = Duration::from_secs(10);
+const ACCEPT_IDLE: Duration = Duration::from_millis(200);
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+pub struct SlotMap {
+    pub slot: String,
+    pub id: String,
+    pub name: String,
+    /// imported by the player rather than from the workshop cdn (derived
+    /// from the id on receive, never taken from the wire)
+    #[serde(default)]
+    pub local: bool,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub description: String,
+}
+
+/// what one online peer says about itself
+#[derive(Clone, Debug)]
+pub struct PeerOffer {
+    pub ip: IpAddr,
+    /// their in-game name, empty if they haven't told us one
+    pub player_name: String,
+    /// tailnet hostname, the fallback label when there's no in-game name
+    pub hostname: String,
+    pub maps: Vec<SlotMap>,
+}
+
+impl PeerOffer {
+    /// "Name (10.242.77.3)", or just the address if there's no name at all
+    pub fn label(&self) -> String {
+        let who = if !self.player_name.is_empty() {
+            &self.player_name
+        } else {
+            &self.hostname
+        };
+        if who.is_empty() {
+            self.ip.to_string()
+        } else {
+            format!("{who} ({})", self.ip)
+        }
+    }
+}
+
+/// what one machine tells its peers about itself
+#[derive(Clone, Debug, Default)]
+pub struct LocalInfo {
+    pub player_name: String,
+    pub maps: Vec<SlotMap>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct Reply {
+    #[serde(default)]
+    player_name: String,
+    maps: Vec<SlotMap>,
+}
+
+pub struct PeerInfoReply {
+    pub player_name: String,
+    pub maps: Vec<SlotMap>,
+}
+
+/// supplies this machine's in-game name and installed workshop maps
+pub type MapProvider = Arc<dyn Fn() -> LocalInfo + Send + Sync>;
+
+/// looks up the cached file for a `local_` map id, None if we don't have it
+pub type MapFileProvider = Arc<dyn Fn(&str) -> Option<PathBuf> + Send + Sync>;
+
+/// live progress of a download from a peer, polled by the ui
+#[derive(Default)]
+pub struct TransferProgress {
+    pub done: AtomicU64,
+    pub total: AtomicU64,
+}
+
+/// map ids end up in a cdn url and a cache filename, so only allow the
+/// characters a plain id needs
+pub fn valid_map_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 32
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+pub fn is_local_map_id(id: &str) -> bool {
+    valid_map_id(id) && id.starts_with(LOCAL_ID_PREFIX)
+}
+
+/// `local_<first 24 hex of the sha256>` -- the same file always gets the same
+/// id on every machine, which is also how a received file is verified
+pub fn local_map_id(sha256_hex: &str) -> String {
+    let end = sha256_hex.len().min(LOCAL_ID_HASH_CHARS);
+    format!("{LOCAL_ID_PREFIX}{}", &sha256_hex[..end])
+}
+
+pub fn hash_file(path: &Path) -> std::io::Result<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn clean_text(text: &str, max_chars: usize) -> String {
+    text.chars()
+        .filter(|c| !c.is_control())
+        .take(max_chars)
+        .collect()
+}
+
+fn clean_name(name: &str) -> String {
+    clean_text(name, MAX_NAME_CHARS)
+}
+
+/// peers are only trusted if they sit in the same /24 as our own tailnet
+/// address (the tailnet is one shared subnet, see tsnet_sidecar.rs)
+fn peer_allowed(local: IpAddr, peer: IpAddr) -> bool {
+    match (local, peer) {
+        (IpAddr::V4(local), IpAddr::V4(peer)) => local.octets()[..3] == peer.octets()[..3],
+        _ => false,
+    }
+}
+
+pub struct MapSync {
+    stop: Arc<AtomicBool>,
+    offers: Arc<Mutex<Vec<PeerOffer>>>,
+}
+
+impl MapSync {
+    pub fn start(
+        sidecar: Arc<TsnetSidecarHandle>,
+        bind_ip: IpAddr,
+        provider: MapProvider,
+        files: MapFileProvider,
+    ) -> Result<Self, String> {
+        let (sync, _) = Self::start_server(bind_ip, MAP_SYNC_PORT, provider, files)?;
+        let stop = sync.stop.clone();
+        let offers = sync.offers.clone();
+        thread::spawn(move || {
+            while !stop.load(Ordering::Relaxed) {
+                let mut found = Vec::new();
+                if let Ok(peers) = sidecar.peers_now() {
+                    for peer in peers.into_iter().filter(|peer| peer.online) {
+                        let Ok(ip) = peer.tailnet_ip.parse::<IpAddr>() else {
+                            continue;
+                        };
+                        if !peer_allowed(bind_ip, ip) {
+                            continue;
+                        }
+                        if let Ok(info) = fetch_peer_info(ip, MAP_SYNC_PORT) {
+                            found.push(PeerOffer {
+                                ip,
+                                player_name: info.player_name,
+                                hostname: clean_name(&peer.hostname),
+                                maps: info.maps,
+                            });
+                        }
+                    }
+                }
+                if let Ok(mut current) = offers.lock() {
+                    *current = found;
+                }
+                let mut waited = Duration::ZERO;
+                while waited < POLL_INTERVAL && !stop.load(Ordering::Relaxed) {
+                    thread::sleep(ACCEPT_IDLE);
+                    waited += ACCEPT_IDLE;
+                }
+            }
+        });
+        Ok(sync)
+    }
+
+    fn start_server(
+        bind_ip: IpAddr,
+        port: u16,
+        provider: MapProvider,
+        files: MapFileProvider,
+    ) -> Result<(Self, u16), String> {
+        let listener = TcpListener::bind(SocketAddr::new(bind_ip, port))
+            .map_err(|error| format!("could not bind the map sync port: {error}"))?;
+        listener
+            .set_nonblocking(true)
+            .map_err(|error| error.to_string())?;
+        let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+        let stop = Arc::new(AtomicBool::new(false));
+        let server_stop = stop.clone();
+        let connections = Arc::new(AtomicUsize::new(0));
+        let transfers = Arc::new(AtomicUsize::new(0));
+        thread::spawn(move || {
+            while !server_stop.load(Ordering::Relaxed) {
+                match listener.accept() {
+                    Ok((stream, addr)) => {
+                        if !peer_allowed(bind_ip, addr.ip())
+                            || connections.load(Ordering::Relaxed) >= MAX_CONNECTIONS
+                        {
+                            continue;
+                        }
+                        // one thread per connection so a big file transfer
+                        // doesn't hold up everyone else's map-info requests
+                        connections.fetch_add(1, Ordering::Relaxed);
+                        let provider = provider.clone();
+                        let files = files.clone();
+                        let connections = connections.clone();
+                        let transfers = transfers.clone();
+                        thread::spawn(move || {
+                            let _ = serve(stream, &provider, &files, &transfers);
+                            connections.fetch_sub(1, Ordering::Relaxed);
+                        });
+                    }
+                    Err(_) => thread::sleep(ACCEPT_IDLE),
+                }
+            }
+        });
+        let sync = Self {
+            stop,
+            offers: Arc::new(Mutex::new(Vec::new())),
+        };
+        Ok((sync, port))
+    }
+
+    pub fn offers(&self) -> Vec<PeerOffer> {
+        self.offers.lock().map(|o| o.clone()).unwrap_or_default()
+    }
+}
+
+impl Drop for MapSync {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+/// reads one '\n'-terminated line a byte at a time, so nothing past the line
+/// is consumed from the stream
+fn read_line(stream: &mut TcpStream, max: usize) -> std::io::Result<String> {
+    let mut line = Vec::new();
+    let mut byte = [0u8; 1];
+    loop {
+        stream.read_exact(&mut byte)?;
+        if byte[0] == b'\n' {
+            break;
+        }
+        line.push(byte[0]);
+        if line.len() > max {
+            return Err(std::io::Error::other("line too long"));
+        }
+    }
+    String::from_utf8(line).map_err(std::io::Error::other)
+}
+
+fn serve(
+    mut stream: TcpStream,
+    provider: &MapProvider,
+    files: &MapFileProvider,
+    transfers: &AtomicUsize,
+) -> std::io::Result<()> {
+    // accepted sockets can inherit the listener's non-blocking mode on windows
+    stream.set_nonblocking(false)?;
+    stream.set_read_timeout(Some(IO_TIMEOUT))?;
+    stream.set_write_timeout(Some(TRANSFER_TIMEOUT))?;
+    let request = read_line(&mut stream, MAX_REQUEST_LINE)?;
+    if request == REQUEST {
+        let mut info = provider();
+        info.maps.truncate(MAX_MAPS_PER_PEER);
+        let body = serde_json::to_vec(&Reply {
+            player_name: info.player_name,
+            maps: info.maps,
+        })
+        .map_err(std::io::Error::other)?;
+        return stream.write_all(&body);
+    }
+    if let Some(id) = request.strip_prefix(GET_REQUEST) {
+        return serve_file(&mut stream, id, files, transfers);
+    }
+    Ok(())
+}
+
+fn serve_file(
+    stream: &mut TcpStream,
+    id: &str,
+    files: &MapFileProvider,
+    transfers: &AtomicUsize,
+) -> std::io::Result<()> {
+    let refuse = |stream: &mut TcpStream, reason: &str| {
+        let header = serde_json::json!({ "error": reason });
+        stream.write_all(format!("{header}\n").as_bytes())
+    };
+    // only maps the player imported themselves are ever served -- cdn maps
+    // are fetched from the cdn, and nothing outside the map cache can be named
+    if !is_local_map_id(id) {
+        return refuse(stream, "not a shareable map");
+    }
+    let Some(path) = files(id) else {
+        return refuse(stream, "map not found");
+    };
+    if transfers.fetch_add(1, Ordering::Relaxed) >= MAX_TRANSFERS {
+        transfers.fetch_sub(1, Ordering::Relaxed);
+        return refuse(stream, "busy");
+    }
+    let result = (|| {
+        let mut file = std::fs::File::open(path)?;
+        let size = file.metadata()?.len();
+        if size == 0 || size > MAX_MAP_BYTES {
+            return refuse(stream, "map too large to share");
+        }
+        let header = serde_json::json!({ "size": size });
+        stream.write_all(format!("{header}\n").as_bytes())?;
+        std::io::copy(&mut file, stream).map(|_| ())
+    })();
+    transfers.fetch_sub(1, Ordering::Relaxed);
+    result
+}
+
+fn connect(peer: IpAddr, port: u16, read_timeout: Duration) -> Result<TcpStream, String> {
+    let stream = TcpStream::connect_timeout(&SocketAddr::new(peer, port), CONNECT_TIMEOUT)
+        .map_err(|error| error.to_string())?;
+    stream
+        .set_read_timeout(Some(read_timeout))
+        .and_then(|_| stream.set_write_timeout(Some(IO_TIMEOUT)))
+        .map_err(|error| error.to_string())?;
+    Ok(stream)
+}
+
+pub fn fetch_peer_info(peer: IpAddr, port: u16) -> Result<PeerInfoReply, String> {
+    let mut stream = connect(peer, port, IO_TIMEOUT)?;
+    stream
+        .write_all(format!("{REQUEST}\n").as_bytes())
+        .map_err(|error| error.to_string())?;
+    let mut body = Vec::new();
+    stream
+        .take(MAX_REPLY_BYTES)
+        .read_to_end(&mut body)
+        .map_err(|error| error.to_string())?;
+    let reply: Reply = serde_json::from_slice(&body).map_err(|error| error.to_string())?;
+    Ok(PeerInfoReply {
+        player_name: clean_name(&reply.player_name),
+        maps: reply
+            .maps
+            .into_iter()
+            .filter(|map| valid_map_id(&map.id))
+            .take(MAX_MAPS_PER_PEER)
+            .map(|map| SlotMap {
+                local: is_local_map_id(&map.id),
+                name: clean_name(&map.name),
+                author: clean_name(&map.author),
+                description: clean_text(&map.description, MAX_DESCRIPTION_CHARS),
+                ..map
+            })
+            .collect(),
+    })
+}
+
+/// downloads a `local_` map from a peer into `dest`. the file only lands at
+/// `dest` if it is no bigger than `max_bytes` and its sha256 matches the hash
+/// baked into the id -- so a peer can't hand over anything other than the
+/// exact file the id names. the partial file is deleted on any failure.
+pub fn fetch_map_file(
+    peer: IpAddr,
+    port: u16,
+    id: &str,
+    dest: &Path,
+    max_bytes: u64,
+    progress: &TransferProgress,
+) -> Result<(), String> {
+    if !is_local_map_id(id) {
+        return Err("only maps imported by a player can be fetched from a peer".to_string());
+    }
+    let partial = dest.with_extension("part");
+    let result = download(peer, port, id, &partial, max_bytes, progress);
+    match result {
+        Ok(()) => std::fs::rename(&partial, dest).map_err(|error| {
+            let _ = std::fs::remove_file(&partial);
+            error.to_string()
+        }),
+        Err(error) => {
+            let _ = std::fs::remove_file(&partial);
+            Err(error)
+        }
+    }
+}
+
+fn download(
+    peer: IpAddr,
+    port: u16,
+    id: &str,
+    partial: &Path,
+    max_bytes: u64,
+    progress: &TransferProgress,
+) -> Result<(), String> {
+    let mut stream = connect(peer, port, TRANSFER_TIMEOUT)?;
+    stream
+        .write_all(format!("{GET_REQUEST}{id}\n").as_bytes())
+        .map_err(|error| error.to_string())?;
+    let header = read_line(&mut stream, MAX_HEADER_LINE).map_err(|error| error.to_string())?;
+    let header: serde_json::Value =
+        serde_json::from_str(&header).map_err(|error| error.to_string())?;
+    if let Some(error) = header.get("error").and_then(|v| v.as_str()) {
+        return Err(format!("peer refused: {}", clean_name(error)));
+    }
+    let size = header
+        .get("size")
+        .and_then(|v| v.as_u64())
+        .ok_or("peer sent no file size")?;
+    if size == 0 || size > max_bytes {
+        return Err(format!("map size {size} bytes is outside the allowed limit"));
+    }
+    progress.total.store(size, Ordering::Relaxed);
+    progress.done.store(0, Ordering::Relaxed);
+
+    let mut file = std::fs::File::create(partial).map_err(|error| error.to_string())?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    let mut received = 0u64;
+    while received < size {
+        let want = buffer.len().min((size - received) as usize);
+        let count = stream
+            .read(&mut buffer[..want])
+            .map_err(|error| error.to_string())?;
+        if count == 0 {
+            return Err("peer closed the connection early".to_string());
+        }
+        hasher.update(&buffer[..count]);
+        file.write_all(&buffer[..count])
+            .map_err(|error| error.to_string())?;
+        received += count as u64;
+        progress.done.store(received, Ordering::Relaxed);
+    }
+    file.flush().map_err(|error| error.to_string())?;
+    drop(file);
+    if local_map_id(&hex::encode(hasher.finalize())) != id {
+        return Err("received file does not match its map id".to_string());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::Ipv4Addr;
+
+    fn slot(id: &str) -> SlotMap {
+        SlotMap {
+            slot: "Underpass".into(),
+            id: id.into(),
+            name: "Test".into(),
+            ..Default::default()
+        }
+    }
+
+    fn loopback() -> IpAddr {
+        IpAddr::V4(Ipv4Addr::LOCALHOST)
+    }
+
+    fn no_files() -> MapFileProvider {
+        Arc::new(|_| None)
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("hebnix_map_sync_{name}_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// server that shares one file under whatever id the test gives it
+    fn serve_file_as(id: &str, path: PathBuf) -> (MapSync, u16) {
+        let id = id.to_string();
+        let files: MapFileProvider = Arc::new(move |asked| (asked == id).then(|| path.clone()));
+        let provider: MapProvider = Arc::new(LocalInfo::default);
+        MapSync::start_server(loopback(), 0, provider, files).unwrap()
+    }
+
+    #[test]
+    fn map_ids_are_restricted() {
+        assert!(valid_map_id("12"));
+        assert!(valid_map_id("abc-DEF_9"));
+        assert!(!valid_map_id(""));
+        assert!(!valid_map_id("../evil"));
+        assert!(!valid_map_id("a/b"));
+        assert!(!valid_map_id("1?x=2"));
+        assert!(!valid_map_id(&"9".repeat(33)));
+    }
+
+    #[test]
+    fn local_ids_come_from_the_file_hash() {
+        let id = local_map_id(&"ab".repeat(32));
+        assert_eq!(id, format!("local_{}", "ab".repeat(12)));
+        assert!(id.len() <= 32);
+        assert!(is_local_map_id(&id));
+        assert!(!is_local_map_id("12"));
+    }
+
+    #[test]
+    fn labels_prefer_the_in_game_name() {
+        let mut offer = PeerOffer {
+            ip: "10.242.77.3".parse().unwrap(),
+            player_name: "Squishy".into(),
+            hostname: "hebnix-abc".into(),
+            maps: vec![],
+        };
+        assert_eq!(offer.label(), "Squishy (10.242.77.3)");
+        offer.player_name.clear();
+        assert_eq!(offer.label(), "hebnix-abc (10.242.77.3)");
+        offer.hostname.clear();
+        assert_eq!(offer.label(), "10.242.77.3");
+    }
+
+    #[test]
+    fn only_same_subnet_peers_are_allowed() {
+        let local: IpAddr = "10.242.77.1".parse().unwrap();
+        assert!(peer_allowed(local, "10.242.77.9".parse().unwrap()));
+        assert!(!peer_allowed(local, "10.242.78.9".parse().unwrap()));
+        assert!(!peer_allowed(local, "192.168.0.5".parse().unwrap()));
+    }
+
+    #[test]
+    fn peers_can_read_each_others_maps_and_bad_ids_are_dropped() {
+        let provider: MapProvider = Arc::new(|| LocalInfo {
+            player_name: format!("Player{}One", char::from(7)),
+            maps: vec![slot("7"), slot("../bad"), slot("local_abc")],
+        });
+        let (_server, port) = MapSync::start_server(loopback(), 0, provider, no_files()).unwrap();
+        let info = fetch_peer_info(loopback(), port).unwrap();
+        assert_eq!(info.player_name, "PlayerOne");
+        assert_eq!(info.maps.len(), 2);
+        assert_eq!(info.maps[0], slot("7"));
+        // the local flag follows the id, whatever the peer claimed
+        assert!(info.maps[1].local);
+    }
+
+    #[test]
+    fn a_local_map_can_be_fetched_and_is_verified() {
+        let dir = temp_dir("ok");
+        let source = dir.join("source.upk");
+        let content = vec![7u8; 200_000];
+        std::fs::write(&source, &content).unwrap();
+        let id = local_map_id(&hash_file(&source).unwrap());
+        let (_server, port) = serve_file_as(&id, source);
+
+        let dest = dir.join("got.upk");
+        let progress = TransferProgress::default();
+        fetch_map_file(loopback(), port, &id, &dest, MAX_MAP_BYTES, &progress).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), content);
+        assert_eq!(progress.done.load(Ordering::Relaxed), 200_000);
+        assert!(!dest.with_extension("part").exists());
+    }
+
+    #[test]
+    fn a_file_that_does_not_match_its_id_is_rejected() {
+        let dir = temp_dir("mismatch");
+        let source = dir.join("source.upk");
+        std::fs::write(&source, b"real content").unwrap();
+        // peer serves this file under an id that names different content
+        let wrong_id = local_map_id(&"0".repeat(64));
+        let (_server, port) = serve_file_as(&wrong_id, source);
+
+        let dest = dir.join("got.upk");
+        let error =
+            fetch_map_file(loopback(), port, &wrong_id, &dest, MAX_MAP_BYTES, &TransferProgress::default())
+                .unwrap_err();
+        assert!(error.contains("does not match"), "{error}");
+        assert!(!dest.exists());
+        assert!(!dest.with_extension("part").exists());
+    }
+
+    #[test]
+    fn oversized_maps_are_rejected() {
+        let dir = temp_dir("big");
+        let source = dir.join("source.upk");
+        std::fs::write(&source, vec![1u8; 4096]).unwrap();
+        let id = local_map_id(&hash_file(&source).unwrap());
+        let (_server, port) = serve_file_as(&id, source);
+
+        let dest = dir.join("got.upk");
+        let error = fetch_map_file(loopback(), port, &id, &dest, 1024, &TransferProgress::default())
+            .unwrap_err();
+        assert!(error.contains("limit"), "{error}");
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn only_local_ids_are_served() {
+        let dir = temp_dir("refuse");
+        let source = dir.join("source.upk");
+        std::fs::write(&source, b"data").unwrap();
+        // even a provider that would happily return a file must not be asked
+        // for a cdn-style or path-like id
+        let (_server, port) = serve_file_as("12", source);
+        let mut stream = TcpStream::connect((loopback(), port)).unwrap();
+        stream.write_all(b"HEBNIX-GET 1 12\n").unwrap();
+        let mut reply = String::new();
+        stream.read_to_string(&mut reply).unwrap();
+        assert!(reply.contains("error"), "{reply}");
+
+        let mut stream = TcpStream::connect((loopback(), port)).unwrap();
+        stream.write_all(b"HEBNIX-GET 1 local_../../x\n").unwrap();
+        let mut reply = String::new();
+        stream.read_to_string(&mut reply).unwrap();
+        assert!(reply.contains("error"), "{reply}");
+    }
+}
