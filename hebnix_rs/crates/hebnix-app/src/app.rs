@@ -26,7 +26,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.11";
+pub const APP_VERSION: &str = "2.1.12";
 
 pub const DEFAULT_WIDTH: f32 = 1250.0;
 pub const DEFAULT_HEIGHT: f32 = 700.0;
@@ -634,6 +634,24 @@ impl HebnixApp {
                 }
             })
             .ok();
+
+        // one-shot check for a stale Tailscale DNS policy rule left behind by
+        // a crashed/force-killed multiplayer session (see dns_cleanup.rs) --
+        // registry + a short socket probe, so it goes on its own thread
+        // rather than blocking startup.
+        {
+            let tx = tx.clone();
+            let ctx = cc.egui_ctx.clone();
+            std::thread::Builder::new()
+                .name("dns-policy-check".into())
+                .spawn(move || {
+                    crate::multiplayer_lan::clean_stale_nrpt_rule(|msg| {
+                        let _ = tx.send(AppMsg::Log(msg.to_string()));
+                        ctx.request_repaint();
+                    });
+                })
+                .ok();
+        }
 
         let stats = Arc::new(StatsClient::new("127.0.0.1", 49123));
         let (stats_tx, stats_rx) = crossbeam_channel::unbounded();
@@ -1536,6 +1554,16 @@ impl HebnixApp {
         self.monitor.stop();
         self.discord_presence.stop();
         self.tray = None;
+        // std::process::exit() terminates immediately without running Rust
+        // destructors, so `impl Drop for HebnixApp` (which would otherwise
+        // clean up the WinDivert capture handle and bring the tailnet down)
+        // never runs on this path. Windows does force-close the process's
+        // handles on exit regardless, but that's exactly what left the
+        // WinDivert driver in a corrupted, file-locked state before - it
+        // needs the cooperative shutdown (WinDivertShutdown then close) to
+        // unload cleanly, not just have its handle yanked. Do that
+        // explicitly here rather than relying on process teardown to do it.
+        self.workshop.suspend_multiplayer();
         std::process::exit(0);
     }
 
@@ -1606,8 +1634,9 @@ impl HebnixApp {
                         self.check_web_port();
                     }
                     if rl_state_changed || platform_changed {
-                        self.workshop.refresh_wizard_status(&self.tx, ctx);
+                        self.workshop.refresh_launch_status(&self.tx, ctx);
                     }
+                    self.workshop.tick_shutdown_grace();
                 }
                 AppMsg::AppUpdateFetched { result } => match result {
                     Ok(Some(info)) => {
@@ -1842,13 +1871,13 @@ impl HebnixApp {
                 }
                 AppMsg::WorkshopCatalog(result) => match result {
                     Ok(items) => {
-                        self.workshop.catalog = items;
-                        self.workshop.execute_search(true);
+                        self.workshop.set_catalog(items);
                         if self.workshop.valid.is_empty() {
                             self.workshop.catalog_status = "No maps found.".to_string();
                         }
                     }
                     Err(e) => {
+                        self.workshop.merge_local_maps();
                         self.workshop.catalog_status = "Failed to load maps.".to_string();
                         self.console
                             .write(format!("[Core] Failed to fetch maps: {e}"));
@@ -1881,14 +1910,14 @@ impl HebnixApp {
                 AppMsg::WorkshopMultiplayerProgress(status) => {
                     self.workshop.set_multiplayer_progress(status);
                 }
-                AppMsg::WorkshopMultiplayerPrepared { result } => {
-                    self.workshop.finish_multiplayer_prepare(result);
+                AppMsg::WorkshopTailnetStarted { result } => {
+                    self.workshop.finish_tailnet_started(result);
                 }
-                AppMsg::WorkshopHostStarted { result } => {
-                    self.workshop.finish_hosting(result);
+                AppMsg::WorkshopMultiplayerLaunched { result } => {
+                    self.workshop.finish_multiplayer_launch(result);
                 }
-                AppMsg::WorkshopGuestJoined { result } => {
-                    self.workshop.finish_joining(result);
+                AppMsg::WorkshopRelayStarted { result } => {
+                    self.workshop.finish_relay_started(result);
                 }
                 AppMsg::WorkshopPlayerUpdated { result } => {
                     self.workshop.finish_player_update(result);
@@ -1896,20 +1925,13 @@ impl HebnixApp {
                 AppMsg::WorkshopHostSessionCheck { result } => {
                     self.workshop.finish_host_session_check(result);
                 }
-                AppMsg::WorkshopWizardCheck {
+                AppMsg::WorkshopLaunchCheck {
                     rl_open,
-                    tap_ready,
                     launch_ready,
-                    detected_map,
                 } => {
-                    self.workshop.finish_wizard_check(
-                        rl_open,
-                        tap_ready,
-                        launch_ready,
-                        detected_map,
-                    );
+                    self.workshop.finish_launch_check(rl_open, launch_ready);
                     if self.workshop.retry_multihome_check() {
-                        self.workshop.refresh_wizard_status(&self.tx, ctx);
+                        self.workshop.refresh_launch_status(&self.tx, ctx);
                     }
                 }
                 AppMsg::PluginFetch { result } => {
@@ -2031,6 +2053,38 @@ impl HebnixApp {
                 AppMsg::PluginWsClose { slug, id, reason } => {
                     self.plugin_mgr.on_ws_close(&slug, &id, &reason);
                     ctx.request_repaint();
+                }
+                AppMsg::TsnetUpResult { result } => match result {
+                    Ok(ip) => {
+                        self.console.write(format!("[tsnet] tailnet up, IP {ip}"));
+                        self.workshop.set_tailnet_ip(ip);
+                        self.workshop.refresh_launch_status(&self.tx, ctx);
+                    }
+                    Err(error) => {
+                        self.console
+                            .write(format!("[tsnet] failed to bring the tailnet up: {error}"));
+                        self.workshop.tailnet_failed(error);
+                    }
+                },
+                // not otherwise consumed yet -- peer-level status/events only
+                // drive the console for now. See the tsnet-multiplayer rework
+                // plan's beacon-relay/firewall-scoping notes for what would
+                // consume a live peer list if this UI panel grows one later.
+                AppMsg::TsnetStatus { state, tailnet_ip, peers } => {
+                    self.console.write(format!(
+                        "[tsnet] status={state:?} ip={tailnet_ip:?} peers={}",
+                        peers.len()
+                    ));
+                }
+                AppMsg::TsnetPeerEvent { online, tailnet_ip } => {
+                    let word = if online { "online" } else { "offline" };
+                    self.console.write(format!("[tsnet] peer {tailnet_ip} {word}"));
+                }
+                AppMsg::TsnetDownResult { ok } => {
+                    self.console.write(format!("[tsnet] tailnet down (ok={ok})"));
+                }
+                AppMsg::TsnetSidecarDisconnected => {
+                    self.console.write("[tsnet] lost connection to the multiplayer helper".to_string());
                 }
             }
         }
@@ -4860,6 +4914,7 @@ impl HebnixApp {
             self.save_config();
             if spoofer::spawn_elevated_relaunch() {
                 self.spoofer_mgr.shutdown();
+                self.workshop.suspend_multiplayer();
                 std::process::exit(0);
             }
             self.spoofer_master = false;
@@ -4906,6 +4961,7 @@ impl HebnixApp {
             self.colour_admin_prompt_open = false;
             if spoofer::spawn_elevated_relaunch() {
                 self.spoofer_mgr.shutdown();
+                self.workshop.suspend_multiplayer();
                 std::process::exit(0);
             }
             self.console

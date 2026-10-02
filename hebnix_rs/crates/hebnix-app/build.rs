@@ -174,14 +174,31 @@ fn copy_runtime_binaries() {
         "rlapi-bridge.exe missing - run rlapi_bridge/build.bat (RLAPI off until then)",
     );
 
-    copy_tree(
-        &manifest_dir
-            .join("src")
-            .join("multiplayer-lan")
-            .join("tap-driver"),
-        &profile_dir.join("tap-driver"),
-        "tap-driver/ missing - Workshop LAN is unavailable",
-    );
+    let sidecar_dir = workspace_root.join("sidecar");
+    for (file_name, missing_hint) in [
+        (
+            "tailscaled.exe",
+            "tailscaled.exe missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
+        ),
+        (
+            "tailscale.exe",
+            "tailscale.exe missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
+        ),
+        (
+            "wintun.dll",
+            "wintun.dll missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
+        ),
+        (
+            "WinDivert.dll",
+            "WinDivert.dll missing from hebnix_rs/sidecar/ - the beacon capture (multiplayer-lan/beacon.rs) needs it next to the exe. Official release: https://github.com/basil00/WinDivert/releases",
+        ),
+        (
+            "WinDivert64.sys",
+            "WinDivert64.sys missing from hebnix_rs/sidecar/ - the signed driver WinDivert.dll loads, same source as WinDivert.dll above",
+        ),
+    ] {
+        copy_file(&sidecar_dir.join(file_name), &profile_dir, missing_hint);
+    }
 }
 
 fn copy_file(
@@ -208,45 +225,6 @@ fn copy_file(
     }
 }
 
-fn copy_tree(
-    src: &Path,
-    dst: &Path,
-    missing_hint: &str,
-) {
-    if !src.is_dir() {
-        println!("cargo:warning=hebnix: {missing_hint}");
-        return;
-    }
-
-    let Ok(entries) = std::fs::read_dir(src) else {
-        return;
-    };
-
-    let _ = std::fs::create_dir_all(dst);
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let destination = dst.join(entry.file_name());
-
-        if path.is_dir() {
-            copy_tree(
-                &path,
-                &destination,
-                missing_hint,
-            );
-        } else if path.is_file() {
-            println!(
-                "cargo:rerun-if-changed={}",
-                path.display()
-            );
-
-            let _ = std::fs::copy(
-                &path,
-                destination,
-            );
-        }
-    }
-}
 
 // target/<profile>/ derived from
 // OUT_DIR = target/<profile>/build/<pkg>/out
