@@ -102,6 +102,7 @@ impl HostSession {
                         guest_ips.len()
                     )));
                     let rewritten = rewrite_lan_beacon_payload(payload, host_octets);
+                    let mut relayed = 0;
                     for &guest_ip in &guest_ips {
                         // don't echo the beacon back to whoever it came from
                         // -- WinDivert's sniff filter matches both directions
@@ -117,15 +118,19 @@ impl HostSession {
                         match relay.send_to(&rewritten, guest) {
                             Ok(()) => {
                                 worker_stats.sent.fetch_add(1, Ordering::Relaxed);
-                                if let Ok(mut value) = worker_stats.last_beacon_relayed.lock() {
-                                    *value = format!("beacon → {guest}");
-                                }
+                                relayed += 1;
                             }
                             Err(error) => {
                                 let _ = tx.send(AppMsg::Log(format!(
                                     "[Core] Beacon relay failed to send to {guest}: {error}"
                                 )));
                             }
+                        }
+                    }
+                    // shown in the ui, so no addresses in it
+                    if relayed > 0 {
+                        if let Ok(mut value) = worker_stats.last_beacon_relayed.lock() {
+                            *value = format!("beacon relayed to {relayed} player(s)");
                         }
                     }
                 }
@@ -157,6 +162,25 @@ impl HostSession {
     /// workshop maps online peers say they have installed
     pub fn peer_offers(&self) -> Vec<PeerOffer> {
         self.map_sync.as_ref().map(MapSync::offers).unwrap_or_default()
+    }
+
+    /// hides a player's maps and refuses their map sync connections for the
+    /// rest of this session
+    pub fn block(&self, ip: std::net::IpAddr, label: String) {
+        if let Some(map_sync) = &self.map_sync {
+            map_sync.block(ip, label);
+        }
+    }
+
+    pub fn unblock(&self, ip: std::net::IpAddr) {
+        if let Some(map_sync) = &self.map_sync {
+            map_sync.unblock(ip);
+        }
+    }
+
+    /// players blocked this session, by name
+    pub fn blocked(&self) -> Vec<(std::net::IpAddr, String)> {
+        self.map_sync.as_ref().map(MapSync::blocked).unwrap_or_default()
     }
 
     pub fn suspend(&mut self) {
