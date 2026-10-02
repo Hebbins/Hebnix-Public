@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 
 use super::{
     CreateRoomRequest, JoinRoomRequest, JoinedRoom, LeaveRoomRequest, Room, RoomCredentials,
-    UpdatePlayerRequest,
+    TsnetAuthKey, UpdatePlayerRequest,
 };
 
 #[derive(Clone)]
@@ -60,6 +60,18 @@ impl RoomClient {
             &request,
         )?;
         Ok(())
+    }
+
+    /// speculative: the backend doesn't have this endpoint yet (see the
+    /// tsnet-multiplayer rework plan) -- calls will fail until Harry adds
+    /// it. `pin` is empty for a host's pre-session key request.
+    pub fn request_tsnet_authkey(&self, role: &str, pin: &str) -> Result<TsnetAuthKey, String> {
+        #[derive(Serialize)]
+        struct Request<'a> {
+            pin: &'a str,
+            role: &'a str,
+        }
+        self.post("/?request=tsnet/authkey", &Request { pin, role })
     }
 
     pub fn update_player(&self, pin: &str, request: &UpdatePlayerRequest) -> Result<(), String> {

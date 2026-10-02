@@ -54,8 +54,14 @@ reqwest = { version = "0.11", features = ["blocking", "multipart"] }
 base64 = "0.21"
 flate2 = "1.0"
 hmac = "0.12"
-igd-next = "0.17"
 sha2 = "0.10"
+socket2 = "0.5"
+windivert-sys = { version = "0.10", features = ["vendored"] }
+# same version windivert-sys itself depends on internally (pinned so its
+# HANDLE type is the exact same type windivert-sys's own extern "C"
+# functions expect) - used only to unblock a pending WinDivertRecv() from a
+# different thread on shutdown, see beacon.rs
+windows-windivert-handle = { package = "windows", version = "0.48", default-features = false, features = ["Win32_Foundation"] }
 hex = "0.4"
 gamepads = "0.1"
 rodio = "0.17"
