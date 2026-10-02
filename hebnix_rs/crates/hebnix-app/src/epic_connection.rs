@@ -1,3 +1,4 @@
+use crate::i18n::{t, t_args};
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, unbounded};
@@ -44,19 +45,19 @@ impl RepairState {
             self.result = Some(result);
         }
         if self.confirm {
-            egui::Window::new("Fix Epic Connection")
+            egui::Window::new(t("action-fix-epic-connection")).id(egui::Id::new("action-fix-epic-connection"))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     ui.label(
-                        "Rocket League must close to repair the Epic connection. Close it now?",
+                        t("epic-connection-rocket-league-must-close-to-repair"),
                     );
                     ui.horizontal(|ui| {
-                        if ui.button("Yes").clicked() {
+                        if ui.button(t("plugin-delete-prompt-yes")).clicked() {
                             self.run(ctx);
                         }
-                        if ui.button("No").clicked() {
+                        if ui.button(t("plugin-delete-prompt-no")).clicked() {
                             self.confirm = false;
                         }
                     });
@@ -64,9 +65,9 @@ impl RepairState {
         }
         if let Some(result) = &self.result {
             let title = if result.is_ok() {
-                "Epic Connection Repaired"
+                t("epic-connection-epic-connection-repaired")
             } else {
-                "Fix Epic Connection"
+                t("action-fix-epic-connection")
             };
             let mut close = false;
             egui::Window::new(title)
@@ -75,11 +76,11 @@ impl RepairState {
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     if let Err(error) = result {
-                        ui.label(format!("Could not repair the Epic connection: {error}"));
+                        ui.label(t_args("epic-connection-could-not-repair-the-epic-connection", &[("error", error.to_string().into())]));
                     } else {
-                        ui.label("Epic Connection Repaired");
+                        ui.label(t("epic-connection-epic-connection-repaired"));
                     }
-                    if ui.button("OK").clicked() {
+                    if ui.button(t("btn-ok")).clicked() {
                         close = true;
                     }
                 });

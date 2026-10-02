@@ -10,6 +10,8 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use crate::i18n::{t, t_args};
+
 const RETRY_INTERVAL: Duration = Duration::from_secs(10);
 const APPLICATION_ID: &str = "1517810728155746405";
 const HEBNIX_DISPLAY_NAME: &str = "Hebnix";
@@ -137,26 +139,26 @@ fn idle_activity(
 ) -> (String, String) {
     if !settings.discord_game_state {
         return (
-            nonempty(&settings.discord_custom_message, "Playing Rocket League"),
+            nonempty(&settings.discord_custom_message, &t("discord-presence-playing")),
             String::new(),
         );
     }
     if !rocket_league_open {
         return (String::new(), String::new());
     }
-    ("In Rocket League".to_string(), "Main menu".to_string())
+    (t("discord-presence-in-game"), t("discord-presence-main-menu"))
 }
 
 fn match_activity(settings: &crate::config::SettingsCfg, info: &MatchInfo) -> (String, String) {
     let details = if settings.discord_game_state {
-        "In a match".to_string()
+        t("discord-presence-in-match")
     } else {
-        nonempty(&settings.discord_custom_message, "Playing Rocket League")
+        nonempty(&settings.discord_custom_message, &t("discord-presence-playing"))
     };
     let mut fields = Vec::with_capacity(3);
     if settings.discord_game_state {
         if settings.discord_show_score && !info.score.is_empty() {
-            fields.push(format!("Score: {}", info.score));
+            fields.push(t_args("discord-presence-score", &[("score", info.score.as_str().into())]));
         }
         if settings.discord_show_map && !info.map.is_empty() {
             fields.push(info.map.clone());
@@ -308,8 +310,8 @@ fn activity_json(activity: &Activity) -> serde_json::Value {
         "state": activity.state,
         "timestamps": {"start": activity.started_at},
         "buttons": [
-            {"label": "Hebnix Website", "url": WEBSITE_URL},
-            {"label": "Hebnix Discord", "url": COMMUNITY_URL},
+            {"label": t("discord-button-website"), "url": WEBSITE_URL},
+            {"label": t("discord-button-community"), "url": COMMUNITY_URL},
         ],
         "instance": false,
     });

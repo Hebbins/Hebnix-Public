@@ -1,0 +1,37 @@
+# list of shipped languages. a folder in locales/ also needs a row here to get
+# a proper name and status, otherwise it shows up under its code as a draft.
+#
+# code      folder name in locales/ and bcp47 tag
+# name      the language's own name, shown in the picker
+# direction "ltr" or "rtl" (rtl isn't laid out yet, see README)
+# status    "reviewed" once a human fluent speaker signed it off, else "draft"
+
+[[locale]]
+code = "en"
+name = "English"
+direction = "ltr"
+status = "reviewed"
+
+[[locale]]
+code = "de"
+name = "Deutsch"
+direction = "ltr"
+status = "draft"
+
+[[locale]]
+code = "fr"
+name = "Français"
+direction = "ltr"
+status = "draft"
+
+[[locale]]
+code = "it"
+name = "Italiano"
+direction = "ltr"
+status = "draft"
+
+[[locale]]
+code = "es"
+name = "Español"
+direction = "ltr"
+status = "draft"

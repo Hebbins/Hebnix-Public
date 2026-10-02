@@ -31,6 +31,8 @@ impl Default for WindowCfg {
 pub struct SettingsCfg {
     pub hotkey: String,
     pub theme: String,
+    /// UI language code ("en", "de", ...) or "auto" to follow the system
+    pub language: String,
     /// Main tab selected when Hebnix starts.
     pub default_tab: String,
     /// main window bg opacity (0.5-1.0)
@@ -67,6 +69,7 @@ impl Default for SettingsCfg {
         Self {
             hotkey: "f2".to_string(),
             theme: "Dark".to_string(),
+            language: crate::i18n::AUTO.to_string(),
             default_tab: "Console".to_string(),
             window_opacity: 0.96,
             start_in_tray: false,
@@ -134,6 +137,14 @@ pub enum PatchSource {
     Custom,
 }
 
+/// experimental animation speed patch, see patcher/speed_patch.rs
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SpeedPatchCfg {
+    /// show a speed picker on the Items page decal and swap rows
+    pub items_page: bool,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PatcherCfg {
@@ -177,15 +188,16 @@ impl ActionButtonAction {
         Self::ReloadPlugins,
     ];
 
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
+        use crate::i18n::t;
         match self {
-            Self::StartRocketLeague => "Start Rocket League",
-            Self::RestartRocketLeague => "Restart Rocket League",
-            Self::CloseRocketLeague => "Close Rocket League",
-            Self::OpenHebnixFolder => "Open Hebnix Folder",
-            Self::OpenPluginsFolder => "Open Plugins Folder",
-            Self::ReloadPlugins => "Reload Plugins",
-            Self::FixEpicConnection => "Fix Epic Connection",
+            Self::StartRocketLeague => t("action-start-rocket-league"),
+            Self::RestartRocketLeague => t("action-restart-rocket-league"),
+            Self::CloseRocketLeague => t("action-close-rocket-league"),
+            Self::OpenHebnixFolder => t("action-open-hebnix-folder"),
+            Self::OpenPluginsFolder => t("action-open-plugins-folder"),
+            Self::ReloadPlugins => t("action-reload-plugins"),
+            Self::FixEpicConnection => t("action-fix-epic-connection"),
         }
     }
 }
@@ -280,6 +292,7 @@ pub struct Config {
     pub settings: SettingsCfg,
     pub rl_launch: RlLaunchCfg,
     pub patcher: PatcherCfg,
+    pub speed_patch: SpeedPatchCfg,
     pub action_button: ActionButtonCfg,
     /// enabled state keyed by plugin slug
     pub plugins: BTreeMap<String, bool>,

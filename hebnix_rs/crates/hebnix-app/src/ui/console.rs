@@ -1,6 +1,7 @@
 //! Developer console: scrollback, command input with history and
 //! autocomplete suggestions.
 
+use crate::i18n::t;
 use eframe::egui::{self, Key, Modifiers};
 
 const MAX_LINES: usize = 2000;
@@ -203,7 +204,7 @@ impl ConsoleState {
         let response = ui.add(
             egui::TextEdit::singleline(&mut self.input)
                 .id(input_id)
-                .hint_text("Enter system command...")
+                .hint_text(t("render-enter-system-command"))
                 .font(egui::TextStyle::Monospace)
                 .lock_focus(!self.suggestions.is_empty()) // else tab should walk focus off the input
                 .desired_width(f32::INFINITY),

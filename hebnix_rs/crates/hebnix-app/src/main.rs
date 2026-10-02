@@ -27,6 +27,7 @@ mod dpi_fix;
 mod epic_connection;
 mod hosts_file;
 mod hotkey;
+mod i18n;
 #[path = "item-spawning/mod.rs"]
 mod item_spawning;
 mod messages;
@@ -44,6 +45,9 @@ mod rl_launch;
 mod runtime_assets;
 mod spoofer;
 mod statsapi_ini;
+mod speed_patch {
+    pub use crate::patcher::speed_patch::*;
+}
 mod swapper {
     pub use crate::patcher::swapper::*;
 }
@@ -185,6 +189,7 @@ fn main() -> eframe::Result {
     tracing::info!("Hebnix {} starting", app::APP_VERSION);
 
     let mut cfg = config::Config::load(&base_dir);
+    i18n::init(&cfg.settings.language, Some(base_dir.join("locales")));
 
     // relaunch elevated if the user asked for it. --no-elevate comes back when
     // uac was declined

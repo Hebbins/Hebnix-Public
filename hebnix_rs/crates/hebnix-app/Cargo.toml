@@ -67,7 +67,13 @@ gamepads = "0.1"
 rodio = "0.17"
 tungstenite = { version = "0.21", features = ["native-tls"] }
 p256 = { version = "0.13", default-features = false, features = ["ecdsa", "pkcs8", "std"] }
+fluent-bundle = "0.16.0"
+unic-langid = "0.9.6"
+sys-locale = "0.3.2"
 
 [build-dependencies]
 embed-manifest = "1.5.0"
 embed-resource = "3.0.6"
+
+[dev-dependencies]
+fluent-syntax = "0.12.0"
