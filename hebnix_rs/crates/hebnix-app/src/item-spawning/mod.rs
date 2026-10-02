@@ -1,9 +1,24 @@
 use rand::Rng;
 
 pub const PAINTS: [&str; 18] = [
-    "Default (no colour)", "Crimson", "Lime", "Black", "Sky Blue", "Cobalt",
-    "Burnt Sienna", "Forest Green", "Purple", "Pink", "Orange", "Grey",
-    "Titanium White", "Saffron", "Gold", "Rose Gold", "White Gold", "Onyx",
+    "Default (no colour)",
+    "Crimson",
+    "Lime",
+    "Black",
+    "Sky Blue",
+    "Cobalt",
+    "Burnt Sienna",
+    "Forest Green",
+    "Purple",
+    "Pink",
+    "Orange",
+    "Grey",
+    "Titanium White",
+    "Saffron",
+    "Gold",
+    "Rose Gold",
+    "White Gold",
+    "Onyx",
 ];
 
 #[derive(Debug, Clone)]
@@ -16,8 +31,10 @@ pub struct ItemSpawnRequest {
     pub quantity: usize,
 }
 
-pub fn reward_message(request: &ItemSpawnRequest, psy_time: i64) -> Result<(String, Vec<String>), String> {
-
+pub fn reward_message(
+    request: &ItemSpawnRequest,
+    psy_time: i64,
+) -> Result<(String, Vec<String>), String> {
     let mut products = Vec::with_capacity(request.quantity);
     let mut instance_ids = Vec::with_capacity(request.quantity);
     for _ in 0..request.quantity {
@@ -44,11 +61,13 @@ pub fn reward_message(request: &ItemSpawnRequest, psy_time: i64) -> Result<(Stri
     }
     let body = serde_json::to_string(&serde_json::json!({"RocketPassInfo":{"TierLevel":0,"bOwnsPremium":false,"XPMultiplier":0.0},"ProductData":products,"RewardDrops":[],"ChallengeRewards":[],"CurrencyDrops":[],"Source":"","MatchGUID":""})).map_err(|e| e.to_string())?;
     let sig = crate::spoofer::rules::psy_response_signature(&psy_time.to_string(), body.as_bytes());
-    Ok((format!(
-        "PsyService: Reward/RewardResult\r\nPsyServiceVersion: 2\r\nPsyTime: {psy_time}\r\nPsySig: {sig}\r\n\r\n{body}"
-    ), instance_ids))
+    Ok((
+        format!(
+            "PsyService: Reward/RewardResult\r\nPsyServiceVersion: 2\r\nPsyTime: {psy_time}\r\nPsySig: {sig}\r\n\r\n{body}"
+        ),
+        instance_ids,
+    ))
 }
-
 
 /// Instance IDs created by Hebnix. This is separate from Rocket League saves.
 pub struct SpawnedItemLedger {
@@ -59,20 +78,28 @@ pub struct SpawnedItemLedger {
 impl SpawnedItemLedger {
     pub fn new(base_dir: &std::path::Path) -> Self {
         let path = base_dir.join("spawned_item_ids.json");
-        let read_ids = |path: &std::path::Path| std::fs::read(path).ok()
-            .and_then(|bytes| serde_json::from_slice::<Vec<String>>(&bytes).ok());
+        let read_ids = |path: &std::path::Path| {
+            std::fs::read(path)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<Vec<String>>(&bytes).ok())
+        };
         let ids = read_ids(&path)
             .or_else(|| read_ids(&path.with_extension("json.bak")))
             .unwrap_or_default()
             .into_iter()
             .filter(|id| id.len() == 32 && id.bytes().all(|byte| byte.is_ascii_hexdigit()))
             .collect();
-        Self { path, ids: std::sync::Mutex::new(ids) }
+        Self {
+            path,
+            ids: std::sync::Mutex::new(ids),
+        }
     }
 
     fn save(&self, ids: &[String]) -> Result<(), String> {
         let bytes = serde_json::to_vec_pretty(ids).map_err(|error| error.to_string())?;
-        let temporary = self.path.with_extension(format!("json.{}.tmp", std::process::id()));
+        let temporary = self
+            .path
+            .with_extension(format!("json.{}.tmp", std::process::id()));
         std::fs::write(&temporary, bytes).map_err(|error| error.to_string())?;
         if self.path.is_file() {
             std::fs::copy(&self.path, self.path.with_extension("json.bak"))
@@ -83,7 +110,10 @@ impl SpawnedItemLedger {
     }
 
     pub fn record(&self, new_ids: &[String]) -> Result<(), String> {
-        let mut ids = self.ids.lock().map_err(|_| "spawned item ledger lock poisoned")?;
+        let mut ids = self
+            .ids
+            .lock()
+            .map_err(|_| "spawned item ledger lock poisoned")?;
         let old_len = ids.len();
         ids.extend(new_ids.iter().cloned());
         if let Err(error) = self.save(&ids) {
@@ -106,13 +136,20 @@ mod tests {
     #[test]
     fn reward_ids_match_the_products_sent_to_rocket_league() {
         let request = ItemSpawnRequest {
-            product_id: 42, series_id: 1, quality: 0, paint: 0,
-            certification: 0, quantity: 2,
+            product_id: 42,
+            series_id: 1,
+            quality: 0,
+            paint: 0,
+            certification: 0,
+            quantity: 2,
         };
         let (message, ids) = reward_message(&request, 1_700_000_000).unwrap();
         let (_, body) = message.split_once("\r\n\r\n").unwrap();
         let body: serde_json::Value = serde_json::from_str(body).unwrap();
-        let sent_ids = body["ProductData"].as_array().unwrap().iter()
+        let sent_ids = body["ProductData"]
+            .as_array()
+            .unwrap()
+            .iter()
             .map(|product| product["InstanceID"].as_str().unwrap().to_string())
             .collect::<Vec<_>>();
         assert_eq!(sent_ids, ids);
@@ -121,7 +158,8 @@ mod tests {
 
     #[test]
     fn ledger_retains_spawned_ids_across_restart() {
-        let dir = std::env::temp_dir().join(format!("hebnix-spawn-ledger-{}", rand::random::<u64>()));
+        let dir =
+            std::env::temp_dir().join(format!("hebnix-spawn-ledger-{}", rand::random::<u64>()));
         std::fs::create_dir_all(&dir).unwrap();
         let first = "00000000000000000000000000000001".to_string();
         let second = "00000000000000000000000000000002".to_string();

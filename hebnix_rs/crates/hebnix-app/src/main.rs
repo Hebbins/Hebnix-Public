@@ -8,6 +8,9 @@ mod ball {
 mod boost_patcher {
     pub use crate::patcher::boost_patcher::*;
 }
+mod car_patcher {
+    pub use crate::patcher::car_patcher::*;
+}
 mod config;
 mod cosmetic_thumbnail {
     pub use crate::patcher::cosmetic_thumbnail::*;
@@ -19,19 +22,19 @@ mod decal_patcher {
     pub use crate::patcher::decal_patcher::*;
 }
 mod deep_link;
-mod epic_connection;
 mod discord_presence;
 mod dpi_fix;
-mod hotkey;
+mod epic_connection;
 mod hosts_file;
+mod hotkey;
 #[path = "item-spawning/mod.rs"]
 mod item_spawning;
-mod veryimportantfile;
 mod messages;
 mod monitor;
 #[path = "multiplayer-lan/mod.rs"]
 mod multiplayer_lan;
 mod overlay;
+mod veryimportantfile;
 mod patch_core {
     pub use crate::patcher::patch_core::*;
 }
@@ -158,6 +161,10 @@ fn dcomp_wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
     if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut options.wgpu_setup {
         let desc = &mut setup.instance_descriptor;
         desc.backends = wgpu::Backends::DX12;
+        // `Auto` may pick up an unrelated dxcompiler.dll from PATH without the
+        // matching dxil.dll, making wgpu's first internal shader fail and lose
+        // the device. FXC is provided by Windows and needs no bundled DLLs.
+        desc.backend_options.dx12.shader_compiler = wgpu::Dx12Compiler::Fxc;
         desc.backend_options.dx12.presentation_system = wgpu::Dx12SwapchainKind::DxgiFromVisual;
     }
     options

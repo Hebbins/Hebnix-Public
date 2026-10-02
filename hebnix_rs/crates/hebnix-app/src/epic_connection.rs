@@ -3,7 +3,6 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, unbounded};
 use eframe::egui;
 
-
 #[derive(Default)]
 pub struct RepairState {
     pub confirm: bool,
@@ -50,7 +49,9 @@ impl RepairState {
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label("Rocket League must close to repair the Epic connection. Close it now?");
+                    ui.label(
+                        "Rocket League must close to repair the Epic connection. Close it now?",
+                    );
                     ui.horizontal(|ui| {
                         if ui.button("Yes").clicked() {
                             self.run(ctx);
@@ -62,7 +63,11 @@ impl RepairState {
                 });
         }
         if let Some(result) = &self.result {
-            let title = if result.is_ok() { "Epic Connection Repaired" } else { "Fix Epic Connection" };
+            let title = if result.is_ok() {
+                "Epic Connection Repaired"
+            } else {
+                "Fix Epic Connection"
+            };
             let mut close = false;
             egui::Window::new(title)
                 .collapsible(false)
@@ -86,7 +91,8 @@ impl RepairState {
 }
 
 fn repair() -> Result<(), String> {
-    crate::hosts_file::clear().map_err(|error| format!("Could not clear Hebnix hosts redirects: {error}"))?;
+    crate::hosts_file::clear()
+        .map_err(|error| format!("Could not clear Hebnix hosts redirects: {error}"))?;
     crate::winutil::clear_rocket_league_web_cache()
         .map_err(|error| format!("Could not clear Rocket League WebCache: {error}"))?;
     use std::os::windows::process::CommandExt;

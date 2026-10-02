@@ -329,23 +329,25 @@ impl TitleRule {
     }
 }
 
-#[derive(Clone)]
-pub struct TitleSettings {
-    pub enabled: bool,
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct TitleSpoofSettings {
     pub text: String,
     pub color: String,
     pub glow: bool,
     pub target_id: Option<String>,
 }
 
+#[derive(Clone)]
+pub struct TitleSettings {
+    pub enabled: bool,
+    pub titles: Vec<TitleSpoofSettings>,
+}
+
 impl Default for TitleSettings {
     fn default() -> Self {
         Self {
             enabled: false,
-            text: String::new(),
-            color: "E8E8E8".to_string(),
-            glow: false,
-            target_id: None,
+            titles: Vec::new(),
         }
     }
 }
@@ -386,7 +388,7 @@ impl Rule for TitleRule {
             .lock()
             .map(|value| value.clone())
             .unwrap_or_default();
-        if !settings.enabled || settings.text.trim().is_empty() {
+        if !settings.enabled || settings.titles.is_empty() {
             return false;
         }
 
@@ -398,26 +400,44 @@ impl Rule for TitleRule {
             return false;
         };
 
-        let mut count = 0;
+        let mut applied = std::collections::HashSet::new();
         for title in titles.iter_mut() {
             if let Some(obj) = title.as_object_mut() {
-                let matches_target = settings.target_id.as_ref().is_none_or(|target| {
-                    obj.get("ID").and_then(serde_json::Value::as_str) == Some(target)
-                });
-                if matches_target && obj.contains_key("Text") {
+                let original_id = obj.get("ID").and_then(serde_json::Value::as_str);
+                let spoof = settings
+                    .titles
+                    .iter()
+                    .enumerate()
+                    .find(|(_, spoof)| {
+                        spoof
+                            .target_id
+                            .as_deref()
+                            .is_some_and(|target| Some(target) == original_id)
+                    })
+                    .or_else(|| {
+                        settings
+                            .titles
+                            .iter()
+                            .enumerate()
+                            .find(|(_, spoof)| spoof.target_id.is_none())
+                    });
+                if let Some((index, spoof)) = spoof
+                    .filter(|(_, spoof)| !spoof.text.trim().is_empty() && obj.contains_key("Text"))
+                {
+                    let category_id = format!("Hebnix_Custom_{index}");
                     obj.insert(
                         "Text".to_string(),
-                        serde_json::Value::String(settings.text.trim().to_string()),
+                        serde_json::Value::String(spoof.text.trim().to_string()),
                     );
                     obj.insert(
                         "Category".to_string(),
-                        serde_json::Value::String("Hebnix_Custom".to_string()),
+                        serde_json::Value::String(category_id),
                     );
-                    count += 1;
+                    applied.insert(index);
                 }
             }
         }
-        if count == 0 {
+        if applied.is_empty() {
             return false;
         }
 
@@ -426,20 +446,24 @@ impl Rule for TitleRule {
             .and_then(|config| config.get_mut("Categories"))
             .and_then(serde_json::Value::as_array_mut)
         {
-            let category = categories.iter_mut().find(|category| {
-                category.get("ID").and_then(serde_json::Value::as_str) == Some("Hebnix_Custom")
-            });
-            let mut replacement = serde_json::json!({
-                "ID": "Hebnix_Custom",
-                "Color": settings.color,
-            });
-            if settings.glow {
-                replacement["GlowColor"] = replacement["Color"].clone();
-            }
-            if let Some(category) = category {
-                *category = replacement;
-            } else {
-                categories.insert(0, replacement);
+            for index in applied {
+                let spoof = &settings.titles[index];
+                let category_id = format!("Hebnix_Custom_{index}");
+                let mut replacement = serde_json::json!({
+                    "ID": category_id,
+                    "Color": spoof.color,
+                });
+                if spoof.glow {
+                    replacement["GlowColor"] = replacement["Color"].clone();
+                }
+                if let Some(category) = categories.iter_mut().find(|category| {
+                    category.get("ID").and_then(serde_json::Value::as_str)
+                        == replacement.get("ID").and_then(serde_json::Value::as_str)
+                }) {
+                    *category = replacement;
+                } else {
+                    categories.insert(0, replacement);
+                }
             }
         }
 
@@ -454,12 +478,20 @@ impl Rule for TitleRule {
 
     fn announce(&self) -> Option<String> {
         (!self.announced.swap(true, Ordering::Relaxed)).then(|| {
-            let title = self
+            let titles = self
                 .settings
                 .lock()
-                .map(|settings| settings.text.clone())
+                .map(|settings| {
+                    settings
+                        .titles
+                        .iter()
+                        .map(|title| title.text.trim())
+                        .filter(|title| !title.is_empty())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                })
                 .unwrap_or_default();
-            format!("Title Spoofed to {title}")
+            format!("Titles Spoofed to {titles}")
         })
     }
 }
@@ -485,8 +517,6 @@ impl RankRule {
             announced: AtomicBool::new(false),
         }
     }
-
-
 }
 
 impl Rule for RankRule {
@@ -514,12 +544,22 @@ impl Rule for RankRule {
         // paths to the real API backend in proxy.rs.
         if body_str.contains("api.rlpp.psynet.gg") {
             let rewritten = body_str
-                .replace("https:\\/\\/api.rlpp.psynet.gg\\/rpc", "https:\\/\\/config.psynet.gg\\/rpc")
-                .replace("https://api.rlpp.psynet.gg/rpc", "https://config.psynet.gg/rpc")
-                .replace("https://api.rlpp.psynet.gg/Services", "https://config.psynet.gg/Services");
+                .replace(
+                    "https:\\/\\/api.rlpp.psynet.gg\\/rpc",
+                    "https:\\/\\/config.psynet.gg\\/rpc",
+                )
+                .replace(
+                    "https://api.rlpp.psynet.gg/rpc",
+                    "https://config.psynet.gg/rpc",
+                )
+                .replace(
+                    "https://api.rlpp.psynet.gg/Services",
+                    "https://config.psynet.gg/Services",
+                );
             if rewritten != body_str {
                 let bytes = rewritten.into_bytes();
-                body.set_headers.push(("Psysignature".into(), psysignature(&bytes)));
+                body.set_headers
+                    .push(("Psysignature".into(), psysignature(&bytes)));
                 body.bytes = bytes;
                 return true;
             }
@@ -545,19 +585,31 @@ impl Rule for RankRule {
         let mut modified = false;
         fn rewrite_connection_urls(value: &mut serde_json::Value) -> bool {
             match value {
-                serde_json::Value::Object(object) => object.iter_mut().fold(false, |changed, (key, value)| {
-                    let replacement = match key.as_str() {
-                        "PerConURL" => Some("ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player"),
-                        "PerConURLv2" => Some("ws://127.0.0.1:8025/ws/gc2"),
-                        _ => None,
-                    };
-                    if let Some(url) = replacement {
-                        let was_different = value.as_str() != Some(url);
-                        if was_different { *value = serde_json::Value::String(url.into()); }
-                        changed || was_different
-                    } else { changed | rewrite_connection_urls(value) }
-                }),
-                serde_json::Value::Array(array) => array.iter_mut().fold(false, |changed, value| changed | rewrite_connection_urls(value)),
+                serde_json::Value::Object(object) => {
+                    object.iter_mut().fold(false, |changed, (key, value)| {
+                        let replacement = match key.as_str() {
+                            "PerConURL" => {
+                                Some("ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player")
+                            }
+                            "PerConURLv2" => Some("ws://127.0.0.1:8025/ws/gc2"),
+                            _ => None,
+                        };
+                        if let Some(url) = replacement {
+                            let was_different = value.as_str() != Some(url);
+                            if was_different {
+                                *value = serde_json::Value::String(url.into());
+                            }
+                            changed || was_different
+                        } else {
+                            changed | rewrite_connection_urls(value)
+                        }
+                    })
+                }
+                serde_json::Value::Array(array) => {
+                    array.iter_mut().fold(false, |changed, value| {
+                        changed | rewrite_connection_urls(value)
+                    })
+                }
                 _ => false,
             }
         }
@@ -682,27 +734,35 @@ mod tests {
         let mut body = Body::new("application/json", original);
         assert!(rule.rewrite(&mut body));
         let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
-        assert_eq!(value["Result"]["PerConURL"], "ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player");
+        assert_eq!(
+            value["Result"]["PerConURL"],
+            "ws://127.0.0.1:8025/ws/gc?PsyConnectionType=Player"
+        );
         assert_eq!(value["Result"]["PerConURLv2"], "ws://127.0.0.1:8025/ws/gc2");
     }
 
     #[test]
     fn rank_rule_routes_psynet_api_through_config() {
         let rule = RankRule::new(Arc::new(Mutex::new(HashMap::from([(10, (22, 95.0))]))));
-        let mut body = Body::new("application/json", br#"{"PsyNetUrl":"https://api.rlpp.psynet.gg/rpc"}"#.to_vec());
+        let mut body = Body::new(
+            "application/json",
+            br#"{"PsyNetUrl":"https://api.rlpp.psynet.gg/rpc"}"#.to_vec(),
+        );
         assert!(rule.rewrite(&mut body));
         let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
         assert_eq!(value["PsyNetUrl"], "https://config.psynet.gg/rpc");
-        assert!(body.set_headers.iter().any(|(name, _)| name == "Psysignature"));
+        assert!(
+            body.set_headers
+                .iter()
+                .any(|(name, _)| name == "Psysignature")
+        );
     }
 
     #[test]
     fn item_spawner_routes_websocket_without_rank_spoofs() {
         let enabled = Arc::new(AtomicBool::new(true));
-        let rule = RankRule::with_item_spawner(
-            Arc::new(Mutex::new(HashMap::new())),
-            Arc::clone(&enabled),
-        );
+        let rule =
+            RankRule::with_item_spawner(Arc::new(Mutex::new(HashMap::new())), Arc::clone(&enabled));
         let mut body = Body::new(
             "application/json",
             br#"{"Result":{"PerConURLv2":"wss://ws.rlpp.psynet.gg/ws/gc2"}}"#.to_vec(),
@@ -745,10 +805,12 @@ mod tests {
     fn title_rule_targets_one_title_and_adds_custom_palette() {
         let settings = Arc::new(Mutex::new(TitleSettings {
             enabled: true,
-            text: "Hebnix".into(),
-            color: "12ABEF".into(),
-            glow: true,
-            target_id: Some("Second".into()),
+            titles: vec![TitleSpoofSettings {
+                text: "Hebnix".into(),
+                color: "12ABEF".into(),
+                glow: true,
+                target_id: Some("Second".into()),
+            }],
         }));
         let rule = TitleRule::new(settings);
         let mut body = Body::new(
@@ -764,5 +826,124 @@ mod tests {
             value["PlayerTitleConfig"]["Categories"][0]["GlowColor"],
             "12ABEF"
         );
+    }
+
+    #[test]
+    fn title_rule_spoofs_each_configured_title() {
+        let settings = Arc::new(Mutex::new(TitleSettings {
+            enabled: true,
+            titles: vec![
+                TitleSpoofSettings {
+                    text: "First Spoof".into(),
+                    color: "112233".into(),
+                    glow: false,
+                    target_id: Some("First".into()),
+                },
+                TitleSpoofSettings {
+                    text: "Second Spoof".into(),
+                    color: "AABBCC".into(),
+                    glow: true,
+                    target_id: Some("Second".into()),
+                },
+            ],
+        }));
+        let rule = TitleRule::new(settings);
+        let mut body = Body::new(
+            "application/json",
+            br#"{"PlayerTitleConfig":{"Titles":[{"ID":"First","Text":"One"},{"ID":"Second","Text":"Two"}],"Categories":[]}}"#.to_vec(),
+        );
+        assert!(rule.rewrite(&mut body));
+        let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(
+            value["PlayerTitleConfig"]["Titles"][0]["Text"],
+            "First Spoof"
+        );
+        assert_eq!(
+            value["PlayerTitleConfig"]["Titles"][1]["Text"],
+            "Second Spoof"
+        );
+        assert_ne!(
+            value["PlayerTitleConfig"]["Titles"][0]["Category"],
+            value["PlayerTitleConfig"]["Titles"][1]["Category"]
+        );
+    }
+
+    #[test]
+    fn dedicated_title_takes_priority_and_all_spoofs_the_rest() {
+        let settings = Arc::new(Mutex::new(TitleSettings {
+            enabled: true,
+            titles: vec![
+                TitleSpoofSettings {
+                    text: "Fallback".into(),
+                    color: "112233".into(),
+                    glow: false,
+                    target_id: None,
+                },
+                TitleSpoofSettings {
+                    text: "Dedicated".into(),
+                    color: "AABBCC".into(),
+                    glow: true,
+                    target_id: Some("Second".into()),
+                },
+            ],
+        }));
+        let rule = TitleRule::new(settings);
+        let mut body = Body::new(
+            "application/json",
+            br#"{"PlayerTitleConfig":{"Titles":[{"ID":"First","Text":"One"},{"ID":"Second","Text":"Two"},{"ID":"Third","Text":"Three"}],"Categories":[]}}"#.to_vec(),
+        );
+        assert!(rule.rewrite(&mut body));
+        let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(value["PlayerTitleConfig"]["Titles"][0]["Text"], "Fallback");
+        assert_eq!(
+            value["PlayerTitleConfig"]["Titles"][1]["Text"],
+            "Dedicated"
+        );
+        assert_eq!(value["PlayerTitleConfig"]["Titles"][2]["Text"], "Fallback");
+    }
+}
+
+/// Keep normal spoof rules inactive when only the RLAPI workbench is enabled.
+pub struct EnabledRule {
+    pub inner: Box<dyn Rule>,
+    pub http: Arc<AtomicBool>,
+    pub socket: Arc<AtomicBool>,
+}
+impl Rule for EnabledRule {
+    fn matches_host(&self, host: &str) -> bool {
+        (self.http.load(Ordering::Relaxed) || self.socket.load(Ordering::Relaxed))
+            && self.inner.matches_host(host)
+    }
+    fn strip_request_headers(&self) -> &[&str] {
+        self.inner.strip_request_headers()
+    }
+    fn rewrite(&self, body: &mut Body) -> bool {
+        self.inner.rewrite(body)
+    }
+    fn announce(&self) -> Option<String> {
+        self.inner.announce()
+    }
+}
+
+/// Route the original game authentication and WebSocket, with no data spoofs.
+pub struct RlApiRouteRule;
+impl Rule for RlApiRouteRule {
+    fn matches_host(&self, host: &str) -> bool {
+        hebnix_sdk::rlapi::session::shared_game_session().enabled()
+            && (host.eq_ignore_ascii_case(TITLE_HOST)
+                || host.eq_ignore_ascii_case("api.rlpp.psynet.gg"))
+    }
+    fn strip_request_headers(&self) -> &[&str] {
+        &["if-none-match", "if-modified-since"]
+    }
+    fn rewrite(&self, body: &mut Body) -> bool {
+        if !hebnix_sdk::rlapi::session::shared_game_session().enabled() {
+            return false;
+        }
+        let route = RankRule::with_item_spawner(
+            Arc::new(Mutex::new(HashMap::new())),
+            Arc::new(AtomicBool::new(true)),
+        );
+        route.rewrite(body)
     }
 }

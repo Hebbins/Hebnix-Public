@@ -116,7 +116,9 @@ pub fn find_heroic_shortcuts() -> Vec<ShortcutCandidate> {
 
     let mut candidates = Vec::new();
     for (_, entry) in shortcuts {
-        let VdfValue::Map(fields) = entry else { continue };
+        let VdfValue::Map(fields) = entry else {
+            continue;
+        };
         let mut app_name = None;
         let mut exe = None;
         for (key, value) in &fields {

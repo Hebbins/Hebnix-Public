@@ -12,15 +12,15 @@
 
 use windows::Win32::Foundation::{E_FAIL, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D_RECT_F, D2D_SIZE_U, D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F,
-    D2D1_FIGURE_BEGIN_FILLED, D2D1_FIGURE_END_CLOSED, D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT,
+    D2D_RECT_F, D2D_SIZE_U, D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED,
+    D2D1_FIGURE_END_CLOSED, D2D1_GRADIENT_STOP, D2D1_PIXEL_FORMAT,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1_ANTIALIAS_MODE_PER_PRIMITIVE, D2D1_BITMAP_OPTIONS_CANNOT_DRAW, D2D1_BITMAP_OPTIONS_NONE,
     D2D1_BITMAP_OPTIONS_TARGET, D2D1_BITMAP_PROPERTIES1, D2D1_BUFFER_PRECISION_8BPC_UNORM,
     D2D1_COLOR_INTERPOLATION_MODE_STRAIGHT, D2D1_COLOR_SPACE_SRGB,
     D2D1_DEVICE_CONTEXT_OPTIONS_NONE, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE,
-    D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_EXTEND_MODE_CLAMP, D2D1_INTERPOLATION_MODE_LINEAR,
+    D2D1_EXTEND_MODE_CLAMP, D2D1_FACTORY_TYPE_SINGLE_THREADED, D2D1_INTERPOLATION_MODE_LINEAR,
     D2D1_LAYER_OPTIONS1_NONE, D2D1_LAYER_PARAMETERS1, D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES,
     D2D1_ROUNDED_RECT, D2D1CreateFactory, ID2D1Bitmap1, ID2D1DeviceContext, ID2D1Factory1,
     ID2D1Geometry, ID2D1SolidColorBrush,
@@ -32,15 +32,14 @@ use windows::Win32::Graphics::Direct3D11::{
 use windows::Win32::Graphics::DirectComposition::{
     DCompositionCreateDevice, IDCompositionDevice, IDCompositionTarget, IDCompositionVisual,
 };
+#[cfg(not(feature = "lite"))]
+use windows::Win32::Graphics::DirectWrite::IDWriteFactory5;
 use windows::Win32::Graphics::DirectWrite::{
     DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
     DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_MEASURING_MODE_NATURAL,
-    DWRITE_TEXT_ALIGNMENT_CENTER,
-    DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_TEXT_ALIGNMENT_TRAILING, DWRITE_TEXT_METRICS,
-    DWriteCreateFactory, IDWriteFactory, IDWriteFontCollection,
+    DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_TEXT_ALIGNMENT_TRAILING,
+    DWRITE_TEXT_METRICS, DWriteCreateFactory, IDWriteFactory, IDWriteFontCollection,
 };
-#[cfg(not(feature = "lite"))]
-use windows::Win32::Graphics::DirectWrite::IDWriteFactory5;
 use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_ALPHA_MODE_PREMULTIPLIED, DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_SAMPLE_DESC,
 };
@@ -110,7 +109,7 @@ fn load_d2d_bitmap(ctx: &ID2D1DeviceContext, path: &str) -> Option<ID2D1Bitmap1>
     }
 }
 
-/// rl's faces as a private directwrite collection built once from the ttfs rl_font rebuilds. None if rl isn't installed or dwrite5 is missing, falls back to segoe 
+/// rl's faces as a private directwrite collection built once from the ttfs rl_font rebuilds. None if rl isn't installed or dwrite5 is missing, falls back to segoe
 fn rl_collection(factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
     thread_local! {
         static CACHE: std::cell::RefCell<Option<(u64, Option<IDWriteFontCollection>)>> =
@@ -126,7 +125,9 @@ fn rl_collection(factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
                 Some(c) => tracing::info!("rl font collection ready, {} families", unsafe {
                     c.GetFontFamilyCount()
                 }),
-                None => tracing::warn!("rl font collection unavailable, overlay text stays on segoe"),
+                None => {
+                    tracing::warn!("rl font collection unavailable, overlay text stays on segoe")
+                }
             }
             *slot = Some((generation, built));
         }
@@ -508,7 +509,9 @@ impl D2dCanvas {
                 if let Some(ref geo) = mask {
                     let params = D2D1_LAYER_PARAMETERS1 {
                         contentBounds: dest,
-                        geometricMask: std::mem::ManuallyDrop::new(geo.cast::<ID2D1Geometry>().ok()),
+                        geometricMask: std::mem::ManuallyDrop::new(
+                            geo.cast::<ID2D1Geometry>().ok(),
+                        ),
                         maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
                         maskTransform: identity_matrix(),
                         opacity: 1.0,

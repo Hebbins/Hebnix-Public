@@ -1096,7 +1096,9 @@ pub fn patch_boost_meter(
     EncryptedPackage::load(live_raw, key_file)
         .map_err(|e| format!("Installed {} is not a valid package: {e}", GFX_UPK))?;
     crate::patcher::backup_guard::prepare(
-        Path::new(game_dir), Path::new(backup_dir), "boost-build.sha256",
+        Path::new(game_dir),
+        Path::new(backup_dir),
+        "boost-build.sha256",
         |name| name == format!("{}.bak", GFX_UPK),
     )?;
     let backup_upk = Path::new(backup_dir).join(format!("{}.bak", GFX_UPK));
@@ -1362,7 +1364,9 @@ impl BoostPatcherState {
 
         std::thread::spawn(move || {
             if let Err(error) = crate::patcher::backup_guard::check(
-                &cooked_pc_clone, &backups_dir_clone, "boost-build.sha256",
+                &cooked_pc_clone,
+                &backups_dir_clone,
+                "boost-build.sha256",
                 |name| name == format!("{}.bak", GFX_UPK),
             ) {
                 let _ = local_tx.send(BoostOp::Error(error));

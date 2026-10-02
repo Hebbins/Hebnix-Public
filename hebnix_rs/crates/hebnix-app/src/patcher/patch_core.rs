@@ -1085,23 +1085,32 @@ pub mod standard_ball {
     pub fn validate_standard_tfcs(game_dir: &str) -> Result<(), String> {
         for (tfc_name, offset, slot_size, width) in TFC_ENTRIES {
             let path = Path::new(game_dir).join(tfc_name);
-            let mut file = OpenOptions::new().read(true).open(&path)
+            let mut file = OpenOptions::new()
+                .read(true)
+                .open(&path)
                 .map_err(|e| format!("Cannot open {}: {e}", path.display()))?;
-            let end = offset.checked_add(slot_size as u64)
+            let end = offset
+                .checked_add(slot_size as u64)
                 .ok_or_else(|| format!("Invalid ball texture offset in {tfc_name}"))?;
             if file.metadata().map_err(|e| e.to_string())?.len() < end {
-                return Err(format!("Ball texture slot is outside {tfc_name}; this game build is not supported"));
+                return Err(format!(
+                    "Ball texture slot is outside {tfc_name}; this game build is not supported"
+                ));
             }
-            file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
+            file.seek(SeekFrom::Start(offset))
+                .map_err(|e| e.to_string())?;
             let mut header = [0u8; 16];
             file.read_exact(&mut header).map_err(|e| e.to_string())?;
-            let word = |start: usize| u32::from_le_bytes(header[start..start + 4].try_into().unwrap());
+            let word =
+                |start: usize| u32::from_le_bytes(header[start..start + 4].try_into().unwrap());
             if word(0) != super::upk::UPK_MAGIC
                 || word(4) != 131_072
                 || word(12) != width * width / 2
                 || word(8) as usize > slot_size - header.len()
             {
-                return Err(format!("Ball texture slot in {tfc_name} has changed; this game build is not supported"));
+                return Err(format!(
+                    "Ball texture slot in {tfc_name} has changed; this game build is not supported"
+                ));
             }
         }
         Ok(())
@@ -1202,9 +1211,11 @@ pub mod standard_ball {
             let payload = payload_opt.ok_or_else(|| {
                 format!("Could not fit ball texture in {tfc_name} at offset {offset}")
             })?;
-            tfc_file.seek(SeekFrom::Start(offset))
+            tfc_file
+                .seek(SeekFrom::Start(offset))
                 .map_err(|e| format!("Could not seek {tfc_name}: {e}"))?;
-            tfc_file.write_all(&payload)
+            tfc_file
+                .write_all(&payload)
                 .map_err(|e| format!("Could not write {tfc_name}: {e}"))?;
         }
 
@@ -1515,8 +1526,12 @@ pub mod gameinfo {
             return Ok(false);
         }
         let bak_path = Path::new(backup_dir).join(format!("{target_name}.bak"));
-        let vanilla = fs::read(if bak_path.is_file() { &bak_path } else { &target_path })
-            .map_err(|e| e.to_string())?;
+        let vanilla = fs::read(if bak_path.is_file() {
+            &bak_path
+        } else {
+            &target_path
+        })
+        .map_err(|e| e.to_string())?;
         let mut offset = vanilla
             .get(8..12)
             .map(|b| u32::from_le_bytes(b.try_into().unwrap()) as usize)
@@ -1527,7 +1542,11 @@ pub mod gameinfo {
                 if let Some(signature) = index_of(&decoded, &VANILLA_THUMB_SIG, 0) {
                     let chain = find_inline_chains(&decoded)
                         .into_iter()
-                        .find(|chain| chain.first().is_some_and(|(_, start, _)| *start == signature))
+                        .find(|chain| {
+                            chain
+                                .first()
+                                .is_some_and(|(_, start, _)| *start == signature)
+                        })
                         .ok_or("Ball thumbnail has no matching inline mip chain")?;
                     if chain.len() != PH4D_SPECS.len() {
                         return Err("Ball inline mip chain is incomplete".into());
@@ -1542,17 +1561,25 @@ pub mod gameinfo {
                     }
                     let range = (chain.first().unwrap().1, chain.last().unwrap().2);
                     let (chunk, _, fits) = patcher::recomp_chunk_inplace(
-                        &vanilla, offset, &changed, block_size as usize, range,
+                        &vanilla,
+                        offset,
+                        &changed,
+                        block_size as usize,
+                        range,
                     );
                     let chunk = if fits {
                         chunk.ok_or("Ball mip recompression failed")?
                     } else {
                         match upk::recomp_chunk_safely_padded(
-                            &changed, block_size as usize, Some(end - offset),
+                            &changed,
+                            block_size as usize,
+                            Some(end - offset),
                         ) {
                             Ok(chunk) => chunk,
                             Err(upk::UpkError::OversizedChunk) => return Ok(false),
-                            Err(error) => return Err(format!("Ball mip recompression failed: {error:?}")),
+                            Err(error) => {
+                                return Err(format!("Ball mip recompression failed: {error:?}"));
+                            }
                         }
                     };
                     if chunk.len() != end - offset {
@@ -1582,10 +1609,15 @@ pub mod gameinfo {
     #[cfg(test)]
     #[test]
     fn current_soccar_mips_patch_without_changing_metadata() {
-        let Ok(package_path) = std::env::var("HEBNIX_INSPECT_UPK") else { return };
-        let Ok(png_path) = std::env::var("HEBNIX_INSPECT_PNG") else { return };
+        let Ok(package_path) = std::env::var("HEBNIX_INSPECT_UPK") else {
+            return;
+        };
+        let Ok(png_path) = std::env::var("HEBNIX_INSPECT_PNG") else {
+            return;
+        };
         let source = Path::new(&package_path);
-        let temp = std::env::temp_dir().join(format!("hebnix-soccar-mip-test-{}", std::process::id()));
+        let temp =
+            std::env::temp_dir().join(format!("hebnix-soccar-mip-test-{}", std::process::id()));
         fs::create_dir_all(&temp).unwrap();
         let target = temp.join("gameinfo_soccar_sf.upk");
         let backup = temp.join("gameinfo_soccar_sf.upk.bak");
@@ -1593,7 +1625,9 @@ pub mod gameinfo {
         fs::copy(source, &backup).unwrap();
         let original = fs::read(&target).unwrap();
         let png = fs::read(png_path).unwrap();
-        assert!(patch_soccar_ball_upk(temp.to_str().unwrap(), temp.to_str().unwrap(), &png).unwrap());
+        assert!(
+            patch_soccar_ball_upk(temp.to_str().unwrap(), temp.to_str().unwrap(), &png).unwrap()
+        );
         let patched = fs::read(&target).unwrap();
         assert_eq!(original.len(), patched.len());
         assert_ne!(original, patched);
@@ -1602,11 +1636,20 @@ pub mod gameinfo {
     #[cfg(test)]
     #[test]
     fn current_arena_mips_patch_without_changing_metadata() {
-        let Ok(package_path) = std::env::var("HEBNIX_INSPECT_UPK") else { return };
-        let Ok(png_path) = std::env::var("HEBNIX_INSPECT_PNG") else { return };
+        let Ok(package_path) = std::env::var("HEBNIX_INSPECT_UPK") else {
+            return;
+        };
+        let Ok(png_path) = std::env::var("HEBNIX_INSPECT_PNG") else {
+            return;
+        };
         let source = Path::new(&package_path);
-        let name = source.file_name().unwrap().to_string_lossy().to_ascii_lowercase();
-        let temp = std::env::temp_dir().join(format!("hebnix-arena-mip-test-{}", std::process::id()));
+        let name = source
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_ascii_lowercase();
+        let temp =
+            std::env::temp_dir().join(format!("hebnix-arena-mip-test-{}", std::process::id()));
         fs::create_dir_all(&temp).unwrap();
         let target = temp.join(&name);
         let backup = temp.join(format!("{name}.bak"));
@@ -1615,7 +1658,15 @@ pub mod gameinfo {
         let original = fs::read(&target).unwrap();
         let png = fs::read(png_path).unwrap();
         let textures = prepare_ball_textures(&png).unwrap();
-        assert!(patch_ball_upk(temp.to_str().unwrap(), temp.to_str().unwrap(), &textures, &name).unwrap());
+        assert!(
+            patch_ball_upk(
+                temp.to_str().unwrap(),
+                temp.to_str().unwrap(),
+                &textures,
+                &name
+            )
+            .unwrap()
+        );
         let patched = fs::read(&target).unwrap();
         assert_eq!(original.len(), patched.len());
         assert_ne!(original, patched);

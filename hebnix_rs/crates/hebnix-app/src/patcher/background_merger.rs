@@ -6,7 +6,7 @@ use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 
 use serde::{Deserialize, Serialize};
 
-use super::upk_package::{strip, ExportEntry, Prop, UpkPackage};
+use super::upk_package::{ExportEntry, Prop, UpkPackage, strip};
 
 const BACKUP_SUFFIX: &str = ".hbnx_mapbak";
 const MANIFEST: &str = "background_swaps.json";

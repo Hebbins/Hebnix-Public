@@ -15,6 +15,8 @@ pub fn block_item_action_if_game_running(tx: &Sender<AppMsg>) -> bool {
 #[derive(Debug)]
 pub enum AppMsg {
     Log(String),
+    RlApiCaptureReady(Result<(), String>),
+    RlApiResponse(Result<Value, String>),
     GameEvent(StatsEvent),
     // periodic RL monitor result. root_dir is the game install folder resolved
     // from the running process, used to auto-fill the configured paths.

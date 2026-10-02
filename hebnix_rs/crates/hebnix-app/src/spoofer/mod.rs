@@ -19,7 +19,7 @@ use crossbeam_channel::Sender;
 
 use crate::messages::AppMsg;
 use crate::spoofer::rules::{
-    NameRule, OwnedProductsRule, Rule, TITLE_HOST, TitleRule, TitleSettings,
+    NameRule, OwnedProductsRule, Rule, TITLE_HOST, TitleRule, TitleSettings, TitleSpoofSettings,
 };
 use crate::spoofer::skill_bridge::SkillBridge;
 use crate::spoofer::socket::SocketProxy;
@@ -185,13 +185,14 @@ pub struct SpooferManager {
     pub spoofed_ranks: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
     owned_products: Arc<Mutex<HashSet<i64>>>,
     reverse_proxy: Mutex<Option<SocketProxy>>,
-    http_active: AtomicBool,
-    socket_active: AtomicBool,
+    http_active: Arc<AtomicBool>,
+    socket_active: Arc<AtomicBool>,
     title_settings: Arc<Mutex<TitleSettings>>,
     skill_bridge: Mutex<Option<SkillBridge>>,
     item_spawner_enabled: Arc<AtomicBool>,
     spawned_items: crate::item_spawning::SpawnedItemLedger,
     crl: Mutex<Option<crl::CrlServer>>,
+    rlapi_retained: AtomicBool,
 }
 
 impl SpooferManager {
@@ -253,16 +254,78 @@ impl SpooferManager {
             spoofed_ranks: Arc::new(Mutex::new(HashMap::new())),
             owned_products: Arc::new(Mutex::new(owned_products)),
             reverse_proxy: Mutex::new(None),
-            http_active: AtomicBool::new(false),
-            socket_active: AtomicBool::new(false),
+            http_active: Arc::new(AtomicBool::new(false)),
+            socket_active: Arc::new(AtomicBool::new(false)),
             title_settings: Arc::new(Mutex::new(TitleSettings::default())),
             skill_bridge: Mutex::new(None),
             item_spawner_enabled: Arc::new(AtomicBool::new(false)),
             spawned_items,
             crl: Mutex::new(None),
+            rlapi_retained: AtomicBool::new(false),
         }
     }
 
+    pub fn rlapi_running(&self) -> bool {
+        let session = hebnix_sdk::rlapi::session::shared_game_session();
+        session.enabled()
+            || session.has_connection()
+            || (self.rlapi_retained.load(Ordering::Acquire)
+                && hebnix_sdk::process::is_rocket_league_running())
+    }
+
+    fn redirect_hosts(&self) -> &'static [&'static str] {
+        if self.http_active.load(Ordering::Relaxed) || self.socket_active.load(Ordering::Relaxed) {
+            &REDIRECT_HOSTS
+        } else {
+            &[TITLE_HOST]
+        }
+    }
+
+    pub fn enable_rlapi(&self) -> Result<(), String> {
+        if !is_admin() || !ca::is_current_installed(&self.base_dir) {
+            return Err("RLAPI capture requires administrator rights and the existing Hebnix certificate setup.".into());
+        }
+        let session = hebnix_sdk::rlapi::session::shared_game_session();
+        session.set_enabled(true);
+        let result = self
+            .start_skill_bridge()
+            .and_then(|_| self.ensure_reverse_proxy());
+        if let Err(error) = result {
+            session.set_enabled(false);
+            self.stop_skill_bridge();
+            self.stop_reverse_if_unused();
+            return Err(error);
+        }
+        self.rlapi_retained.store(true, Ordering::Release);
+        Ok(())
+    }
+
+    pub fn disable_rlapi(&self) {
+        hebnix_sdk::rlapi::session::shared_game_session().set_enabled(false);
+        // A connected game retains its relay until it disconnects. Disabling
+        // API requests must not kick the game out of its current session.
+        self.cleanup_idle_rlapi();
+    }
+
+    pub fn cleanup_idle_rlapi(&self) {
+        if !self.rlapi_running() {
+            self.stop_reverse_if_unused();
+            if !self.http_active.load(Ordering::Relaxed)
+                && !self.socket_active.load(Ordering::Relaxed)
+            {
+                self.stop_skill_bridge();
+            }
+            self.maybe_stop_crl();
+            // Cached localhost endpoints must not survive the final relay.
+            // Retry on later monitor ticks if Windows still holds cache files.
+            if self.rlapi_retained.load(Ordering::Acquire)
+                && !hebnix_sdk::process::is_rocket_league_running()
+                && crate::winutil::clear_rocket_league_web_cache().is_ok()
+            {
+                self.rlapi_retained.store(false, Ordering::Release);
+            }
+        }
+    }
     pub fn owned_product_ids(&self) -> HashSet<i64> {
         self.owned_products
             .lock()
@@ -339,6 +402,9 @@ impl SpooferManager {
     }
 
     fn stop_skill_bridge(&self) {
+        if self.rlapi_running() {
+            return;
+        }
         if let Ok(mut slot) = self.skill_bridge.lock() {
             if let Some(bridge) = slot.take() {
                 bridge.stop();
@@ -390,23 +456,24 @@ impl SpooferManager {
         self.maybe_stop_crl();
     }
 
-    pub fn set_title(&self, text: &str) {
+    pub fn set_titles(&self, titles: Vec<TitleSpoofSettings>) {
         if let Ok(mut settings) = self.title_settings.lock() {
-            settings.text = text.chars().take(64).collect();
+            let mut normalized: Vec<TitleSpoofSettings> = titles
+                .into_iter()
+                .filter_map(|mut title| {
+                    title.text = title.text.trim().chars().take(64).collect();
+                    (!title.text.is_empty()).then_some(title)
+                })
+                .collect();
+            let mut seen = HashSet::new();
+            normalized.retain(|title| seen.insert(title.target_id.clone()));
+            settings.titles = normalized;
         }
     }
 
     pub fn set_title_enabled(&self, enabled: bool) {
         if let Ok(mut settings) = self.title_settings.lock() {
             settings.enabled = enabled;
-        }
-    }
-
-    pub fn set_title_options(&self, color: String, glow: bool, target_id: Option<String>) {
-        if let Ok(mut settings) = self.title_settings.lock() {
-            settings.color = color;
-            settings.glow = glow;
-            settings.target_id = target_id;
         }
     }
 
@@ -444,7 +511,9 @@ impl SpooferManager {
             .map_err(|e| e.to_string())?
             .as_secs() as i64;
         let (message, instance_ids) = crate::item_spawning::reward_message(request, psy_time)?;
-        self.spawned_items.record(&instance_ids).map_err(|error| format!("Could not track spawned item: {error}"))?;
+        self.spawned_items
+            .record(&instance_ids)
+            .map_err(|error| format!("Could not track spawned item: {error}"))?;
         let slot = self
             .skill_bridge
             .lock()
@@ -455,7 +524,11 @@ impl SpooferManager {
     }
 
     pub fn item_spawner_websocket_connected(&self) -> bool {
-        self.skill_bridge.lock().ok().and_then(|slot| slot.as_ref().map(SkillBridge::is_connected)).unwrap_or(false)
+        self.skill_bridge
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().map(SkillBridge::is_connected))
+            .unwrap_or(false)
     }
 
     pub fn stop_socket(&self) {
@@ -471,7 +544,7 @@ impl SpooferManager {
             .lock()
             .map_err(|_| "reverse proxy lock poisoned")?;
         if slot.is_some() {
-            return hosts::set_redirects(&REDIRECT_HOSTS);
+            return hosts::set_redirects(self.redirect_hosts());
         }
         let ca = Arc::new(ca::ensure(&self.base_dir)?);
         if !ca::is_current_installed(&self.base_dir) {
@@ -487,8 +560,11 @@ impl SpooferManager {
         for host in REDIRECT_HOSTS {
             real_ips.insert(host.to_string(), dns::resolve_a(host)?);
         }
-        real_ips.insert("api.rlpp.psynet.gg".to_string(), dns::resolve_a("api.rlpp.psynet.gg")?);
-        let rules: Arc<Vec<Box<dyn Rule>>> = Arc::new(vec![
+        real_ips.insert(
+            "api.rlpp.psynet.gg".to_string(),
+            dns::resolve_a("api.rlpp.psynet.gg")?,
+        );
+        let spoof_rules: Vec<Box<dyn Rule>> = vec![
             Box::new(NameRule::new(Arc::clone(&self.spoofed_name))),
             Box::new(crate::spoofer::rules::FriendsRule::new(
                 Arc::clone(&self.spoofed_friends),
@@ -503,10 +579,22 @@ impl SpooferManager {
                 Arc::clone(&self.spoofed_ranks),
                 Arc::clone(&self.item_spawner_enabled),
             )),
-        ]);
+        ];
+        let mut rules: Vec<Box<dyn Rule>> = spoof_rules
+            .into_iter()
+            .map(|rule| {
+                Box::new(crate::spoofer::rules::EnabledRule {
+                    inner: rule,
+                    http: Arc::clone(&self.http_active),
+                    socket: Arc::clone(&self.socket_active),
+                }) as Box<dyn Rule>
+            })
+            .collect();
+        rules.push(Box::new(crate::spoofer::rules::RlApiRouteRule));
+        let rules = Arc::new(rules);
         self.ensure_crl(&ca);
         let proxy = SocketProxy::start(ca, rules, self.tx.clone(), real_ips)?;
-        if let Err(error) = hosts::set_redirects(&REDIRECT_HOSTS) {
+        if let Err(error) = hosts::set_redirects(self.redirect_hosts()) {
             proxy.stop();
             return Err(error);
         }
@@ -516,15 +604,18 @@ impl SpooferManager {
 
     /// Reconcile hosts with the shared proxy's actual runtime state.
     pub fn reconcile_hosts(&self) -> Result<(), String> {
-        if self.http_running() || self.socket_running() {
-            hosts::set_redirects(&REDIRECT_HOSTS)
+        if self.http_running() || self.socket_running() || self.rlapi_running() {
+            hosts::set_redirects(self.redirect_hosts())
         } else {
             hosts::clear()
         }
     }
 
     fn stop_reverse_if_unused(&self) {
-        if self.http_active.load(Ordering::Relaxed) || self.socket_active.load(Ordering::Relaxed) {
+        if self.http_active.load(Ordering::Relaxed)
+            || self.socket_active.load(Ordering::Relaxed)
+            || self.rlapi_running()
+        {
             return;
         }
         if let Err(error) = hosts::clear() {
@@ -542,6 +633,8 @@ impl SpooferManager {
     /// Stops only runtime interception. It deliberately does not modify saved
     /// spoof settings, so the user's enabled toggles survive the next launch.
     pub fn shutdown(&self) {
+        self.rlapi_retained.store(false, Ordering::Release);
+        hebnix_sdk::rlapi::session::shared_game_session().reset();
         self.item_spawner_enabled.store(false, Ordering::SeqCst);
         self.stop_socket();
         self.stop_http();

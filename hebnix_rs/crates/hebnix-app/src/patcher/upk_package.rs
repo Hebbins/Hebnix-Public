@@ -58,6 +58,10 @@ pub struct ExportEntry {
 
 #[derive(Clone, Debug)]
 struct ImportEntry {
+    entry_offset: usize,
+    class_package: FName,
+    class_name: FName,
+    outer_index: i32,
     object_name: FName,
 }
 
@@ -208,6 +212,13 @@ fn write_i64(data: &mut [u8], offset: usize, value: i64) -> Result<(), String> {
         .ok_or_else(|| format!("UPK field at {offset} is out of bounds"))?
         .copy_from_slice(&value.to_le_bytes());
     Ok(())
+}
+
+fn write_fname_bytes(data: &mut [u8], offset: usize, name_index: usize) -> Result<(), String> {
+    let name_index = i32::try_from(name_index).map_err(|_| "Name index is too large")?;
+    write_i32(data, offset, name_index)?;
+    // Serialized FName number zero means the base name without an instance suffix.
+    write_i32(data, offset + 4, 0)
 }
 
 fn read_header(raw: &[u8]) -> Result<Header, String> {
@@ -458,16 +469,27 @@ impl UpkPackage {
             .get(header.name_offset..header.name_offset + encrypted_header_size)
             .ok_or("File too small for encrypted header")?;
         let mut selected = None;
-        for (_, key) in crate::upk_keys::embedded()? {
-            let Ok(dec) = crypt_header(encrypted, &key, false, &header) else {
-                continue;
-            };
-            if !validate_names(&dec, header.name_count) {
-                continue;
+        if header.licensee_version < 33 {
+            let dec = raw[header.name_offset..header.total_header_size].to_vec();
+            if validate_names(&dec, header.name_count) {
+                let chunks = parse_chunks(&dec, &header, &raw).unwrap_or_default();
+                selected = Some(([0u8; 32], dec, chunks));
             }
-            if let Ok(chunks) = parse_chunks(&dec, &header, &raw) {
-                selected = Some((key, dec, chunks));
-                break;
+        }
+        // Older cooked packages can also have AES-encrypted headers.
+        // Plain custom packages are accepted above; fall back to keys if needed.
+        if selected.is_none() {
+            for (_, key) in crate::upk_keys::embedded()? {
+                let Ok(dec) = crypt_header(encrypted, &key, false, &header) else {
+                    continue;
+                };
+                if !validate_names(&dec, header.name_count) {
+                    continue;
+                }
+                if let Ok(chunks) = parse_chunks(&dec, &header, &raw) {
+                    selected = Some((key, dec, chunks));
+                    break;
+                }
             }
         }
         let (key, decrypted_header, mut chunks) =
@@ -525,10 +547,15 @@ impl UpkPackage {
         let mut r = Cursor::at(&image, header.import_offset)?;
         let mut imports = Vec::with_capacity(header.import_count);
         for _ in 0..header.import_count {
-            read_fname(&mut r, header.file_version)?;
-            read_fname(&mut r, header.file_version)?;
-            r.i32()?;
+            let entry_offset = r.pos;
+            let class_package = read_fname(&mut r, header.file_version)?;
+            let class_name = read_fname(&mut r, header.file_version)?;
+            let outer_index = r.i32()?;
             imports.push(ImportEntry {
+                entry_offset,
+                class_package,
+                class_name,
+                outer_index,
                 object_name: read_fname(&mut r, header.file_version)?,
             });
         }
@@ -608,6 +635,148 @@ impl UpkPackage {
         } else {
             "Class".into()
         }
+    }
+
+    pub fn object_path(&self, index: i32) -> String {
+        let mut parts = Vec::new();
+        let mut current = index;
+        for _ in 0..64 {
+            if current > 0 {
+                let Some(entry) = self.exports.get((current - 1) as usize) else {
+                    break;
+                };
+                parts.push(self.name_of(entry.object_name));
+                current = entry.outer_index;
+            } else if current < 0 {
+                let Some(entry) = self.imports.get((-current - 1) as usize) else {
+                    break;
+                };
+                parts.push(self.name_of(entry.object_name));
+                current = entry.outer_index;
+            } else {
+                break;
+            }
+        }
+        parts.reverse();
+        parts.join(".")
+    }
+
+    pub fn import_debug(&self) -> Vec<(String, String, String)> {
+        self.imports
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| {
+                (
+                    self.object_path(-(index as i32) - 1),
+                    self.name_of(entry.class_package),
+                    self.name_of(entry.class_name),
+                )
+            })
+            .collect()
+    }
+
+    pub fn empty_import_slots(&self) -> Vec<usize> {
+        self.imports
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| {
+                (self.name_of(entry.class_package).starts_with("None")
+                    && self.name_of(entry.class_name).starts_with("None")
+                    && entry.outer_index == 0
+                    && self.name_of(entry.object_name).starts_with("None"))
+                .then_some(index)
+            })
+            .collect()
+    }
+
+    fn exact_name_index(&self, wanted: &str) -> Result<usize, String> {
+        self.names
+            .iter()
+            .position(|name| name == wanted)
+            .ok_or_else(|| format!("The target package has no '{wanted}' name entry"))
+    }
+
+    /// Point a car ProductAsset's Mesh property at a SkeletalMesh in an
+    /// external package. This deliberately reuses two genuinely blank import
+    /// slots so the encrypted header never changes size.
+    pub fn inject_external_car_mesh(
+        &mut self,
+        package_name: &str,
+        mesh_name: &str,
+    ) -> Result<(), String> {
+        if self.header.file_version != 868 || self.header.licensee_version < 33 {
+            return Err(
+                "External car mesh injection requires a current Rocket League package".into(),
+            );
+        }
+        // Reuse a real optional texture dependency rather than a reserved blank
+        // slot. Cooked UE3 dependency maps do not resolve newly populated blank
+        // imports, while this pair is already part of the seek-free graph.
+        let package_slot = self
+            .imports
+            .iter()
+            .position(|entry| {
+                strip(&self.name_of(entry.class_name)) == "Package"
+                    && strip(&self.name_of(entry.object_name)) == "Detail_Fur"
+                    && entry.outer_index == 0
+            })
+            .ok_or("The body package has no reusable Detail_Fur package import")?;
+        let package_reference = -(i32::try_from(package_slot).unwrap() + 1);
+        let mesh_slot = self
+            .imports
+            .iter()
+            .position(|entry| {
+                strip(&self.name_of(entry.object_name)) == "Fur_N"
+                    && entry.outer_index == package_reference
+            })
+            .ok_or("The body package has no reusable Detail_Fur.Fur_N import")?;
+
+        let core = self.exact_name_index("Core")?;
+        let package_class = self.exact_name_index("Package")?;
+        let engine = self.exact_name_index("Engine")?;
+        let skeletal_mesh = self.exact_name_index("SkeletalMesh")?;
+        let package_object = self.exact_name_index(package_name)?;
+        let mesh_object = self.exact_name_index(mesh_name)?;
+
+        let package_entry = self.imports[package_slot].entry_offset;
+        let mesh_entry = self.imports[mesh_slot].entry_offset;
+        let mut encoded = [0u8; 28];
+        write_fname_bytes(&mut encoded, 0, core)?;
+        write_fname_bytes(&mut encoded, 8, package_class)?;
+        write_i32(&mut encoded, 16, 0)?;
+        write_fname_bytes(&mut encoded, 20, package_object)?;
+        self.patch(package_entry, &encoded)?;
+
+        encoded.fill(0);
+        write_fname_bytes(&mut encoded, 0, engine)?;
+        write_fname_bytes(&mut encoded, 8, skeletal_mesh)?;
+        write_i32(&mut encoded, 16, package_reference)?;
+        write_fname_bytes(&mut encoded, 20, mesh_object)?;
+        self.patch(mesh_entry, &encoded)?;
+
+        let mut targets = Vec::new();
+        for export in &self.exports {
+            if strip(&self.class_of(export)) != "ProductAsset_Body_TA" {
+                continue;
+            }
+            for property in self.parse_props(export) {
+                if property.name == "Mesh"
+                    && property.tag_type == "ObjectProperty"
+                    && property.size == 4
+                {
+                    targets.push(export.serial_offset + property.value_offset);
+                }
+            }
+        }
+        if targets.len() != 1 {
+            return Err(format!(
+                "Expected one ProductAsset_Body_TA.Mesh property, found {}",
+                targets.len()
+            ));
+        }
+        let mesh_reference = -(i32::try_from(mesh_slot).unwrap() + 1);
+        self.patch_i32(targets[0], mesh_reference)?;
+        Ok(())
     }
     pub fn obj_name(&self, reference: i32) -> String {
         if reference > 0 {
@@ -755,15 +924,26 @@ impl UpkPackage {
     }
 
     /// Read a bounded nested tagged struct. Offsets are absolute in `image`.
-    pub(crate) fn nested_props(&self, start: usize, end: usize) -> Result<(Vec<Prop>, usize), String> {
-        let raw = self.image.get(..end).ok_or("Nested property range outside UPK")?;
+    pub(crate) fn nested_props(
+        &self,
+        start: usize,
+        end: usize,
+    ) -> Result<(Vec<Prop>, usize), String> {
+        let raw = self
+            .image
+            .get(..end)
+            .ok_or("Nested property range outside UPK")?;
         let mut at = start;
         let mut props = Vec::new();
         for _ in 0..4096 {
             let (prop, next, ended) = self.parse_tag(raw, at);
-            if ended { return Ok((props, next)); }
+            if ended {
+                return Ok((props, next));
+            }
             props.push(prop.ok_or("Invalid nested property stream")?);
-            if next <= at { return Err("Nested property stream did not advance".into()); }
+            if next <= at {
+                return Err("Nested property stream did not advance".into());
+            }
             at = next;
         }
         Err("Too many nested properties".into())
@@ -913,9 +1093,108 @@ impl UpkPackage {
         self.patch(offset, &value.to_le_bytes())
     }
 
+    /// Relocate a caller-validated pointer-free export payload to the logical end.
+    /// The caller must rebase any absolute bulk-data pointers before using this.
+    pub(crate) fn replace_export_payload(
+        &mut self,
+        index: usize,
+        bytes: &[u8],
+    ) -> Result<(), String> {
+        if self.header.file_version != 868 || self.header.licensee_version < 22 {
+            return Err("Export relocation requires the inspected Rocket League format".into());
+        }
+        let entry = self
+            .exports
+            .get(index)
+            .ok_or("Invalid export index")?
+            .entry_offset;
+        let last = self
+            .chunks
+            .len()
+            .checked_sub(1)
+            .ok_or("Package has no chunks")?;
+        let chunk_start = self.chunks[last].uncompressed_offset;
+        if self
+            .chunks
+            .iter()
+            .any(|c| c.uncompressed_offset > chunk_start)
+        {
+            return Err("Chunk table is not in logical order".into());
+        }
+        let start = (self.image.len() + 3) & !3;
+        let end = start
+            .checked_add(bytes.len())
+            .ok_or("Export relocation overflow")?;
+        if end > MAX_LOGICAL_SIZE || bytes.len() > i32::MAX as usize {
+            return Err("Relocated export is too large".into());
+        }
+        self.image.resize(start, 0);
+        self.image.extend_from_slice(bytes);
+        self.chunks[last].uncompressed_size = end - chunk_start;
+        // Chunk metadata belongs to the physical header. Its padded range can
+        // overlap logical export addresses, so writing through patch() would
+        // corrupt an unrelated export in the decompressed image.
+        let size_field = self.chunks[last].table_entry_offset + 8;
+        write_i32(
+            &mut self.decrypted_header,
+            size_field,
+            (end - chunk_start) as i32,
+        )?;
+        self.header_dirty = true;
+        self.patch_i32(entry + 32, bytes.len() as i32)?;
+        self.patch(entry + 36, &(start as i64).to_le_bytes())?;
+        self.exports[index].serial_size = bytes.len();
+        self.exports[index].serial_offset = start;
+        self.modified_chunks.insert(last);
+        Ok(())
+    }
     pub fn save(&self, path: &Path) -> Result<(), String> {
         std::fs::write(path, self.repacked()?)
             .map_err(|e| format!("Could not write {}: {e}", path.display()))
+    }
+    /// Duplicate a validated local template into a stripped export slot.
+    /// Used only by the offline experiment; existing exports stay in place.
+    pub fn clone_into_empty_export(&mut self, template: usize) -> Result<usize, String> {
+        let slot = self
+            .exports
+            .iter()
+            .position(|e| {
+                e.class_index == 0
+                    && e.serial_size == 0
+                    && strip(&self.name_of(e.object_name)) == "None"
+            })
+            .ok_or("No stripped export slots remain")?;
+        let source = self
+            .exports
+            .get(template)
+            .ok_or("Invalid template")?
+            .clone();
+        let destination = self.exports[slot].entry_offset;
+        let source_end = self
+            .exports
+            .get(template + 1)
+            .ok_or("Cannot clone final export entry")?
+            .entry_offset;
+        let destination_end = self
+            .exports
+            .get(slot + 1)
+            .ok_or("Cannot use final export entry")?
+            .entry_offset;
+        if source_end - source.entry_offset != destination_end - destination {
+            return Err("Export entry widths differ".into());
+        }
+        let mut metadata = self.image[source.entry_offset..source_end].to_vec();
+        write_i32(&mut metadata, 16, 10000 + slot as i32)?;
+        self.patch(destination, &metadata)?;
+        let mut entry = source.clone();
+        entry.entry_offset = destination;
+        entry.table_index = slot;
+        entry.object_name.instance = 9999 + slot as i32;
+        self.exports[slot] = entry;
+        let bytes =
+            self.image[source.serial_offset..source.serial_offset + source.serial_size].to_vec();
+        self.replace_export_payload(slot, &bytes)?;
+        Ok(slot)
     }
     fn repacked(&self) -> Result<Vec<u8>, String> {
         if self.modified_chunks.is_empty() {

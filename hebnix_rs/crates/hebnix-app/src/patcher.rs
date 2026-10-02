@@ -5,19 +5,24 @@
 pub mod background_merger;
 pub mod backup_guard;
 pub mod ball;
+pub mod ball_visual;
 pub mod boost_patcher;
+#[path = "../examples/support/car_geometry.rs"]
+pub mod car_geometry;
+pub mod car_patcher;
 pub mod catalog;
 pub mod colours;
 pub mod cosmetic_thumbnail;
 pub mod cosmetic_upk;
 pub mod decal_patcher;
 pub mod heatseeker;
-pub mod patch_core;
 pub mod painted_swap;
+pub mod patch_core;
 pub mod rl_font;
 pub mod swapper;
 pub mod upk_keys;
 pub mod upk_package;
+pub mod wheel_alignment;
 
 use crate::config::PatchSource;
 
