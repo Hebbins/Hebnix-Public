@@ -23,9 +23,17 @@ struct Bulk<'a> {
 fn bulk<'a>(bytes: &'a [u8], at: &mut usize, offset_width: usize) -> Result<Bulk<'a>, String> {
     let flags = word(bytes, at)?;
     let size = word(bytes, at)? as usize;
-    let disk_size = word(bytes, at)? as usize;
+    let stored_size = word(bytes, at)?;
+    // Stripped cooked mips use -1 for their stored size and have no pixels.
+    let disk_size = if flags & 32 != 0 && size == 0 && stored_size == u32::MAX {
+        0
+    } else {
+        stored_size as usize
+    };
     if size > MAX_TEXTURE_BYTES || disk_size > MAX_TEXTURE_BYTES {
-        return Err("Texture bulk data exceeds size limit".into());
+        return Err(format!(
+            "Texture bulk data exceeds size limit: flags={flags:x} size={size} disk={disk_size} at={at}"
+        ));
     }
     // Rocket League omits the offset when BULKDATA_NoOffsetFixUp is set.
     let offset = if flags & 0x10000 != 0 && flags & 1 == 0 {
@@ -146,7 +154,7 @@ fn decode_pixels(
     RgbaImage::from_raw(width as u32, height as u32, rgba).ok_or("Invalid RGBA image".into())
 }
 
-fn texture(
+pub(crate) fn texture(
     package: &UpkPackage,
     export: &ExportEntry,
     directory: &Path,
@@ -186,6 +194,62 @@ fn texture(
         }
     }
     Err(last_error)
+}
+
+/// Strict validation for the self-contained car replacement textures.
+pub(crate) fn validate_resident_texture(
+    package: &UpkPackage,
+    export: &ExportEntry,
+) -> Result<usize, String> {
+    let (props, mut at) = package.serialized_props(export)?;
+    let serial = &package.image[export.serial_offset..export.serial_offset + export.serial_size];
+    if !props
+        .iter()
+        .any(|p| p.name == "NeverStream" && p.bool_value == Some(true))
+    {
+        return Err("Texture is streamable".into());
+    }
+    let named = |name: &str| -> Result<&str, String> {
+        let prop = props
+            .iter()
+            .find(|p| p.name == name)
+            .ok_or(format!("Missing {name}"))?;
+        let mut pos = prop.value_offset;
+        package
+            .names
+            .get(word(serial, &mut pos)? as usize)
+            .map(String::as_str)
+            .ok_or("Invalid texture name".into())
+    };
+    if named("TextureFileCacheName")? != "None" {
+        return Err("Texture retains external cache".into());
+    }
+    let format = named("Format")?;
+    bulk(serial, &mut at, package.bulk_offset_width())?;
+    let count = word(serial, &mut at)?;
+    if count == 0 || count > 16 {
+        return Err("Invalid resident mip count".into());
+    }
+    let mut previous: Option<(usize, usize)> = None;
+    for _ in 0..count {
+        let record = bulk(serial, &mut at, package.bulk_offset_width())?;
+        if record.flags & (1 | 32 | 64) != 0 {
+            return Err("Mip is not inline".into());
+        }
+        let width = word(serial, &mut at)? as usize;
+        let height = word(serial, &mut at)? as usize;
+        if let Some((w, h)) = previous {
+            if (width, height) != ((w / 2).max(1), (h / 2).max(1)) {
+                return Err("Broken mip dimensions".into());
+            }
+        }
+        decode_pixels(record.inline, width, height, format)?;
+        previous = Some((width, height));
+    }
+    if previous != Some((1, 1)) {
+        return Err("Incomplete mip chain".into());
+    }
+    Ok(count as usize)
 }
 
 pub fn extract_png(path: &Path, _category: &str) -> Result<Vec<u8>, String> {
@@ -261,6 +325,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn dxt5_preserves_alpha_including_small_mips() {
+        for size in [1, 2, 4, 8] {
+            for alpha in [0, 63, 128, 255] {
+                let pixels = RgbaImage::from_pixel(size, size, image::Rgba([128, 64, 32, alpha]));
+                let bytes = encode_dxt5_alpha(&pixels, size as usize, size as usize);
+                let decoded =
+                    decode_pixels(&bytes, size as usize, size as usize, "PF_DXT5").unwrap();
+                assert!(decoded.pixels().all(|p| p[3] == alpha));
+            }
+        }
+        let pixels = RgbaImage::from_fn(4, 4, |x, y| {
+            image::Rgba([255, 255, 255, ((y * 4 + x) * 17) as u8])
+        });
+        let bytes = encode_dxt5_alpha(&pixels, 4, 4);
+        let decoded = decode_pixels(&bytes, 4, 4, "PF_DXT5").unwrap();
+        for (a, b) in pixels.pixels().zip(decoded.pixels()) {
+            assert!((a[3] as i16 - b[3] as i16).abs() <= 19);
+        }
+    }
+
+    #[test]
     #[ignore = "Audits installed boost/banner packages; set HEBNIX_THUMBNAIL_DIR"]
     fn audit_local_thumbnails() {
         let directory = std::env::var_os("HEBNIX_THUMBNAIL_DIR").expect("Set HEBNIX_THUMBNAIL_DIR");
@@ -288,6 +373,7 @@ mod tests {
         }
         println!("AUDIT: {success} decoded, {failures} unavailable");
         assert!(success > 0);
+        assert!(success * 100 >= (success + failures) * 95, "Thumbnail audit fell below 95%: {success} decoded, {failures} unavailable");
     }
 
     #[test]
@@ -333,6 +419,12 @@ mod tests {
         let directory = std::env::var_os("HEBNIX_THUMBNAIL_DIR").expect("Set HEBNIX_THUMBNAIL_DIR");
         let mut failures = Vec::new();
         for name in [
+            "Body_Grain",
+            "Hat_Halo",
+            "Skin_Zomba",
+            "Antenna_8Ball",
+            "EngineAudio_AA",
+            "AvatarBorder_10Year",
             "Boost_AlphaReward",
             "boost_lp_fire",
             "boost_sphenergy",
@@ -364,4 +456,175 @@ mod tests {
         }
         assert!(failures.is_empty(), "{}", failures.join("\n"));
     }
+}
+
+/// Bake an opaque image into the existing Texture2D, with a complete inline mip
+/// chain. No shared TFC is edited and no absolute bulk-data pointers are emitted.
+pub(crate) fn bake_texture(
+    package: &UpkPackage,
+    export: &ExportEntry,
+    pixels: &RgbaImage,
+) -> Result<Vec<u8>, String> {
+    bake_texture_encoded(package, export, pixels, false)
+}
+
+/// Preserve mask alpha using an inline DXT5 mip chain.
+pub(crate) fn bake_texture_alpha(
+    package: &UpkPackage,
+    export: &ExportEntry,
+    pixels: &RgbaImage,
+) -> Result<Vec<u8>, String> {
+    let mut bytes = bake_texture_encoded(package, export, pixels, true)?;
+    let (props, native) = package.serialized_props(export)?;
+    let name = |s: &str| {
+        package
+            .names
+            .iter()
+            .position(|n| n == s)
+            .map(|i| i as u32)
+            .ok_or_else(|| format!("Missing texture property name {s}"))
+    };
+    // These mips are embedded. A retained TFC name permits the streaming path
+    // to read the old cache using offsets belonging to the rebuilt package.
+    if let Some(cache) = props.iter().find(|p| p.name == "TextureFileCacheName") {
+        bytes[cache.value_offset..cache.value_offset + 4]
+            .copy_from_slice(&name("None")?.to_le_bytes());
+        bytes[cache.value_offset + 4..cache.value_offset + 8].fill(0);
+    }
+    if let Some(stream) = props.iter().find(|p| p.name == "NeverStream") {
+        bytes[stream.value_offset - 1] = 1;
+    } else {
+        let mut tag = Vec::new();
+        for n in [name("NeverStream")?, 0, name("BoolProperty")?, 0, 0, 0] {
+            tag.extend_from_slice(&n.to_le_bytes());
+        }
+        tag.push(1);
+        bytes.splice(native - 8..native - 8, tag);
+    }
+    Ok(bytes)
+}
+
+fn encode_dxt5_alpha(pixels: &RgbaImage, width: usize, height: usize) -> Vec<u8> {
+    let mut bytes = crate::patcher::patch_core::dxt::image_to_dxt5(pixels, width, height);
+    for by in 0..height.div_ceil(4) {
+        for bx in 0..width.div_ceil(4) {
+            let mut values = [0u8; 16];
+            for y in 0..4 {
+                for x in 0..4 {
+                    values[y * 4 + x] = pixels.get_pixel(
+                        (bx * 4 + x).min(width - 1) as u32,
+                        (by * 4 + y).min(height - 1) as u32,
+                    )[3];
+                }
+            }
+            let hi = *values.iter().max().unwrap();
+            let lo = *values.iter().min().unwrap();
+            let mut palette = [0u8; 8];
+            palette[0] = hi;
+            palette[1] = lo;
+            if hi > lo {
+                for i in 1..7 {
+                    palette[i + 1] =
+                        (((7 - i) as u16 * hi as u16 + i as u16 * lo as u16) / 7) as u8;
+                }
+            } else {
+                palette.fill(hi);
+            }
+            let mut indices = 0u64;
+            for (i, value) in values.iter().enumerate() {
+                let selected = (0..8)
+                    .min_by_key(|&j| (palette[j] as i16 - *value as i16).abs())
+                    .unwrap();
+                indices |= (selected as u64) << (3 * i);
+            }
+            let at = (by * width.div_ceil(4) + bx) * 16;
+            bytes[at] = hi;
+            bytes[at + 1] = lo;
+            bytes[at + 2..at + 8].copy_from_slice(&indices.to_le_bytes()[..6]);
+        }
+    }
+    bytes
+}
+
+fn bake_texture_encoded(
+    package: &UpkPackage,
+    export: &ExportEntry,
+    pixels: &RgbaImage,
+    alpha: bool,
+) -> Result<Vec<u8>, String> {
+    let (props, native) = package.serialized_props(export)?;
+    let serial = &package.image[export.serial_offset..export.serial_offset + export.serial_size];
+    let mut at = native;
+    let art = bulk(serial, &mut at, package.bulk_offset_width())?;
+    if art.size != 0 {
+        return Err("Unexpected source art in cooked ball texture".into());
+    }
+    let count = word(serial, &mut at)?;
+    if count == 0 || count > 32 {
+        return Err("Invalid ball mip count".into());
+    }
+    for _ in 0..count {
+        bulk(serial, &mut at, package.bulk_offset_width())?;
+        word(serial, &mut at)?;
+        word(serial, &mut at)?;
+    }
+    // Keep the inspected native tail (GUID and empty cached-platform data).
+    let tail = &serial[at..];
+    let empty_tail: Vec<u8> = [0i32, 0, 0, 33, 0, -1, -1, -1, 0]
+        .into_iter()
+        .flat_map(i32::to_le_bytes)
+        .collect();
+    if tail.len() != 52 || tail[16..] != empty_tail {
+        return Err(format!(
+            "Unsupported cached texture tail ({} bytes): {tail:?}",
+            tail.len()
+        ));
+    }
+    let mut output = serial[..native].to_vec();
+    let size = pixels
+        .width()
+        .max(pixels.height())
+        .min(1024)
+        .next_power_of_two();
+    let mips = size.ilog2() + 1;
+    let format = package
+        .names
+        .iter()
+        .position(|n| n == if alpha { "PF_DXT5" } else { "PF_DXT1" })
+        .ok_or("Required DXT format name missing")?;
+    for prop in &props {
+        let value = match prop.name.as_str() {
+            "SizeX" | "SizeY" | "OriginalSizeX" | "OriginalSizeY" => Some(size),
+            "MipTailBaseIdx" => Some(mips - 1),
+            "FirstResourceMemMip" => Some(0),
+            "Format" => Some(format as u32),
+            _ => None,
+        };
+        if let Some(value) = value {
+            output[prop.value_offset..prop.value_offset + 4].copy_from_slice(&value.to_le_bytes());
+        }
+    }
+    let push = |out: &mut Vec<u8>, n: u32| out.extend_from_slice(&n.to_le_bytes());
+    for n in [0x10000, 0, 0, mips] {
+        push(&mut output, n);
+    }
+    for level in 0..mips {
+        let width = (size >> level).max(1);
+        let resized =
+            image::imageops::resize(pixels, width, width, image::imageops::FilterType::Triangle);
+        let encode = if alpha {
+            encode_dxt5_alpha
+        } else {
+            crate::patcher::patch_core::dxt::image_to_dxt1
+        };
+        let bytes = encode(&resized, width as usize, width as usize);
+        for n in [0x10000, bytes.len() as u32, bytes.len() as u32] {
+            push(&mut output, n);
+        }
+        output.extend_from_slice(&bytes);
+        push(&mut output, width);
+        push(&mut output, width);
+    }
+    output.extend_from_slice(tail);
+    Ok(output)
 }

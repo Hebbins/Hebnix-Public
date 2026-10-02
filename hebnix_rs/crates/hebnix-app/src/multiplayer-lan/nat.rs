@@ -52,7 +52,10 @@ impl HostReachability {
     pub fn summary(&self) -> String {
         match self.kind {
             Reachability::UpnpOpened => {
-                format!("UDP port {} opened on your router via UPnP.", self.public_port)
+                format!(
+                    "UDP port {} opened on your router via UPnP.",
+                    self.public_port
+                )
             }
             Reachability::StunMapped => format!(
                 "Public UDP port {} found via STUN. Guests can connect if your NAT allows \
@@ -142,10 +145,7 @@ pub fn establish(socket: &UdpSocket, local_port: u16) -> (HostReachability, NatK
     let mapped = stun_mapped_endpoints(socket);
     tracing::info!("workshop lan: STUN mapped endpoints: {mapped:?}");
     let (kind, public_port) = classify_stun(&mapped, cgnat, local_port);
-    (
-        HostReachability { kind, public_port },
-        keepalive(None),
-    )
+    (HostReachability { kind, public_port }, keepalive(None))
 }
 
 fn classify_stun(mapped: &[SocketAddr], cgnat: bool, local_port: u16) -> (Reachability, u16) {
@@ -414,7 +414,10 @@ mod tests {
     #[test]
     fn parses_xor_mapped_address() {
         let transaction = [9u8; 12];
-        let bytes = response(transaction, &xor_mapped(Ipv4Addr::new(203, 0, 113, 5), 40_123));
+        let bytes = response(
+            transaction,
+            &xor_mapped(Ipv4Addr::new(203, 0, 113, 5), 40_123),
+        );
         assert_eq!(
             parse_binding_response(&bytes, &transaction),
             Some("203.0.113.5:40123".parse().unwrap())
@@ -479,10 +482,22 @@ mod tests {
     fn classifies_stun_results() {
         let a: SocketAddr = "203.0.113.5:40000".parse().unwrap();
         let b: SocketAddr = "203.0.113.5:40001".parse().unwrap();
-        assert_eq!(classify_stun(&[], false, 7000), (Reachability::Unknown, 7000));
+        assert_eq!(
+            classify_stun(&[], false, 7000),
+            (Reachability::Unknown, 7000)
+        );
         assert_eq!(classify_stun(&[], true, 7000), (Reachability::Cgnat, 7000));
-        assert_eq!(classify_stun(&[a, a], false, 7000), (Reachability::StunMapped, 40000));
-        assert_eq!(classify_stun(&[a, b], false, 7000), (Reachability::SymmetricNat, 40000));
-        assert_eq!(classify_stun(&[a], true, 7000), (Reachability::Cgnat, 40000));
+        assert_eq!(
+            classify_stun(&[a, a], false, 7000),
+            (Reachability::StunMapped, 40000)
+        );
+        assert_eq!(
+            classify_stun(&[a, b], false, 7000),
+            (Reachability::SymmetricNat, 40000)
+        );
+        assert_eq!(
+            classify_stun(&[a], true, 7000),
+            (Reachability::Cgnat, 40000)
+        );
     }
 }

@@ -75,6 +75,14 @@ const BOOST_ARENA_PACKAGES: &[&str] = &[
 pub enum ColourAction {
     Apply,
     Restore,
+    ApplyBall {
+        source: usize,
+        donor: usize,
+        colours: bool,
+    },
+    RestoreBall {
+        source: usize,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,6 +166,11 @@ pub struct ColoursState {
     error: bool,
     result_rx: Option<Receiver<Result<ColourAction, String>>>,
     loaded_backups_dir: Option<PathBuf>,
+    ball_source: usize,
+    ball_donor: usize,
+    ball_colours: bool,
+    ball_swaps: Vec<super::ball_visual::SavedSwap>,
+    ball_state_error: Option<String>,
 }
 
 impl ColoursState {
@@ -170,6 +183,11 @@ impl ColoursState {
             error: false,
             result_rx: None,
             loaded_backups_dir: None,
+            ball_source: 0,
+            ball_donor: 1,
+            ball_colours: true,
+            ball_swaps: Vec::new(),
+            ball_state_error: None,
         }
     }
 
@@ -185,7 +203,20 @@ impl ColoursState {
             settings.applied = false;
         }
         self.settings = settings;
+        self.reload_ball_state(backups_dir);
         self.loaded_backups_dir = Some(backups_dir.to_path_buf());
+    }
+
+    fn reload_ball_state(&mut self, backups: &Path) {
+        match super::ball_visual::active(backups) {
+            Ok(swaps) => {
+                self.ball_swaps = swaps;
+                self.ball_state_error = None;
+            }
+            Err(error) => {
+                self.ball_state_error = Some(error);
+            }
+        }
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui, backups_dir: &Path) -> Option<ColourAction> {
@@ -306,6 +337,128 @@ impl ColoursState {
         requested
     }
 
+    pub fn render_ball_appearance(
+        &mut self,
+        ui: &mut egui::Ui,
+        backups_dir: &Path,
+    ) -> Option<ColourAction> {
+        self.load_active(backups_dir);
+        let mut requested = None;
+        egui::ScrollArea::vertical()
+            .id_salt("ball_appearance_page")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.heading("Ball Appearance");
+                ui.label(
+                    "Change the ball's shape locally while keeping its original physics and hitbox.",
+                );
+                ui.weak("Experimental visual swap. Collision and physics are preserved.");
+                ui.add_space(12.0);
+                ui.add_enabled_ui(!self.busy, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Original ball");
+                        egui::ComboBox::from_id_salt("ball_visual_source")
+                            .selected_text(super::ball_visual::BALLS[self.ball_source].0)
+                            .show_ui(ui, |ui| {
+                                for (index, (label, _)) in
+                                    super::ball_visual::BALLS.iter().enumerate()
+                                {
+                                    ui.selectable_value(&mut self.ball_source, index, *label);
+                                }
+                            });
+                        ui.label("Replace appearance with");
+                        egui::ComboBox::from_id_salt("ball_visual_donor")
+                            .selected_text(super::ball_visual::BALLS[self.ball_donor].0)
+                            .show_ui(ui, |ui| {
+                                for (index, (label, _)) in
+                                    super::ball_visual::BALLS.iter().enumerate()
+                                {
+                                    ui.add_enabled_ui(index != self.ball_source, |ui| {
+                                        ui.selectable_value(&mut self.ball_donor, index, *label);
+                                    });
+                                }
+                            });
+                    });
+                    let colour_support =
+                        super::ball_visual::colour_texture(self.ball_source, self.ball_donor)
+                            .is_some();
+                    ui.add_enabled_ui(colour_support, |ui| {
+                        ui.checkbox(
+                            &mut self.ball_colours,
+                            "Include replacement colours (experimental)",
+                        );
+                    });
+                    if colour_support {
+                        ui.weak(
+                            "Copies the colour texture; special shaders and effects stay original.",
+                        );
+                    } else {
+                        ui.weak(
+                            "Colours are available for Normal → selected balls. This pair swaps shape only.",
+                        );
+                    }
+                    let active = self
+                        .ball_swaps
+                        .iter()
+                        .find(|swap| swap.source == self.ball_source);
+                    if let Some(swap) = active {
+                        ui.label(format!(
+                            "Applied: {} → {}",
+                            super::ball_visual::BALLS[swap.source].0,
+                            super::ball_visual::BALLS[swap.donor].0
+                        ));
+                        ui.weak("Restore this ball before choosing another appearance.");
+                    }
+                    if let Some(error) = &self.ball_state_error {
+                        ui.colored_label(egui::Color32::RED, error);
+                    }
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_enabled(
+                                active.is_none()
+                                    && self.ball_source != self.ball_donor
+                                    && self.ball_state_error.is_none(),
+                                egui::Button::new("Apply Ball Appearance"),
+                            )
+                            .clicked()
+                        {
+                            requested = Some(ColourAction::ApplyBall {
+                                source: self.ball_source,
+                                donor: self.ball_donor,
+                                colours: self.ball_colours && colour_support,
+                            });
+                        }
+                        if ui
+                            .add_enabled(
+                                active.is_some() && self.ball_state_error.is_none(),
+                                egui::Button::new("Restore Ball Appearance"),
+                            )
+                            .clicked()
+                        {
+                            requested = Some(ColourAction::RestoreBall {
+                                source: self.ball_source,
+                            });
+                        }
+                    });
+                });
+                ui.add_space(8.0);
+                if self.busy {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(&self.status);
+                    });
+                } else {
+                    let colour = if self.error {
+                        egui::Color32::from_rgb(0xe7, 0x4c, 0x3c)
+                    } else {
+                        ui.visuals().text_color()
+                    };
+                    ui.colored_label(colour, &self.status);
+                }
+            });
+        requested
+    }
+
     pub fn begin(
         &mut self,
         action: ColourAction,
@@ -322,6 +475,8 @@ impl ColoursState {
         self.status = match action {
             ColourAction::Apply => "Applying stadium, HUD and garage palette colours…",
             ColourAction::Restore => "Restoring original colours…",
+            ColourAction::ApplyBall { .. } => "Preparing and validating visual ball swaps…",
+            ColourAction::RestoreBall { .. } => "Restoring original ball geometry…",
         }
         .into();
         let cooked_pc = cooked_pc.to_path_buf();
@@ -337,6 +492,20 @@ impl ColoursState {
                 let result = match action {
                     ColourAction::Apply => apply(&cooked_pc, &backups_dir, &settings),
                     ColourAction::Restore => restore(&cooked_pc, &backups_dir),
+                    ColourAction::ApplyBall {
+                        source,
+                        donor,
+                        colours,
+                    } => super::ball_visual::apply_with_colours(
+                        &cooked_pc,
+                        &backups_dir,
+                        source,
+                        donor,
+                        colours,
+                    ),
+                    ColourAction::RestoreBall { source } => {
+                        super::ball_visual::restore(&cooked_pc, &backups_dir, source)
+                    }
                 }
                 .map(|_| action);
                 let message = match &result {
@@ -344,6 +513,13 @@ impl ColoursState {
                         "[Colours] Colours applied. Start Rocket League to see them.".to_string()
                     }
                     Ok(ColourAction::Restore) => "[Colours] Original colours restored.".to_string(),
+                    Ok(ColourAction::ApplyBall { .. }) => {
+                        "[Colours] Ball appearance applied. Restart Rocket League to test it."
+                            .to_string()
+                    }
+                    Ok(ColourAction::RestoreBall { .. }) => {
+                        "[Colours] Original ball appearance restored.".to_string()
+                    }
                     Err(error) => format!("[Colours] Error: {error}"),
                 };
                 let _ = log_tx.send(crate::messages::AppMsg::Log(message));
@@ -368,12 +544,23 @@ impl ColoursState {
                 self.status = "Original stadium, HUD and garage palette colours restored.".into();
                 self.error = false;
             }
+            Ok(ColourAction::ApplyBall { .. }) => {
+                self.status = "Ball shape applied. Restart Rocket League to test it.".into();
+                self.error = false;
+            }
+            Ok(ColourAction::RestoreBall { .. }) => {
+                self.status = "Original ball shape restored.".into();
+                self.error = false;
+            }
             Err(error) => {
                 self.status = error;
                 self.error = true;
             }
         }
         self.result_rx = None;
+        if let Some(backups) = self.loaded_backups_dir.clone() {
+            self.reload_ball_state(&backups);
+        }
     }
 }
 

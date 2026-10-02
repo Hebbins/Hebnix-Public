@@ -69,7 +69,16 @@ pub fn rect(
 pub fn gradient(x: f32, y: f32, w: f32, h: f32, c1: Rgba, c2: Rgba, radius: f32, angle: f32) {
     with_canvas(|canvas| match canvas {
         Canvas::Gdi(hdc) => gdi::rect(
-            *hdc, x as i32, y as i32, w as i32, h as i32, c1, c1, 0, true, radius as i32,
+            *hdc,
+            x as i32,
+            y as i32,
+            w as i32,
+            h as i32,
+            c1,
+            c1,
+            0,
+            true,
+            radius as i32,
         ),
         Canvas::D2d(c) => c.gradient(x, y, w, h, c1, c2, radius, angle),
     });

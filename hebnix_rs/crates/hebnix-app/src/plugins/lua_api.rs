@@ -251,7 +251,9 @@ fn image_palette(path: &std::path::Path) -> Option<[(&'static str, String); 10]>
         }
     }
 
-    let hex = |(r, g, b): (u64, u64, u64)| format!("#{:02x}{:02x}{:02x}", r.min(255), g.min(255), b.min(255));
+    let hex = |(r, g, b): (u64, u64, u64)| {
+        format!("#{:02x}{:02x}{:02x}", r.min(255), g.min(255), b.min(255))
+    };
     let lighten = |(r, g, b): (u64, u64, u64), t: f64| {
         let f = |c: u64| (c as f64 + (255.0 - c as f64) * t) as u64;
         (f(r), f(g), f(b))
@@ -266,7 +268,11 @@ fn image_palette(path: &std::path::Path) -> Option<[(&'static str, String); 10]>
     let lum = |(r, g, b): (u64, u64, u64)| {
         let f = |c: u64| {
             let c = c as f64 / 255.0;
-            if c <= 0.03928 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+            if c <= 0.03928 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
         };
         0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
     };
@@ -278,8 +284,16 @@ fn image_palette(path: &std::path::Path) -> Option<[(&'static str, String); 10]>
     let black = (0u64, 0u64, 0u64);
     let white = (255u64, 255u64, 255u64);
     // text and accent read against base, the panel's mid tone
-    let bw = if contrast(base, black) >= contrast(base, white) { black } else { white };
-    let text = if contrast(base, vibrant) >= 3.0 { vibrant } else { bw };
+    let bw = if contrast(base, black) >= contrast(base, white) {
+        black
+    } else {
+        white
+    };
+    let text = if contrast(base, vibrant) >= 3.0 {
+        vibrant
+    } else {
+        bw
+    };
 
     // accent keeps the vibrant hue but nudges toward bw until it's clearly seen
     let mix = |a: (u64, u64, u64), b: (u64, u64, u64), t: f64| {
@@ -1003,7 +1017,7 @@ fn load_p256_signing(key: &[u8]) -> Option<p256::ecdsa::SigningKey> {
 /// ES256 signature (SHA-256 + ECDSA P-256), returned as the 64-byte fixed
 /// r||s form JWS/DPoP expects. None if the key can't be parsed.
 fn p256_sign(key: &[u8], msg: &[u8]) -> Option<Vec<u8>> {
-    use p256::ecdsa::{signature::Signer, Signature};
+    use p256::ecdsa::{Signature, signature::Signer};
     let sk = load_p256_signing(key)?;
     let sig: Signature = sk.sign(msg);
     Some(sig.to_bytes().to_vec())
@@ -1012,7 +1026,12 @@ fn p256_sign(key: &[u8], msg: &[u8]) -> Option<Vec<u8>> {
 /// the public key as an uncompressed SEC1 point: 65 bytes, 0x04 || x || y.
 fn p256_public(key: &[u8]) -> Option<Vec<u8>> {
     let sk = load_p256_signing(key)?;
-    Some(sk.verifying_key().to_encoded_point(false).as_bytes().to_vec())
+    Some(
+        sk.verifying_key()
+            .to_encoded_point(false)
+            .as_bytes()
+            .to_vec(),
+    )
 }
 
 // generic websocket for plugins (ws_connect_async / ws_send / ws_close)
@@ -1023,8 +1042,8 @@ enum WsCmd {
 }
 
 /// live plugin websocket connections, keyed by "slug\0id" -> command channel.
-fn ws_registry(
-) -> &'static std::sync::Mutex<std::collections::HashMap<String, std::sync::mpsc::Sender<WsCmd>>> {
+fn ws_registry()
+-> &'static std::sync::Mutex<std::collections::HashMap<String, std::sync::mpsc::Sender<WsCmd>>> {
     static R: OnceLock<
         std::sync::Mutex<std::collections::HashMap<String, std::sync::mpsc::Sender<WsCmd>>>,
     > = OnceLock::new();
@@ -1945,9 +1964,7 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     // Whether the shared PsyNet session is currently connected.
     hebnix.set(
         "rlapi_connected",
-        lua.create_function(|_, ()| {
-            Ok(shared_game_session().connected())
-        })?,
+        lua.create_function(|_, ()| Ok(shared_game_session().connected()))?,
     )?;
 
     // Audio Control
@@ -2651,7 +2668,11 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     hebnix.set(
         "measure_text",
         lua.create_function(|_, (s, size, bold): (String, f32, Option<bool>)| {
-            Ok(crate::overlay::measure_text(&s, size, bold.unwrap_or(false)))
+            Ok(crate::overlay::measure_text(
+                &s,
+                size,
+                bold.unwrap_or(false),
+            ))
         })?,
     )?;
 
@@ -2751,12 +2772,12 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
     // [2..34] / [34..66] in lua for the JWK x / y coords
     hebnix.set(
         "p256_public",
-        lua.create_function(|lua, key: mlua::String| {
-            match p256_public(key.as_bytes().as_ref()) {
+        lua.create_function(
+            |lua, key: mlua::String| match p256_public(key.as_bytes().as_ref()) {
                 Some(pt) => Ok(Some(lua.create_string(&pt)?)),
                 None => Ok(None),
-            }
-        })?,
+            },
+        )?,
     )?;
 
     // true if a process whose exe name contains name (case-insensitive) is
@@ -2844,8 +2865,11 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                                 Ok(token) => req = req.header("X-App-Token", token),
                                 Err(error) => {
                                     let _ = thread_tx.send(AppMsg::PluginHttpResult {
-                                        slug, req_id, status: 0,
-                                        body: error.into_bytes(), headers: String::new(),
+                                        slug,
+                                        req_id,
+                                        status: 0,
+                                        body: error.into_bytes(),
+                                        headers: String::new(),
                                     });
                                     return;
                                 }
@@ -3341,20 +3365,22 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
     // draw.gradient(x, y, w, h, {color=, color2=, radius=0, angle=135})
     draw.set(
         "gradient",
-        lua.create_function(|_, (x, y, w, h, opts): (f32, f32, f32, f32, Option<Table>)| {
-            let c1 = opt_rgba(&opts, "color", WHITE);
-            overlay::gradient(
-                x,
-                y,
-                w,
-                h,
-                c1,
-                opt_rgba(&opts, "color2", c1),
-                opt_f32(&opts, "radius", 0.0),
-                opt_f32(&opts, "angle", 135.0),
-            );
-            Ok(())
-        })?,
+        lua.create_function(
+            |_, (x, y, w, h, opts): (f32, f32, f32, f32, Option<Table>)| {
+                let c1 = opt_rgba(&opts, "color", WHITE);
+                overlay::gradient(
+                    x,
+                    y,
+                    w,
+                    h,
+                    c1,
+                    opt_rgba(&opts, "color2", c1),
+                    opt_f32(&opts, "radius", 0.0),
+                    opt_f32(&opts, "angle", 135.0),
+                );
+                Ok(())
+            },
+        )?,
     )?;
 
     // draw.circle(x, y, radius, {color=, width=, filled=false})

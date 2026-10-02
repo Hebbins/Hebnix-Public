@@ -95,6 +95,14 @@ fn dcomp_wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
     let mut options = eframe::egui_wgpu::WgpuConfiguration::default();
     if let eframe::egui_wgpu::WgpuSetup::CreateNew(setup) = &mut options.wgpu_setup {
         setup.instance_descriptor.backends = wgpu::Backends::DX12;
+        // `Auto` may pick up an unrelated dxcompiler.dll from PATH without the
+        // matching dxil.dll, making wgpu's first internal shader fail and lose
+        // the device. FXC is provided by Windows and needs no bundled DLLs.
+        setup
+            .instance_descriptor
+            .backend_options
+            .dx12
+            .shader_compiler = wgpu::Dx12Compiler::Fxc;
         setup
             .instance_descriptor
             .backend_options

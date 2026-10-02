@@ -11,12 +11,13 @@ use serde_json::Value;
 use hebnix_sdk::save_file::WindowMode;
 use hebnix_sdk::stats::StatsClient;
 
-use crate::config::Config;
+use crate::config::{ActionButtonAction, ActionButtonEntry, Config};
 use crate::hotkey::ToggleHotkey;
 use crate::messages::AppMsg;
 use crate::monitor::{Monitor, MonitorShared};
 use crate::plugins::PluginManager;
 use crate::spoofer;
+use crate::spoofer::rules::TitleSpoofSettings;
 use crate::spoofer::SpooferManager;
 use crate::statsapi_ini;
 use crate::theme;
@@ -280,6 +281,41 @@ enum Tab {
     About,
 }
 
+impl Tab {
+    const ALL: [Self; 9] = [
+        Self::Console,
+        Self::Workshop,
+        Self::Spoofer,
+        Self::Colours,
+        Self::Patcher,
+        Self::Settings,
+        Self::Plugins,
+        Self::RlApi,
+        Self::About,
+    ];
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Console => "Console",
+            Self::Workshop => "Maps",
+            Self::Spoofer => "Spoofer",
+            Self::Patcher => "Items",
+            Self::Colours => "Colours",
+            Self::Settings => "Settings",
+            Self::Plugins => "Plugins",
+            Self::RlApi => "Experimental",
+            Self::About => "About",
+        }
+    }
+
+    fn from_label(label: &str) -> Self {
+        Self::ALL
+            .into_iter()
+            .find(|tab| tab.label() == label)
+            .unwrap_or(Self::Console)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ItemsMode {
     Swapper,
@@ -303,6 +339,14 @@ enum PatcherSubTab {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExperimentalSubTab {
+    RlApi,
+    BallAppearance,
+    CarPatcher,
+    WheelAlignment,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SettingsSubTab {
     Hebnix,
     Plugin,
@@ -313,6 +357,7 @@ enum HebnixSettingsTab {
     Interface,
     Directories,
     Discord,
+    ActionButton,
     System,
 }
 
@@ -399,6 +444,7 @@ pub struct HebnixApp {
     hebnix_settings_tab: HebnixSettingsTab,
     spoofer_subtab: SpooferSubTab,
     patcher_subtab: PatcherSubTab,
+    experimental_subtab: ExperimentalSubTab,
     console: ConsoleState,
     workshop: WorkshopState,
     rlapi_panel: crate::ui::rlapi::RlApiPanel,
@@ -473,6 +519,7 @@ pub struct HebnixApp {
     spoofer_title_color: [u8; 3],
     spoofer_title_glow: bool,
     spoofer_title_target: Option<String>,
+    spoofer_titles: Vec<TitleSpoofSettings>,
     spoofer_title_filter: String,
     spoofer_title_copy: Option<String>,
     spoofer_title_copy_filter: String,
@@ -496,6 +543,8 @@ pub struct HebnixApp {
     patcher_ball: crate::ball::PatcherState,
     patcher_boost: crate::boost_patcher::BoostPatcherState,
     patcher_decal: crate::decal_patcher::DecalPatcherState,
+    patcher_car: crate::car_patcher::CarPatcherState,
+    wheel_alignment: crate::patcher::wheel_alignment::WheelAlignmentState,
     swapper: crate::swapper::SwapperState,
     colours: crate::patcher::colours::ColoursState,
     colour_admin_prompt_open: bool,
@@ -692,6 +741,7 @@ impl HebnixApp {
         let mut spoofer_title_color = [0xE8, 0xE8, 0xE8];
         let mut spoofer_title_glow = false;
         let mut spoofer_title_target = None;
+        let mut spoofer_titles = Vec::new();
         let mut spoofer_title_copy = None;
         let mut spoofer_rank_enabled = false;
         let mut spoofer_ranks = HashMap::new();
@@ -749,6 +799,9 @@ impl HebnixApp {
                     .and_then(|value| value.as_str())
                     .filter(|value| !value.is_empty())
                     .map(str::to_string);
+                if let Some(titles) = json.get("spoofer_titles") {
+                    spoofer_titles = serde_json::from_value(titles.clone()).unwrap_or_default();
+                }
                 spoofer_title_copy = json
                     .get("spoofer_title_copy")
                     .and_then(|value| value.as_str())
@@ -783,6 +836,20 @@ impl HebnixApp {
             }
         }
 
+        // Migrate the former single-title settings into the stack once.
+        if spoofer_titles.is_empty() && spoofer_title_enabled && !spoofer_title.trim().is_empty() {
+            spoofer_titles.push(TitleSpoofSettings {
+                text: spoofer_title.trim().chars().take(64).collect(),
+                color: format!(
+                    "{:02X}{:02X}{:02X}",
+                    spoofer_title_color[0], spoofer_title_color[1], spoofer_title_color[2]
+                ),
+                glow: spoofer_title_glow,
+                target_id: spoofer_title_target.clone(),
+            });
+            spoofer_title.clear();
+        }
+
         if spoofer_master && !spoofer::is_admin() {
             if spoofer::spawn_elevated_relaunch() {
                 std::process::exit(0);
@@ -810,20 +877,13 @@ impl HebnixApp {
         }
 
         spoofer_mgr.set_username(&spoofer_username);
-        spoofer_mgr.set_title(&spoofer_title);
+        spoofer_mgr.set_titles(spoofer_titles.clone());
         spoofer_mgr.set_title_enabled(spoofer_title_enabled);
-        spoofer_mgr.set_title_options(
-            format!(
-                "{:02X}{:02X}{:02X}",
-                spoofer_title_color[0], spoofer_title_color[1], spoofer_title_color[2]
-            ),
-            spoofer_title_glow,
-            spoofer_title_target.clone(),
-        );
 
         let patcher_ball = crate::ball::PatcherState::new(&base_dir, &config);
         let patcher_boost = crate::boost_patcher::BoostPatcherState::new(&base_dir, &config);
         let patcher_decal = crate::decal_patcher::DecalPatcherState::new(&base_dir, &config);
+        let patcher_car = crate::car_patcher::CarPatcherState::new(&base_dir, &config);
         let mut swapper = crate::swapper::SwapperState::new(&base_dir);
         let owned_restart_marker = base_dir.join("enable_owned_replacements.pending");
         if spoofer::is_admin() && owned_restart_marker.is_file() {
@@ -840,6 +900,7 @@ impl HebnixApp {
         }
         let cert_installed = spoofer::ca::is_current_installed(&base_dir);
         let rl_launch_draft = config.rl_launch.clone();
+        let default_tab = Tab::from_label(&config.settings.default_tab);
 
         let discord_presence =
             crate::discord_presence::DiscordPresence::start(config.settings.discord_rich_presence);
@@ -865,11 +926,12 @@ impl HebnixApp {
             tray,
             hotkey,
             _secretsequence: secretsequence,
-            tab: Tab::Console,
+            tab: default_tab,
             settings_subtab: SettingsSubTab::Hebnix,
             hebnix_settings_tab: HebnixSettingsTab::Interface,
             spoofer_subtab: SpooferSubTab::Settings,
             patcher_subtab: PatcherSubTab::Ball,
+            experimental_subtab: ExperimentalSubTab::RlApi,
             console: ConsoleState::default(),
             workshop,
             rlapi_panel: crate::ui::rlapi::RlApiPanel::default(),
@@ -936,6 +998,7 @@ impl HebnixApp {
             spoofer_title_color,
             spoofer_title_glow,
             spoofer_title_target,
+            spoofer_titles,
             spoofer_title_filter: String::new(),
             spoofer_title_copy,
             spoofer_title_copy_filter: String::new(),
@@ -958,6 +1021,8 @@ impl HebnixApp {
             patcher_ball,
             patcher_boost,
             patcher_decal,
+            patcher_car,
+            wheel_alignment: Default::default(),
             swapper,
             colours: crate::patcher::colours::ColoursState::new(),
             colour_admin_prompt_open: false,
@@ -1009,6 +1074,7 @@ impl HebnixApp {
             "spoofer_title_color": format!("{:02X}{:02X}{:02X}", self.spoofer_title_color[0], self.spoofer_title_color[1], self.spoofer_title_color[2]),
             "spoofer_title_glow": self.spoofer_title_glow,
             "spoofer_title_target": self.spoofer_title_target,
+            "spoofer_titles": self.spoofer_titles,
             "spoofer_title_copy": self.spoofer_title_copy,
             "spoofer_rank_enabled": self.spoofer_rank_enabled,
             "ranks": map,
@@ -1054,7 +1120,14 @@ impl HebnixApp {
             .cloned()
             .ok_or_else(|| "The bodies catalog was not downloaded".to_string())?;
         self.swapper.set_catalogs(&catalogs)?;
+        self.wheel_alignment.set_catalog(&bodies);
         self.patcher_decal.set_catalogs(skins, bodies)?;
+        self.patcher_car.set_catalog(
+            catalogs
+                .get("bodies")
+                .cloned()
+                .ok_or_else(|| "The bodies catalog was not downloaded".to_string())?,
+        )?;
         self.title_catalog = titles;
         Ok(())
     }
@@ -1069,9 +1142,13 @@ impl HebnixApp {
     }
 
     fn enable_rlapi(&mut self) {
-        if self.rlapi_panel.starting { return; }
+        if self.rlapi_panel.starting {
+            return;
+        }
         if !spoofer::is_admin() {
-            self.rlapi_panel.complete(Err("Run Hebnix as administrator, then enable RLAPI capture.".into()));
+            self.rlapi_panel.complete(Err(
+                "Run Hebnix as administrator, then enable RLAPI capture.".into(),
+            ));
             return;
         }
         self.rlapi_panel.starting = true;
@@ -1086,7 +1163,9 @@ impl HebnixApp {
                     return Err("Install the existing Hebnix certificate in Spoofer settings, then enable RLAPI.".into());
                 }
                 if !hebnix_sdk::process::is_rocket_league_running() {
-                    crate::winutil::clear_rocket_league_web_cache().map_err(|e|format!("Could not refresh Rocket League's cached configuration: {e}"))?;
+                    crate::winutil::clear_rocket_league_web_cache().map_err(|e| {
+                        format!("Could not refresh Rocket League's cached configuration: {e}")
+                    })?;
                 }
                 manager.enable_rlapi()
             })();
@@ -1097,8 +1176,15 @@ impl HebnixApp {
     fn render_rlapi_tab(&mut self, ui: &mut egui::Ui) {
         use crate::ui::rlapi::Action;
         let session = hebnix_sdk::rlapi::session::shared_game_session();
-        let status = if self.rlapi_panel.starting { "Enabling capture…".into() } else { session.status() };
-        match self.rlapi_panel.show(ui, session.enabled(), session.connected(), &status) {
+        let status = if self.rlapi_panel.starting {
+            "Enabling capture…".into()
+        } else {
+            session.status()
+        };
+        match self
+            .rlapi_panel
+            .show(ui, session.enabled(), session.connected(), &status)
+        {
             Some(Action::Enable) => self.enable_rlapi(),
             Some(Action::Disable) => self.spoofer_mgr.disable_rlapi(),
             Some(Action::Send { service, body }) => {
@@ -1128,6 +1214,7 @@ impl HebnixApp {
                         "ball": self.patcher_ball.active_ball,
                         "boost": self.patcher_boost.active_boost,
                         "decals": self.patcher_decal.active_decals,
+                        "cars": self.patcher_car.active_cars,
                     })
                 } else {
                     serde_json::Value::Null
@@ -1208,7 +1295,27 @@ impl HebnixApp {
                     .get("target_name")
                     .and_then(|v| v.as_str())
                     .unwrap_or("?");
-                ui.label(format!("{source}  →  {target}"));
+                ui.horizontal(|ui| {
+                    ui.label(source);
+                    let arrow = ui.allocate_response(egui::vec2(18.0, 18.0), egui::Sense::hover());
+                    let visuals = ui.style().interact(&arrow);
+                    let center = arrow.rect.center();
+                    ui.painter().line_segment(
+                        [
+                            center + egui::vec2(-3.5, -3.5),
+                            center + egui::vec2(0.0, 0.0),
+                        ],
+                        visuals.fg_stroke,
+                    );
+                    ui.painter().line_segment(
+                        [
+                            center + egui::vec2(0.0, 0.0),
+                            center + egui::vec2(-3.5, 3.5),
+                        ],
+                        visuals.fg_stroke,
+                    );
+                    ui.label(target);
+                });
             }
             if let Some(obj) = preset.patches.as_object() {
                 for (kind, value) in obj {
@@ -1297,7 +1404,8 @@ impl HebnixApp {
                 self.spoofer_mgr.stop_http();
             }
             if let Err(error) = self.spoofer_mgr.reconcile_hosts() {
-                self.console.write(format!("[Spoofer] Hosts cleanup failed: {error}"));
+                self.console
+                    .write(format!("[Spoofer] Hosts cleanup failed: {error}"));
             }
             return;
         }
@@ -1342,7 +1450,8 @@ impl HebnixApp {
         }
 
         if let Err(error) = self.spoofer_mgr.reconcile_hosts() {
-            self.console.write(format!("[Spoofer] Hosts reconciliation failed: {error}"));
+            self.console
+                .write(format!("[Spoofer] Hosts reconciliation failed: {error}"));
         }
         self.save_friends_internal();
         self.save_ranks_internal();
@@ -1417,7 +1526,9 @@ impl HebnixApp {
             return;
         }
 
-        if self.item_spawner_enabled { self.disable_item_spawner(); }
+        if self.item_spawner_enabled {
+            self.disable_item_spawner();
+        }
         self.spoofer_mgr.shutdown();
         self.plugin_mgr.unload_all();
         self.stats.stop();
@@ -1434,7 +1545,9 @@ impl HebnixApp {
                 AppMsg::Log(s) => self.console.write(s),
                 AppMsg::RlApiCaptureReady(result) => {
                     self.rlapi_panel.starting = false;
-                    if let Err(error) = result { self.rlapi_panel.complete(Err(error)); }
+                    if let Err(error) = result {
+                        self.rlapi_panel.complete(Err(error));
+                    }
                 }
                 AppMsg::RlApiResponse(result) => self.rlapi_panel.complete(result),
                 AppMsg::GameEvent(event) => self.handle_game_event(event),
@@ -2163,12 +2276,15 @@ impl HebnixApp {
         self.patcher_ball.active_ball = self.config.patcher.active_ball.clone();
         self.patcher_boost.active_boost = self.config.patcher.active_boost.clone();
         self.patcher_decal.active_decals = self.config.patcher.active_decals.clone();
+        self.patcher_car.active_cars = self.config.patcher.active_cars.clone();
         self.patcher_ball.source = self.config.patcher.ball_source;
         self.patcher_boost.source = self.config.patcher.boost_source;
         self.patcher_decal.source = self.config.patcher.decal_source;
+        self.patcher_car.source = self.config.patcher.car_source;
         self.patcher_ball.refresh_balls();
         self.patcher_boost.refresh_boosts();
         self.patcher_decal.refresh_decals();
+        self.patcher_car.refresh_cars();
         self.save_config();
     }
 
@@ -2809,7 +2925,7 @@ impl HebnixApp {
                                 let mut title_changed = false;
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .checkbox(&mut self.spoofer_title_enabled, "Title:    ")
+                                        .checkbox(&mut self.spoofer_title_enabled, "Titles")
                                         .changed()
                                     {
                                         if !self.spoofer_title_enabled {
@@ -2825,6 +2941,9 @@ impl HebnixApp {
                                         title_changed = true;
                                         self.evaluate_proxies();
                                     }
+                                });
+                                ui.add_enabled_ui(self.spoofer_title_enabled, |ui| {
+                                    ui.horizontal(|ui| {
                                     let text_resp_2 = ui.add_enabled(
                                         self.spoofer_title_enabled,
                                         egui::TextEdit::singleline(&mut self.spoofer_title)
@@ -2859,6 +2978,9 @@ impl HebnixApp {
                                         title_changed = true;
                                     }
 
+                                    });
+                                    ui.horizontal(|ui| {
+                                    ui.label("Title to replace:");
                                     let selected_title = self
                                         .spoofer_title_target
                                         .as_ref()
@@ -3002,7 +3124,7 @@ impl HebnixApp {
                                             }
                                         });
                                 });
-                                ui.horizontal(|ui| {
+                                ui.horizontal_wrapped(|ui| {
                                     for (label, token) in TITLE_RANK_TOKENS {
                                         if ui
                                             .add_enabled(
@@ -3031,20 +3153,98 @@ impl HebnixApp {
                                         title_changed = true;
                                     }
                                 });
+
+                                ui.horizontal(|ui| {
+                                    let target_already_used = self
+                                        .spoofer_titles
+                                        .iter()
+                                        .any(|title| title.target_id == self.spoofer_title_target);
+                                    let target_is_available = !target_already_used;
+                                    let can_add = self.spoofer_title_enabled
+                                        && !self.spoofer_title.trim().is_empty()
+                                        && target_is_available;
+                                    let add_response = ui.add_enabled(
+                                        can_add,
+                                        egui::Button::new("Add title to list"),
+                                    );
+                                    if add_response.clicked() {
+                                        self.spoofer_titles.push(TitleSpoofSettings {
+                                            text: self
+                                                .spoofer_title
+                                                .trim()
+                                                .chars()
+                                                .take(64)
+                                                .collect(),
+                                            color: format!(
+                                                "{:02X}{:02X}{:02X}",
+                                                self.spoofer_title_color[0],
+                                                self.spoofer_title_color[1],
+                                                self.spoofer_title_color[2]
+                                            ),
+                                            glow: self.spoofer_title_glow,
+                                            target_id: self.spoofer_title_target.clone(),
+                                        });
+                                        self.spoofer_title.clear();
+                                        self.spoofer_title_copy = None;
+                                        title_changed = true;
+                                    } else if self.spoofer_title_enabled
+                                        && !self.spoofer_title.trim().is_empty()
+                                        && !target_is_available
+                                    {
+                                        add_response.on_disabled_hover_text(
+                                            "This title is already being replaced",
+                                        );
+                                    }
+                                });
+                                ui.add_space(6.0);
+                                ui.label(egui::RichText::new("Enabled titles:").strong());
+                                if self.spoofer_titles.is_empty() {
+                                    ui.weak("No titles added");
+                                } else {
+                                    let mut remove_title = None;
+                                    for (index, title) in self.spoofer_titles.iter().enumerate() {
+                                        ui.horizontal(|ui| {
+                                            let color = parse_hex_color(&title.color);
+                                            ui.label(
+                                                egui::RichText::new(&title.text)
+                                                    .color(Color32::from_rgb(
+                                                        color[0], color[1], color[2],
+                                                    )),
+                                            );
+                                            if title.glow {
+                                                ui.weak("Glow");
+                                            }
+                                            ui.weak("replaces");
+                                            let target = title
+                                                .target_id
+                                                .as_ref()
+                                                .and_then(|id| {
+                                                    self.title_catalog
+                                                        .iter()
+                                                        .find(|catalog_title| &catalog_title.id == id)
+                                                })
+                                                .map(|catalog_title| catalog_title.text.as_str())
+                                                .unwrap_or("All");
+                                            ui.label(target);
+                                            if ui
+                                                .small_button("x")
+                                                .on_hover_text("Remove this title")
+                                                .clicked()
+                                            {
+                                                remove_title = Some(index);
+                                            }
+                                        });
+                                    }
+                                    if let Some(index) = remove_title {
+                                        self.spoofer_titles.remove(index);
+                                        title_changed = true;
+                                    }
+                                }
+                                });
                                 if title_changed {
-                                    self.spoofer_mgr.set_title(&self.spoofer_title);
+                                    self.spoofer_mgr.set_titles(self.spoofer_titles.clone());
                                     self.spoofer_mgr
                                         .set_title_enabled(self.spoofer_title_enabled);
-                                    self.spoofer_mgr.set_title_options(
-                                        format!(
-                                            "{:02X}{:02X}{:02X}",
-                                            self.spoofer_title_color[0],
-                                            self.spoofer_title_color[1],
-                                            self.spoofer_title_color[2]
-                                        ),
-                                        self.spoofer_title_glow,
-                                        self.spoofer_title_target.clone(),
-                                    );
                                     self.save_config();
                                 }
                             });
@@ -3482,6 +3682,243 @@ impl HebnixApp {
         }
     }
 
+    fn execute_action_button_action(&mut self, action: ActionButtonAction, ctx: &egui::Context) {
+        match action {
+            ActionButtonAction::StartRocketLeague | ActionButtonAction::RestartRocketLeague => {
+                let path = self.config.settings.rl_path.clone();
+                if !self.config.settings.rl_path_confirmed
+                    || path.trim().is_empty()
+                    || !std::path::Path::new(&path).is_dir()
+                {
+                    self.launch_path_notice = true;
+                    return;
+                }
+
+                let tx = self.tx.clone();
+                let rl_launch = self.config.rl_launch.clone();
+                std::thread::spawn(move || {
+                    let (verb, result) = match action {
+                        ActionButtonAction::StartRocketLeague => (
+                            "start",
+                            crate::winutil::start_rocket_league(
+                                &rl_launch,
+                                std::path::Path::new(&path),
+                            ),
+                        ),
+                        ActionButtonAction::RestartRocketLeague => (
+                            "restart",
+                            crate::winutil::restart_rocket_league(
+                                &rl_launch,
+                                std::path::Path::new(&path),
+                            ),
+                        ),
+                        _ => unreachable!(),
+                    };
+                    let message = match result {
+                        Ok(()) => format!("[Core] Rocket League {verb} requested."),
+                        Err(error) => format!("[Core] Rocket League {verb} failed: {error}"),
+                    };
+                    let _ = tx.send(AppMsg::Log(message));
+                });
+            }
+            ActionButtonAction::CloseRocketLeague => {
+                let tx = self.tx.clone();
+                std::thread::spawn(move || {
+                    let message = match crate::winutil::kill_rocket_league() {
+                        Ok(()) => "[Core] Rocket League close requested.".to_string(),
+                        Err(error) => format!("[Core] Rocket League close failed: {error}"),
+                    };
+                    let _ = tx.send(AppMsg::Log(message));
+                });
+            }
+            ActionButtonAction::OpenHebnixFolder => {
+                if let Err(error) = open::that(&self.base_dir) {
+                    self.console
+                        .write(format!("[Core] Could not open Hebnix folder: {error}"));
+                }
+            }
+            ActionButtonAction::OpenPluginsFolder => {
+                if let Err(error) = open::that(&self.plugin_dir) {
+                    self.console
+                        .write(format!("[Core] Could not open Plugins folder: {error}"));
+                }
+            }
+            ActionButtonAction::ReloadPlugins => {
+                self.plugin_mgr.reload_all(&mut self.config);
+                self.save_config();
+            }
+            ActionButtonAction::FixEpicConnection => {
+                self.epic_repair.begin(ctx);
+                if self.epic_repair.running {
+                    self.spoofer_mgr.shutdown();
+                }
+            }
+        }
+    }
+
+    fn render_action_button(&mut self, ui: &mut egui::Ui) {
+        let entries = if self.last_rl_open {
+            &self.config.action_button.rocket_league_open
+        } else {
+            &self.config.action_button.rocket_league_closed
+        };
+        let actions: Vec<ActionButtonAction> = entries
+            .iter()
+            .filter(|entry| entry.enabled)
+            .map(|entry| entry.action)
+            .collect();
+        let Some((&primary, secondary)) = actions.split_first() else {
+            return;
+        };
+
+        if secondary.is_empty() {
+            if ui.button(primary.label()).clicked() {
+                self.execute_action_button_action(primary, ui.ctx());
+            }
+            return;
+        }
+
+        let mut run_primary = false;
+        let mut selected = None;
+        ui.scope(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            ui.horizontal(|ui| {
+                let arrow = ui.add(
+                    egui::Button::new("")
+                        .min_size(egui::vec2(24.0, 0.0))
+                        .corner_radius(egui::CornerRadius {
+                            nw: 0,
+                            ne: 3,
+                            sw: 0,
+                            se: 3,
+                        }),
+                );
+                let main = ui.add(egui::Button::new(primary.label()).corner_radius(
+                    egui::CornerRadius {
+                        nw: 3,
+                        ne: 0,
+                        sw: 3,
+                        se: 0,
+                    },
+                ));
+                run_primary = main.clicked();
+                let arrow_visuals = ui.style().interact(&arrow);
+                let center = arrow.rect.center();
+                ui.painter().line_segment(
+                    [
+                        center + egui::vec2(-3.5, -1.5),
+                        center + egui::vec2(0.0, 2.0),
+                    ],
+                    arrow_visuals.fg_stroke,
+                );
+                ui.painter().line_segment(
+                    [
+                        center + egui::vec2(0.0, 2.0),
+                        center + egui::vec2(3.5, -1.5),
+                    ],
+                    arrow_visuals.fg_stroke,
+                );
+
+                let combined_rect = main.rect.union(arrow.rect);
+                let popup_anchor = ui.interact(
+                    combined_rect,
+                    ui.make_persistent_id("action_button_menu_anchor"),
+                    egui::Sense::hover(),
+                );
+                egui::Popup::menu(&popup_anchor)
+                    .open_memory(arrow.clicked().then_some(egui::SetOpenCommand::Toggle))
+                    .width(combined_rect.width())
+                    .show(|ui| {
+                        for &action in secondary {
+                            if ui.button(action.label()).clicked() {
+                                selected = Some(action);
+                                ui.close();
+                            }
+                        }
+                    });
+            });
+        });
+        if run_primary {
+            self.execute_action_button_action(primary, ui.ctx());
+        } else if let Some(action) = selected {
+            self.execute_action_button_action(action, ui.ctx());
+        }
+    }
+
+    fn render_action_button_state_editor(
+        ui: &mut egui::Ui,
+        id: &'static str,
+        entries: &mut Vec<ActionButtonEntry>,
+    ) -> bool {
+        let enabled_count = entries.iter().filter(|entry| entry.enabled).count();
+        let mut moved = None;
+        let mut changed = false;
+
+        for (index, entry) in entries.iter_mut().enumerate() {
+            let row_id = egui::Id::new((id, entry.action));
+            let (_, dropped) = ui.dnd_drop_zone::<usize, _>(
+                egui::Frame::new().inner_margin(egui::Margin::symmetric(4, 2)),
+                |ui| {
+                    ui.horizontal(|ui| {
+                        ui.weak(format!("{}.", index + 1));
+                        ui.dnd_drag_source(row_id, index, |ui| {
+                            ui.weak("::");
+                        });
+                        let can_toggle = !entry.enabled || enabled_count > 1;
+                        if ui
+                            .add_enabled(
+                                can_toggle,
+                                egui::Checkbox::new(&mut entry.enabled, entry.action.label()),
+                            )
+                            .on_disabled_hover_text("At least one action must remain selected.")
+                            .changed()
+                        {
+                            changed = true;
+                        }
+                    });
+                },
+            );
+            if let Some(from) = dropped {
+                moved = Some((*from, index));
+            }
+        }
+
+        if let Some((from, to)) = moved
+            && from != to
+            && from < entries.len()
+        {
+            let entry = entries.remove(from);
+            entries.insert(to.min(entries.len()), entry);
+            changed = true;
+        }
+        changed
+    }
+
+    fn render_action_button_settings(&mut self, ui: &mut egui::Ui) {
+        ui.label("Choose the actions available for each Rocket League state.");
+        ui.weak(
+            "Drag the :: handle to reorder. The first checked action is the main button action.",
+        );
+        ui.add_space(12.0);
+
+        ui.strong("State: Rocket League Closed");
+        let closed_changed = Self::render_action_button_state_editor(
+            ui,
+            "action_button_closed",
+            &mut self.config.action_button.rocket_league_closed,
+        );
+        ui.add_space(12.0);
+        ui.strong("State: Rocket League Open");
+        let open_changed = Self::render_action_button_state_editor(
+            ui,
+            "action_button_open",
+            &mut self.config.action_button.rocket_league_open,
+        );
+        if closed_changed || open_changed {
+            self.save_config();
+        }
+    }
+
     fn render_settings_tab(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.selectable_value(
@@ -3533,6 +3970,11 @@ impl HebnixApp {
                             HebnixSettingsTab::Discord,
                             "Discord",
                         );
+                        ui.selectable_value(
+                            &mut self.hebnix_settings_tab,
+                            HebnixSettingsTab::ActionButton,
+                            "Action Button",
+                        );
                     });
             });
 
@@ -3547,6 +3989,7 @@ impl HebnixApp {
                         HebnixSettingsTab::Interface => "Interface Configuration",
                         HebnixSettingsTab::Directories => "Directories & Files Configuration",
                         HebnixSettingsTab::Discord => "Discord",
+                        HebnixSettingsTab::ActionButton => "Action Button",
                         HebnixSettingsTab::System => "System Configuration",
                     });
                     ui.add_space(8.0);
@@ -3932,6 +4375,10 @@ impl HebnixApp {
                             }
                         }
 
+                        HebnixSettingsTab::ActionButton => {
+                            self.render_action_button_settings(ui);
+                        }
+
                         HebnixSettingsTab::System => {
                             ui.horizontal(|ui| {
                                 ui.add_sized([130.0, 20.0], egui::Label::new("Start with Windows:"));
@@ -4026,6 +4473,22 @@ impl HebnixApp {
                                     self.spoofer_mgr.shutdown();
                                 }
                             }
+                            ui.add_space(8.0);
+                            ui.horizontal(|ui| {
+                                ui.add_sized([130.0, 20.0], egui::Label::new("Default Tab:"));
+                                let mut selected = Tab::from_label(&self.config.settings.default_tab);
+                                egui::ComboBox::from_id_salt("default_tab")
+                                    .selected_text(selected.label())
+                                    .show_ui(ui, |ui| {
+                                        for tab in Tab::ALL {
+                                            ui.selectable_value(&mut selected, tab, tab.label());
+                                        }
+                                    });
+                                if self.config.settings.default_tab != selected.label() {
+                                    self.config.settings.default_tab = selected.label().to_string();
+                                    self.save_config();
+                                }
+                            });
                         }
                     }
                 });
@@ -4134,9 +4597,11 @@ impl HebnixApp {
             ui.heading("Hebnix");
             ui.add_space(10.0);
             ui.label(format!(
-                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League with integrated Spoofer & Item Changer.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide window.",
+                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League with integrated Spoofer & Item Changer.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide Hebnix.",
                 self.config.settings.hotkey.to_uppercase()
             ));
+            ui.separator();
+            ui.label("Built with help from the community\nContributors:\nxplodingeggo");
         });
     }
 
@@ -4274,9 +4739,9 @@ impl HebnixApp {
                 Ok(()) => {
                     crate::spoofer::hosts::flush_dns();
                     self.console.write(
-                        "[Item Spawner] Disabled. Hebnix hosts redirects removed and DNS flushed."
+                        "[Item Spawner] Disabled. Hebnix hosts redirects removed and DNS flushed.",
                     );
-                },
+                }
                 Err(error) => self.console.write(format!(
                     "[Item Spawner] Disabled, but hosts cleanup failed: {error}"
                 )),
@@ -4286,7 +4751,8 @@ impl HebnixApp {
 
     fn enable_item_spawner(&mut self) {
         if hebnix_sdk::process::is_rocket_league_running() {
-            self.console.write("[Item Spawner] Close Rocket League before enabling Item Spawner.");
+            self.console
+                .write("[Item Spawner] Close Rocket League before enabling Item Spawner.");
             return;
         }
         if !spoofer::is_admin() {
@@ -4302,7 +4768,8 @@ impl HebnixApp {
                 self.evaluate_proxies();
                 if self.spoofer_mgr.socket_running() {
                     self.spawn_restart_pending = true;
-                    self.console.write("[Item Spawner] Enabled. Start Rocket League to use Item Spawner.");
+                    self.console
+                        .write("[Item Spawner] Enabled. Start Rocket League to use Item Spawner.");
                 } else {
                     self.disable_item_spawner();
                     self.console.write("[Item Spawner] Could not start the PsyNet proxy. Check the Spoofer settings and certificate.");
@@ -4310,25 +4777,33 @@ impl HebnixApp {
             }
             Err(error) => {
                 self.item_spawner_enabled = false;
-                self.console.write(format!("[Item Spawner] Could not enable: {error}"));
+                self.console
+                    .write(format!("[Item Spawner] Could not enable: {error}"));
             }
         }
     }
 
     fn render_spawner_enable_prompt(&mut self, ctx: &egui::Context) {
-        if !self.spawner_enable_prompt_open { return; }
+        if !self.spawner_enable_prompt_open {
+            return;
+        }
         let mut enable = false;
         let mut cancel = false;
         egui::Window::new("Read the Item Spawner tutorial")
-            .collapsible(false).resizable(false)
+            .collapsible(false)
+            .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.label("Read the Tutorial tab before enabling Item Spawner.");
                 ui.label("Rocket League must be closed first. Item spawning is temporary.");
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Continue").clicked() { enable = true; }
-                    if ui.button("Cancel").clicked() { cancel = true; }
+                    if ui.button("Continue").clicked() {
+                        enable = true;
+                    }
+                    if ui.button("Cancel").clicked() {
+                        cancel = true;
+                    }
                 });
             });
         if enable {
@@ -4398,7 +4873,8 @@ impl HebnixApp {
             self.owned_admin_requested = false;
             self.spawner_admin_requested = false;
             self.disable_item_spawner();
-            self.console.write("[Item Spawner] Disabled because Administrator access was declined.");
+            self.console
+                .write("[Item Spawner] Disabled because Administrator access was declined.");
         }
     }
 
@@ -5633,7 +6109,9 @@ impl Drop for HebnixApp {
         if !crate::watchdog::has_live_handoff()
             && !crate::watchdog::handoff_live_spoofer(Arc::clone(&self.spoofer_mgr))
         {
-            if self.item_spawner_enabled { self.disable_item_spawner(); }
+            if self.item_spawner_enabled {
+                self.disable_item_spawner();
+            }
             self.spoofer_mgr.shutdown();
         }
         self.workshop.suspend_multiplayer();
@@ -5725,7 +6203,7 @@ impl eframe::App for HebnixApp {
                     ui.selectable_value(&mut self.tab, Tab::Patcher, "Items");
                     ui.selectable_value(&mut self.tab, Tab::Settings, "Settings");
                     ui.selectable_value(&mut self.tab, Tab::Plugins, "Plugins");
-                    ui.selectable_value(&mut self.tab, Tab::RlApi, "RLAPI");
+                    ui.selectable_value(&mut self.tab, Tab::RlApi, "Experimental");
                     ui.selectable_value(&mut self.tab, Tab::About, "About");
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -5735,49 +6213,7 @@ impl eframe::App for HebnixApp {
                                 .size(12.0)
                                 .color(self.status_color),
                         );
-                        let running = self.last_rl_open;
-                        let label = if running {
-                            "Restart Rocket League"
-                        } else {
-                            "Start Rocket League"
-                        };
-                        if ui.button(label).clicked() {
-                            let path = self.config.settings.rl_path.clone();
-                            if !self.config.settings.rl_path_confirmed
-                                || path.trim().is_empty()
-                                || !std::path::Path::new(&path).is_dir()
-                            {
-                                self.launch_path_notice = true;
-                            } else {
-                                let tx = self.tx.clone();
-                                let rl_launch = self.config.rl_launch.clone();
-                                std::thread::spawn(move || {
-                                    let result = if running {
-                                        crate::winutil::restart_rocket_league(
-                                            &rl_launch,
-                                            std::path::Path::new(&path),
-                                        )
-                                    } else {
-                                        crate::winutil::start_rocket_league(
-                                            &rl_launch,
-                                            std::path::Path::new(&path),
-                                        )
-                                    };
-                                    let action = if running { "restart" } else { "start" };
-                                    let message = match result {
-                                        Ok(()) => format!(
-                                            "[Core] Rocket League {} requested.",
-                                            action
-                                        ),
-                                        Err(error) => format!(
-                                            "[Core] Rocket League {} failed: {}",
-                                            action, error
-                                        ),
-                                    };
-                                    let _ = tx.send(AppMsg::Log(message));
-                                });
-                            }
-                        }
+                        self.render_action_button(ui);
                     });
                 });
                 ui.separator();
@@ -5930,7 +6366,8 @@ impl eframe::App for HebnixApp {
                             .show(ui, |ui| {
                                 let catalog_required = matches!(
                                     self.patcher_subtab,
-                                    PatcherSubTab::Decal | PatcherSubTab::Swapper(_)
+                                    PatcherSubTab::Decal
+                                        | PatcherSubTab::Swapper(_)
                                 );
                                 if self.catalogs_loading {
                                     ui.horizontal(|ui| {
@@ -6023,7 +6460,8 @@ impl eframe::App for HebnixApp {
                                     let active_count = swap_count
                                         + usize::from(self.patcher_ball.active_ball.is_some())
                                         + usize::from(self.patcher_boost.active_boost.is_some())
-                                        + self.patcher_decal.active_decals.len();
+                                        + self.patcher_decal.active_decals.len()
+                                        + self.patcher_car.active_cars.len();
                                     ui.horizontal(|ui| {
                                         ui.label(format!("{active_count} active change(s)"));
                                         ui.with_layout(
@@ -6059,6 +6497,18 @@ impl eframe::App for HebnixApp {
                                                             &self.tx,
                                                             ctx,
                                                         );
+                                                    }
+                                                    if !self.patcher_car.active_cars.is_empty() {
+                                                        if let Err(error) = self.patcher_car.restore_all(
+                                                            &cooked_pc,
+                                                            &backups_dir,
+                                                            &self.tx,
+                                                            &mut self.config,
+                                                        ) {
+                                                            let _ = self.tx.send(AppMsg::Log(format!(
+                                                                "[Cars] Restore failed: {error}"
+                                                            )));
+                                                        }
                                                     }
                                                     match self.swapper.restore_all_active(
                                                         &cooked_pc,
@@ -6199,6 +6649,37 @@ impl eframe::App for HebnixApp {
                                             &car, &skin, &cooked_pc, &backups_dir, &self.tx, ctx,
                                         );
                                     }
+                                    let active_cars = self
+                                        .patcher_car
+                                        .active_cars
+                                        .iter()
+                                        .map(|(target, name)| (target.clone(), name.clone()))
+                                        .collect::<Vec<_>>();
+                                    let mut restore_car = None;
+                                    for (target, name) in active_cars {
+                                        ui.horizontal(|ui| {
+                                            ui.vertical(|ui| {
+                                                ui.strong(&name);
+                                                ui.weak(format!("Replaced {target} for its BodyID car"));
+                                            });
+                                            if ui.button("Restore").clicked() {
+                                                restore_car = Some(target.clone());
+                                            }
+                                        });
+                                    }
+                                    if let Some(target) = restore_car {
+                                        if let Err(error) = self.patcher_car.restore(
+                                            &target,
+                                            &cooked_pc,
+                                            &backups_dir,
+                                            &self.tx,
+                                            &mut self.config,
+                                        ) {
+                                            let _ = self.tx.send(AppMsg::Log(format!(
+                                                "[Cars] Restore failed: {error}"
+                                            )));
+                                        }
+                                    }
                                     self.swapper.render_active_swaps(
                                         ui, &cooked_pc, &backups_dir, &self.tx,
                                     );
@@ -6240,7 +6721,106 @@ impl eframe::App for HebnixApp {
 
                     Tab::Settings => self.render_settings_tab(ui),
                     Tab::Plugins => self.render_plugins_tab(ui),
-                    Tab::RlApi => self.render_rlapi_tab(ui),
+                    Tab::RlApi => {
+                        let cooked_pc = PathBuf::from(&self.config.settings.rl_path)
+                            .join("TAGame")
+                            .join("CookedPCConsole");
+                        let backups_dir = cooked_pc.join("Backups");
+
+                        egui::Panel::left("experimental_list")
+                            .resizable(false)
+                            .exact_size(150.0)
+                            .show(ui, |ui| {
+                                egui::ScrollArea::vertical()
+                                    .id_salt("experimental_subtabs")
+                                    .show(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut self.experimental_subtab,
+                                            ExperimentalSubTab::RlApi,
+                                            "RLAPI",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.experimental_subtab,
+                                            ExperimentalSubTab::BallAppearance,
+                                            "Ball Appearance",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.experimental_subtab,
+                                            ExperimentalSubTab::CarPatcher,
+                                            "Car Patcher",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.experimental_subtab,
+                                            ExperimentalSubTab::WheelAlignment,
+                                            "Wheel Alignment",
+                                        );
+                                    });
+                            });
+
+                        egui::CentralPanel::default()
+                            .frame(egui::Frame::new())
+                            .show(ui, |ui| match self.experimental_subtab {
+                                ExperimentalSubTab::WheelAlignment => {
+                                    if self.catalogs_loading { ui.spinner(); }
+                                    if let Some(error) = &self.catalogs_error { ui.label(error); }
+                                    self.wheel_alignment.render(ui, &cooked_pc);
+                                }
+                                ExperimentalSubTab::RlApi => self.render_rlapi_tab(ui),
+                                ExperimentalSubTab::BallAppearance => {
+                                    self.colours.poll();
+                                    if let Some(action) =
+                                        self.colours.render_ball_appearance(ui, &backups_dir)
+                                    {
+                                        if crate::messages::block_item_action_if_game_running(
+                                            &self.tx,
+                                        ) {
+                                            self.console.write(
+                                                "[Colours] Close Rocket League before changing game files.",
+                                            );
+                                        } else if !spoofer::is_admin()
+                                            && crate::patcher::colours::needs_admin(&cooked_pc)
+                                        {
+                                            self.colour_admin_prompt_open = true;
+                                        } else {
+                                            self.colours.begin(
+                                                action,
+                                                &cooked_pc,
+                                                &backups_dir,
+                                                &self.tx,
+                                                ctx,
+                                            );
+                                        }
+                                    }
+                                }
+                                ExperimentalSubTab::CarPatcher => {
+                                    if self.catalogs_loading {
+                                        ui.horizontal(|ui| {
+                                            ui.spinner();
+                                            ui.label("Loading item catalogs...");
+                                        });
+                                    }
+                                    if let Some(error) = self.catalogs_error.clone() {
+                                        ui.colored_label(
+                                            egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
+                                            format!("Catalog download failed: {error}"),
+                                        );
+                                        if ui.button("Reload Catalogs").clicked() {
+                                            self.reload_catalogs(ctx);
+                                        }
+                                    }
+                                    if self.catalogs_loaded {
+                                        self.patcher_car.render_tab(
+                                            ui,
+                                            ctx,
+                                            &cooked_pc,
+                                            &backups_dir,
+                                            &self.tx,
+                                            &mut self.config,
+                                        );
+                                    }
+                                }
+                            });
+                    }
                     Tab::About => self.render_about_tab(ui),
                 }
             });

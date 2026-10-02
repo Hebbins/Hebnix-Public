@@ -11,11 +11,16 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 fn is_ball_backup(name: &str) -> bool {
-    name.strip_suffix(".bak").is_some_and(crate::patcher::patch_core::gameinfo::is_ball_upk)
+    name.strip_suffix(".bak")
+        .is_some_and(crate::patcher::patch_core::gameinfo::is_ball_upk)
         || crate::patcher::patch_core::standard_ball::is_ball_tfc_backup(name)
-        || matches!(name,
-            "Textures2.tfc_3164923583.bin" | "Textures2.tfc_3165101623.bin"
-            | "Textures2.tfc_3165152057.bin" | "Textures2.tfc_3165166143.bin")
+        || matches!(
+            name,
+            "Textures2.tfc_3164923583.bin"
+                | "Textures2.tfc_3165101623.bin"
+                | "Textures2.tfc_3165152057.bin"
+                | "Textures2.tfc_3165166143.bin"
+        )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,7 +203,10 @@ impl PatcherState {
 
         std::thread::spawn(move || {
             if let Err(error) = crate::patcher::backup_guard::check(
-                &cooked_pc_clone, &backups_dir_clone, "ball-build.sha256", is_ball_backup,
+                &cooked_pc_clone,
+                &backups_dir_clone,
+                "ball-build.sha256",
+                is_ball_backup,
             ) {
                 let _ = local_tx.send(PatcherOp::Error(error));
                 ctx_clone.request_repaint();
@@ -409,7 +417,10 @@ impl PatcherState {
                     &cooked_clone.to_string_lossy(),
                 )?;
                 crate::patcher::backup_guard::prepare(
-                    &cooked_clone, &backups_clone, "ball-build.sha256", is_ball_backup,
+                    &cooked_clone,
+                    &backups_clone,
+                    "ball-build.sha256",
+                    is_ball_backup,
                 )?;
                 // Legacy mutator texture writes lack compatible offsets and restore coverage.
                 crate::patch_core::standard_ball::patch_standard_tfcs(
@@ -423,7 +434,9 @@ impl PatcherState {
                     &img_bytes,
                 )?;
                 if patched_packages == 0 {
-                    return Err("No matching inline ball mips were found in the current packages.".into());
+                    return Err(
+                        "No matching inline ball mips were found in the current packages.".into(),
+                    );
                 }
                 Ok(())
             }));

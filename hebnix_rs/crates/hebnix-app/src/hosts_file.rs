@@ -34,8 +34,8 @@ pub fn set_redirects(hosts: &[&str]) -> Result<(), String> {
 
     let out = with_redirects(&content, hosts);
     write(&path, &out)?;
-    let verified = std::fs::read_to_string(&path)
-        .map_err(|e| format!("cant verify hosts redirects: {e}"))?;
+    let verified =
+        std::fs::read_to_string(&path).map_err(|e| format!("cant verify hosts redirects: {e}"))?;
     if !redirects_match(&verified, hosts) {
         return Err("Hebnix hosts redirects did not match the requested hosts".into());
     }
@@ -49,7 +49,8 @@ fn redirects_match(content: &str, hosts: &[&str]) -> bool {
         && hosts.iter().all(|host| {
             ours.iter()
                 .filter(|line| line.trim().eq_ignore_ascii_case(&line_for(host)))
-                .count() == 1
+                .count()
+                == 1
         })
 }
 
@@ -71,8 +72,8 @@ pub fn clear() -> Result<(), String> {
 
     let out = without_redirects(&content);
     write(&path, &out)?;
-    let verified = std::fs::read_to_string(&path)
-        .map_err(|e| format!("cant verify hosts cleanup: {e}"))?;
+    let verified =
+        std::fs::read_to_string(&path).map_err(|e| format!("cant verify hosts cleanup: {e}"))?;
     if verified.lines().any(is_ours) {
         return Err("Hebnix redirects remain in the hosts file after cleanup".into());
     }
@@ -81,12 +82,17 @@ pub fn clear() -> Result<(), String> {
 }
 
 fn is_ours(line: &str) -> bool {
-    let Some((mapping, comment)) = line.rsplit_once('#') else { return false };
+    let Some((mapping, comment)) = line.rsplit_once('#') else {
+        return false;
+    };
     let mut fields = mapping.split_whitespace();
     if fields.next() != Some("127.0.0.1") || fields.next().is_none() {
         return false;
     }
-    matches!(comment.trim().to_ascii_lowercase().as_str(), "hebnix spoofer" | "hebnix")
+    matches!(
+        comment.trim().to_ascii_lowercase().as_str(),
+        "hebnix spoofer" | "hebnix"
+    )
 }
 
 fn without_redirects(content: &str) -> String {
@@ -98,7 +104,11 @@ fn without_redirects(content: &str) -> String {
 
 fn with_redirects(content: &str, hosts: &[&str]) -> String {
     let mut out = without_redirects(content);
-    let newline = if content.contains("\r\n") { "\r\n" } else { "\n" };
+    let newline = if content.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
     if !out.is_empty() && !out.ends_with('\n') {
         out.push_str(newline);
     }
@@ -142,22 +152,41 @@ mod tests {
     #[test]
     fn redirects_match_only_exact_unique_entries() {
         let hosts = ["api.epicgames.dev", "config.psynet.gg"];
-        let content = format!("# user line\r\n{}\r\n{}\r\n",
-            line_for(hosts[0]), line_for(hosts[1]));
+        let content = format!(
+            "# user line\r\n{}\r\n{}\r\n",
+            line_for(hosts[0]),
+            line_for(hosts[1])
+        );
         assert!(redirects_match(&content, &hosts));
-        assert!(!redirects_match(&(content.clone() + &line_for(hosts[0])), &hosts));
+        assert!(!redirects_match(
+            &(content.clone() + &line_for(hosts[0])),
+            &hosts
+        ));
         assert!(!redirects_match(&content, &hosts[..1]));
-        assert!(!redirects_match("127.0.0.1 api.epicgames.dev #hebnix", &hosts[..1]));
+        assert!(!redirects_match(
+            "127.0.0.1 api.epicgames.dev #hebnix",
+            &hosts[..1]
+        ));
     }
 
     #[test]
     fn cleanup_preserves_other_hosts_and_line_endings() {
         let original = "# personal\n127.0.0.1 localhost\n127.0.0.1 config.psynet.gg # hebnix spoofer\n# trailing note\n";
-        assert_eq!(without_redirects(original), "# personal\n127.0.0.1 localhost\n# trailing note\n");
-        assert_eq!(with_redirects(original, &["config.psynet.gg"]), "# personal\n127.0.0.1 localhost\n# trailing note\n127.0.0.1 config.psynet.gg # hebnix spoofer\n");
+        assert_eq!(
+            without_redirects(original),
+            "# personal\n127.0.0.1 localhost\n# trailing note\n"
+        );
+        assert_eq!(
+            with_redirects(original, &["config.psynet.gg"]),
+            "# personal\n127.0.0.1 localhost\n# trailing note\n127.0.0.1 config.psynet.gg # hebnix spoofer\n"
+        );
 
-        let windows = "127.0.0.1 other.example # user\r\n127.0.0.1 config.psynet.gg # hebnix spoofer\r\n";
-        assert_eq!(without_redirects(windows), "127.0.0.1 other.example # user\r\n");
+        let windows =
+            "127.0.0.1 other.example # user\r\n127.0.0.1 config.psynet.gg # hebnix spoofer\r\n";
+        assert_eq!(
+            without_redirects(windows),
+            "127.0.0.1 other.example # user\r\n"
+        );
         assert_eq!(with_redirects(windows, &["config.psynet.gg"]), windows);
         assert!(!is_ours("127.0.0.1 other.example # hebnix notes"));
     }

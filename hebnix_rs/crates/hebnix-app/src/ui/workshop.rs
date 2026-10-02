@@ -1097,7 +1097,14 @@ impl WorkshopState {
                         ui.add_space(8.0);
                         ui.strong(format!("Hosting PIN: {pin}"));
                         ui.label("This session refreshes every five minutes.");
-                        ui.small(self.multiplayer.hosted.as_ref().unwrap().reachability.summary());
+                        ui.small(
+                            self.multiplayer
+                                .hosted
+                                .as_ref()
+                                .unwrap()
+                                .reachability
+                                .summary(),
+                        );
                         let stats = &self.multiplayer.hosted.as_ref().unwrap().stats;
                         ui.small(format!(
                             "Tunnel: {} · sent {} · received {} · delivered {}",

@@ -2258,9 +2258,11 @@ impl LiteApp {
             ui.heading("Hebnix Lite");
             ui.add_space(10.0);
             ui.label(format!(
-                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide window.",
+                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide Hebnix Lite.",
                 self.config.settings.hotkey.to_uppercase()
             ));
+            ui.separator();
+            ui.label("Built with help from the community\nContributors:\nxplodingeggo");
         });
     }
 

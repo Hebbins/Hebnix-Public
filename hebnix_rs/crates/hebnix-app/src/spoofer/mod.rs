@@ -19,7 +19,7 @@ use crossbeam_channel::Sender;
 
 use crate::messages::AppMsg;
 use crate::spoofer::rules::{
-    NameRule, OwnedProductsRule, Rule, TITLE_HOST, TitleRule, TitleSettings,
+    NameRule, OwnedProductsRule, Rule, TITLE_HOST, TitleRule, TitleSettings, TitleSpoofSettings,
 };
 use crate::spoofer::skill_bridge::SkillBridge;
 use crate::spoofer::socket::SocketProxy;
@@ -267,7 +267,8 @@ impl SpooferManager {
 
     pub fn rlapi_running(&self) -> bool {
         let session = hebnix_sdk::rlapi::session::shared_game_session();
-        session.enabled() || session.has_connection()
+        session.enabled()
+            || session.has_connection()
             || (self.rlapi_retained.load(Ordering::Acquire)
                 && hebnix_sdk::process::is_rocket_league_running())
     }
@@ -275,7 +276,9 @@ impl SpooferManager {
     fn redirect_hosts(&self) -> &'static [&'static str] {
         if self.http_active.load(Ordering::Relaxed) || self.socket_active.load(Ordering::Relaxed) {
             &REDIRECT_HOSTS
-        } else { &[TITLE_HOST] }
+        } else {
+            &[TITLE_HOST]
+        }
     }
 
     pub fn enable_rlapi(&self) -> Result<(), String> {
@@ -284,7 +287,9 @@ impl SpooferManager {
         }
         let session = hebnix_sdk::rlapi::session::shared_game_session();
         session.set_enabled(true);
-        let result = self.start_skill_bridge().and_then(|_| self.ensure_reverse_proxy());
+        let result = self
+            .start_skill_bridge()
+            .and_then(|_| self.ensure_reverse_proxy());
         if let Err(error) = result {
             session.set_enabled(false);
             self.stop_skill_bridge();
@@ -305,7 +310,9 @@ impl SpooferManager {
     pub fn cleanup_idle_rlapi(&self) {
         if !self.rlapi_running() {
             self.stop_reverse_if_unused();
-            if !self.http_active.load(Ordering::Relaxed) && !self.socket_active.load(Ordering::Relaxed) {
+            if !self.http_active.load(Ordering::Relaxed)
+                && !self.socket_active.load(Ordering::Relaxed)
+            {
                 self.stop_skill_bridge();
             }
             self.maybe_stop_crl();
@@ -395,7 +402,9 @@ impl SpooferManager {
     }
 
     fn stop_skill_bridge(&self) {
-        if self.rlapi_running() { return; }
+        if self.rlapi_running() {
+            return;
+        }
         if let Ok(mut slot) = self.skill_bridge.lock() {
             if let Some(bridge) = slot.take() {
                 bridge.stop();
@@ -447,23 +456,24 @@ impl SpooferManager {
         self.maybe_stop_crl();
     }
 
-    pub fn set_title(&self, text: &str) {
+    pub fn set_titles(&self, titles: Vec<TitleSpoofSettings>) {
         if let Ok(mut settings) = self.title_settings.lock() {
-            settings.text = text.chars().take(64).collect();
+            let mut normalized: Vec<TitleSpoofSettings> = titles
+                .into_iter()
+                .filter_map(|mut title| {
+                    title.text = title.text.trim().chars().take(64).collect();
+                    (!title.text.is_empty()).then_some(title)
+                })
+                .collect();
+            let mut seen = HashSet::new();
+            normalized.retain(|title| seen.insert(title.target_id.clone()));
+            settings.titles = normalized;
         }
     }
 
     pub fn set_title_enabled(&self, enabled: bool) {
         if let Ok(mut settings) = self.title_settings.lock() {
             settings.enabled = enabled;
-        }
-    }
-
-    pub fn set_title_options(&self, color: String, glow: bool, target_id: Option<String>) {
-        if let Ok(mut settings) = self.title_settings.lock() {
-            settings.color = color;
-            settings.glow = glow;
-            settings.target_id = target_id;
         }
     }
 
@@ -501,7 +511,9 @@ impl SpooferManager {
             .map_err(|e| e.to_string())?
             .as_secs() as i64;
         let (message, instance_ids) = crate::item_spawning::reward_message(request, psy_time)?;
-        self.spawned_items.record(&instance_ids).map_err(|error| format!("Could not track spawned item: {error}"))?;
+        self.spawned_items
+            .record(&instance_ids)
+            .map_err(|error| format!("Could not track spawned item: {error}"))?;
         let slot = self
             .skill_bridge
             .lock()
@@ -512,7 +524,11 @@ impl SpooferManager {
     }
 
     pub fn item_spawner_websocket_connected(&self) -> bool {
-        self.skill_bridge.lock().ok().and_then(|slot| slot.as_ref().map(SkillBridge::is_connected)).unwrap_or(false)
+        self.skill_bridge
+            .lock()
+            .ok()
+            .and_then(|slot| slot.as_ref().map(SkillBridge::is_connected))
+            .unwrap_or(false)
     }
 
     pub fn stop_socket(&self) {
@@ -544,7 +560,10 @@ impl SpooferManager {
         for host in REDIRECT_HOSTS {
             real_ips.insert(host.to_string(), dns::resolve_a(host)?);
         }
-        real_ips.insert("api.rlpp.psynet.gg".to_string(), dns::resolve_a("api.rlpp.psynet.gg")?);
+        real_ips.insert(
+            "api.rlpp.psynet.gg".to_string(),
+            dns::resolve_a("api.rlpp.psynet.gg")?,
+        );
         let spoof_rules: Vec<Box<dyn Rule>> = vec![
             Box::new(NameRule::new(Arc::clone(&self.spoofed_name))),
             Box::new(crate::spoofer::rules::FriendsRule::new(
@@ -561,11 +580,16 @@ impl SpooferManager {
                 Arc::clone(&self.item_spawner_enabled),
             )),
         ];
-        let mut rules: Vec<Box<dyn Rule>> = spoof_rules.into_iter().map(|rule| {
-            Box::new(crate::spoofer::rules::EnabledRule {
-                inner: rule, http: Arc::clone(&self.http_active), socket: Arc::clone(&self.socket_active),
-            }) as Box<dyn Rule>
-        }).collect();
+        let mut rules: Vec<Box<dyn Rule>> = spoof_rules
+            .into_iter()
+            .map(|rule| {
+                Box::new(crate::spoofer::rules::EnabledRule {
+                    inner: rule,
+                    http: Arc::clone(&self.http_active),
+                    socket: Arc::clone(&self.socket_active),
+                }) as Box<dyn Rule>
+            })
+            .collect();
         rules.push(Box::new(crate::spoofer::rules::RlApiRouteRule));
         let rules = Arc::new(rules);
         self.ensure_crl(&ca);
@@ -588,7 +612,10 @@ impl SpooferManager {
     }
 
     fn stop_reverse_if_unused(&self) {
-        if self.http_active.load(Ordering::Relaxed) || self.socket_active.load(Ordering::Relaxed) || self.rlapi_running() {
+        if self.http_active.load(Ordering::Relaxed)
+            || self.socket_active.load(Ordering::Relaxed)
+            || self.rlapi_running()
+        {
             return;
         }
         if let Err(error) = hosts::clear() {

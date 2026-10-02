@@ -336,7 +336,11 @@ struct Bits<'a> {
 
 impl<'a> Bits<'a> {
     fn new(b: &'a [u8], at: usize) -> Self {
-        Self { b, byte: at, bit: 0 }
+        Self {
+            b,
+            byte: at,
+            bit: 0,
+        }
     }
     fn ub(&mut self, n: u32) -> u32 {
         let mut v = 0u32;
@@ -767,7 +771,14 @@ fn build_ttf(f: &Font3, family: &str) -> Vec<u8> {
         }
         glyf.extend_from_slice(&body);
         loca.push(glyf.len() as u32);
-        advances.push(f.advances.get(i).copied().unwrap_or(0).div_euclid(SCALE).max(0));
+        advances.push(
+            f.advances
+                .get(i)
+                .copied()
+                .unwrap_or(0)
+                .div_euclid(SCALE)
+                .max(0),
+        );
     }
     if bbox[0] > bbox[2] {
         bbox = [0, 0, 0, 0];
@@ -856,7 +867,11 @@ fn build_ttf(f: &Font3, family: &str) -> Vec<u8> {
     os2.extend_from_slice(&beu16(0x0040));
     os2.extend_from_slice(&beu16(map.first().map(|e| e.0 as u32).unwrap_or(32)));
     os2.extend_from_slice(&beu16(
-        map.iter().map(|e| e.0 as u32).max().unwrap_or(126).min(0xFFFF),
+        map.iter()
+            .map(|e| e.0 as u32)
+            .max()
+            .unwrap_or(126)
+            .min(0xFFFF),
     ));
     os2.extend_from_slice(&be16(asc));
     os2.extend_from_slice(&be16(-desc));
@@ -974,9 +989,15 @@ mod tests {
         assert_eq!(&ttf[0..4], &[0x00, 0x01, 0x00, 0x00], "sfnt version");
         let count = u16::from_be_bytes([ttf[4], ttf[5]]) as usize;
         assert_eq!(count, 10, "ten tables");
-        let tags: Vec<&[u8]> = (0..count).map(|i| &ttf[12 + i * 16..12 + i * 16 + 4]).collect();
+        let tags: Vec<&[u8]> = (0..count)
+            .map(|i| &ttf[12 + i * 16..12 + i * 16 + 4])
+            .collect();
         for want in [&b"glyf"[..], b"head", b"cmap", b"hmtx", b"loca", b"maxp"] {
-            assert!(tags.contains(&want), "missing {:?}", std::str::from_utf8(want));
+            assert!(
+                tags.contains(&want),
+                "missing {:?}",
+                std::str::from_utf8(want)
+            );
         }
     }
 
@@ -996,7 +1017,13 @@ mod tests {
         let ids: Vec<&str> = fonts.iter().map(|f| f.id).collect();
         let faces: Vec<&str> = fonts.iter().map(|f| f.face.as_str()).collect();
         println!("dumped to {} -> {ids:?} from {faces:?}", dump.display());
-        for want in ["rl-header", "rl-digits", "rl-body", "rl-body-bold", "rl-header-thin"] {
+        for want in [
+            "rl-header",
+            "rl-digits",
+            "rl-body",
+            "rl-body-bold",
+            "rl-header-thin",
+        ] {
             assert!(ids.contains(&want), "missing {want} in {ids:?}");
         }
     }
