@@ -718,6 +718,9 @@ struct MultiplayerState {
     pending_peer_install: Option<(SlotMap, IpAddr, bool)>,
     /// the warning was accepted once this session, don't ask again
     peer_warning_accepted: bool,
+    /// Back was pressed while the tailnet was still starting; the finished
+    /// connection gets dropped instead of kept
+    abandon_tailnet: bool,
     /// search text for the player list
     player_filter: String,
     /// route everything through tailscale's relays so other players never
@@ -778,6 +781,7 @@ impl Default for MultiplayerState {
             pending_peer_install: None,
             peer_warning_accepted: false,
             player_filter: String::new(),
+            abandon_tailnet: false,
             relay_only: false,
             sidecar: None,
             tailnet_requested: false,
@@ -1283,7 +1287,7 @@ impl WorkshopState {
         }
         ui.horizontal(|ui| {
             if self.multiplayer.relay.is_none() && ui.button(t("multiplayer-back")).clicked() {
-                self.multiplayer.wizard_started = false;
+                self.leave_multiplayer_setup();
                 return;
             }
             ui.strong(t("multiplayer-workshop-multiplayer"));
@@ -1456,12 +1460,50 @@ impl WorkshopState {
         }
     }
 
+    /// Back before the relay is running: take down everything the Connect
+    /// button set up (the tailnet, the Hebnix tailscale service, the Rocket
+    /// League multihome setting, firewall rules) instead of leaving it up
+    /// until Hebnix closes.
+    fn leave_multiplayer_setup(&mut self) {
+        self.multiplayer.wizard_started = false;
+        self.multiplayer.pending_peer_install = None;
+        self.multiplayer.setup_progress = None;
+        self.multiplayer.tailnet_ip = None;
+        self.multiplayer.launch_ready = false;
+        self.multiplayer.launching_rocket_league = false;
+        self.multiplayer.multihome_check_attempts = 0;
+        self.multiplayer.multihome_check_in_flight = false;
+        self.multiplayer.status =
+            t("default-connect-then-host-or-join-inside").to_string();
+        let sidecar = self.multiplayer.sidecar.take();
+        if sidecar.is_none() && self.multiplayer.tailnet_requested {
+            // still starting up in the background, so there's nothing to drop
+            // yet: throw it away the moment it reports in (Connect again
+            // before then just keeps it, see start_tailnet)
+            self.multiplayer.abandon_tailnet = true;
+        } else {
+            self.multiplayer.tailnet_requested = false;
+        }
+        // dropping the handle brings the tailnet down and stops the service,
+        // and the cleanup runs external commands, so none of it on the ui thread
+        std::thread::Builder::new()
+            .name("workshop-leave".into())
+            .spawn(move || {
+                drop(sidecar);
+                let _ = crate::winutil::clear_rocket_league_multihome();
+                let _ = crate::multiplayer_lan::cleanup_system_state();
+            })
+            .ok();
+    }
+
     /// Spawns (or reuses) the tsnet sidecar and brings the tailnet up. This
     /// happens as soon as the user picks Host/Join, before Rocket League is
     /// touched at all, so the multihome address is known up front instead
     /// of being discovered after a launch-and-detect cycle.
     fn start_tailnet(&mut self, tx: &Sender<AppMsg>, ctx: &eframe::egui::Context) {
         if self.multiplayer.tailnet_requested {
+            // came back before an abandoned startup finished: keep it
+            self.multiplayer.abandon_tailnet = false;
             return;
         }
         self.multiplayer.tailnet_requested = true;
@@ -1507,10 +1549,27 @@ impl WorkshopState {
 
     pub fn finish_tailnet_started(&mut self, result: Result<Arc<TsnetSidecarHandle>, String>) {
         match result {
+            Ok(sidecar) if self.multiplayer.abandon_tailnet => {
+                // the player left the screen while this was starting
+                self.multiplayer.abandon_tailnet = false;
+                self.multiplayer.tailnet_requested = false;
+                std::thread::Builder::new()
+                    .name("workshop-leave".into())
+                    .spawn(move || {
+                        drop(sidecar);
+                        let _ = crate::winutil::clear_rocket_league_multihome();
+                        let _ = crate::multiplayer_lan::cleanup_system_state();
+                    })
+                    .ok();
+            }
             Ok(sidecar) => {
                 self.multiplayer.sidecar = Some(sidecar);
                 self.multiplayer.status =
                     t("finish-tailnet-started-connected-to-the-private-workshop-networ").to_string();
+            }
+            Err(_) if self.multiplayer.abandon_tailnet => {
+                self.multiplayer.abandon_tailnet = false;
+                self.multiplayer.tailnet_requested = false;
             }
             Err(error) => {
                 self.multiplayer.tailnet_requested = false;
@@ -1523,12 +1582,19 @@ impl WorkshopState {
     /// called from AppMsg::TsnetUpResult once the sidecar actually finishes
     /// authenticating and reports a tailnet address
     pub fn set_tailnet_ip(&mut self, tailnet_ip: String) {
+        // a late answer from a connection the player already backed out of
+        if !self.multiplayer.wizard_started {
+            return;
+        }
         self.multiplayer.tailnet_ip = Some(tailnet_ip);
         self.multiplayer.status =
             t("set-tailnet-ip-ready-on-the-private-workshop-network").to_string();
     }
 
     pub fn tailnet_failed(&mut self, error: String) {
+        if !self.multiplayer.wizard_started {
+            return;
+        }
         self.multiplayer.tailnet_requested = false;
         self.multiplayer.status =
             format!("The Workshop network connection failed: {}", redact(&error));
