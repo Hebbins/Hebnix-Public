@@ -13,6 +13,7 @@ use hebnix_sdk::stats::StatsClient;
 
 use crate::config::{ActionButtonAction, ActionButtonEntry, Config};
 use crate::hotkey::ToggleHotkey;
+use crate::i18n::{t, t_args, t_n};
 use crate::messages::AppMsg;
 use crate::monitor::{Monitor, MonitorShared};
 use crate::plugins::PluginManager;
@@ -32,6 +33,13 @@ pub const DEFAULT_WIDTH: f32 = 1250.0;
 pub const DEFAULT_HEIGHT: f32 = 700.0;
 pub const MIN_WIDTH: f32 = DEFAULT_WIDTH;
 pub const MIN_HEIGHT: f32 = DEFAULT_HEIGHT;
+
+/// width for a settings page's label column: the widest label on that page,
+/// never narrower than the old fixed 130px, so longer translations aren't
+/// clipped and the inputs next to them still line up.
+fn label_column_width(ui: &egui::Ui, labels: &[String]) -> f32 {
+    crate::i18n::layout::label_column_width(ui, labels, 130.0)
+}
 
 fn get_retry(url: &str, timeout: Duration) -> Result<ureq::Response, String> {
     let agent = ureq::AgentBuilder::new().try_proxy_from_env(false).build();
@@ -294,7 +302,24 @@ impl Tab {
         Self::About,
     ];
 
-    fn label(self) -> &'static str {
+    /// translated tab name for the UI
+    fn label(self) -> String {
+        match self {
+            Self::Console => t("tab-console"),
+            Self::Workshop => t("tab-workshop"),
+            Self::Spoofer => t("tab-spoofer"),
+            Self::Patcher => t("tab-patcher"),
+            Self::Colours => t("tab-colours"),
+            Self::Settings => t("tab-settings"),
+            Self::Plugins => t("tab-plugins"),
+            Self::RlApi => t("tab-rlapi"),
+            Self::About => t("tab-about"),
+        }
+    }
+
+    /// value stored in config.toml (`default_tab`). these are the original
+    /// english names so existing configs keep working, never translate them.
+    fn config_key(self) -> &'static str {
         match self {
             Self::Console => "Console",
             Self::Workshop => "Maps",
@@ -308,10 +333,10 @@ impl Tab {
         }
     }
 
-    fn from_label(label: &str) -> Self {
+    fn from_config_key(key: &str) -> Self {
         Self::ALL
             .into_iter()
-            .find(|tab| tab.label() == label)
+            .find(|tab| tab.config_key() == key)
             .unwrap_or(Self::Console)
     }
 }
@@ -921,7 +946,7 @@ impl HebnixApp {
         }
         let cert_installed = spoofer::ca::is_current_installed(&base_dir);
         let rl_launch_draft = config.rl_launch.clone();
-        let default_tab = Tab::from_label(&config.settings.default_tab);
+        let default_tab = Tab::from_config_key(&config.settings.default_tab);
 
         let discord_presence =
             crate::discord_presence::DiscordPresence::start(config.settings.discord_rich_presence);
@@ -1169,7 +1194,7 @@ impl HebnixApp {
         }
         if !spoofer::is_admin() {
             self.rlapi_panel.complete(Err(
-                "Run Hebnix as administrator, then enable RLAPI capture.".into(),
+                t("enable-rlapi-run-hebnix-as-administrator-then-enable").into(),
             ));
             return;
         }
@@ -1199,7 +1224,7 @@ impl HebnixApp {
         use crate::ui::rlapi::Action;
         let session = hebnix_sdk::rlapi::session::shared_game_session();
         let status = if self.rlapi_panel.starting {
-            "Enabling capture…".into()
+            t("rlapi-enabling-capture").into()
         } else {
             session.status()
         };
@@ -1220,13 +1245,13 @@ impl HebnixApp {
         }
     }
     fn render_presets_tab(&mut self, ui: &mut egui::Ui, backups_dir: &std::path::Path) {
-        ui.heading("Presets");
-        ui.label("Save and restore named collections of your current item changes.");
+        ui.heading(t("presets-presets"));
+        ui.label(t("presets-save-and-restore-named-collections-of"));
         ui.horizontal(|ui| {
-            ui.label("Name:");
+            ui.label(t("presets-name"));
             ui.text_edit_singleline(&mut self.presets.name_edit);
-            ui.checkbox(&mut self.presets.include_patches, "Include patches");
-            if ui.button("Save Preset").clicked() {
+            ui.checkbox(&mut self.presets.include_patches, t("presets-include-patches"));
+            if ui.button(t("presets-save-preset")).clicked() {
                 let swaps = std::fs::read(backups_dir.join("swapper_swaps.json"))
                     .ok()
                     .and_then(|b| serde_json::from_slice::<Vec<serde_json::Value>>(&b).ok())
@@ -1253,12 +1278,12 @@ impl HebnixApp {
             }
         });
         ui.horizontal(|ui| {
-            if ui.button("Refresh").clicked() {
+            if ui.button(t("btn-refresh")).clicked() {
                 self.presets.refresh();
             }
-            if ui.button("Import JSON").clicked() {
+            if ui.button(t("presets-import-json")).clicked() {
                 if let Some(file) = rfd::FileDialog::new()
-                    .add_filter("JSON", &["json"])
+                    .add_filter(t("presets-json"), &["json"])
                     .pick_file()
                 {
                     if let Ok(bytes) = std::fs::read(file) {
@@ -1272,7 +1297,7 @@ impl HebnixApp {
             if ui
                 .add_enabled(
                     !self.presets.presets.is_empty(),
-                    egui::Button::new("Delete"),
+                    egui::Button::new(t("presets-delete")),
                 )
                 .clicked()
             {
@@ -1281,7 +1306,7 @@ impl HebnixApp {
         });
         ui.separator();
         if self.presets.presets.is_empty() {
-            ui.weak("No presets saved.");
+            ui.weak(t("presets-no-presets-saved"));
             return;
         }
         let names: Vec<String> = self
@@ -1346,7 +1371,7 @@ impl HebnixApp {
                     }
                 }
             }
-            ui.weak("Preset contents are shown above; applying a preset will be enabled alongside the patch restore/apply operations.");
+            ui.weak(t("presets-preset-contents-are-shown-above-applying"));
         }
     }
 
@@ -1877,12 +1902,12 @@ impl HebnixApp {
                     Ok(items) => {
                         self.workshop.set_catalog(items);
                         if self.workshop.valid.is_empty() {
-                            self.workshop.catalog_status = "No maps found.".to_string();
+                            self.workshop.catalog_status = t("handle-messages-no-maps-found").to_string();
                         }
                     }
                     Err(e) => {
                         self.workshop.merge_local_maps();
-                        self.workshop.catalog_status = "Failed to load maps.".to_string();
+                        self.workshop.catalog_status = t("handle-messages-failed-to-load-maps").to_string();
                         self.console
                             .write(format!("[Core] Failed to fetch maps: {e}"));
                     }
@@ -1947,7 +1972,7 @@ impl HebnixApp {
                                 self.install_modal.error = None;
                             } else {
                                 self.install_modal.error =
-                                    Some("Invalid API response format.".to_string());
+                                    Some(t("handle-messages-invalid-api-response-format").to_string());
                             }
                         }
                         Err(e) => {
@@ -2608,11 +2633,11 @@ impl HebnixApp {
                         }
                     } else {
                         let reason = if !hebnix_sdk::process::is_rocket_league_running() {
-                            "Rocket League is not running."
+                            t("execute-command-rocket-league-is-not-running")
                         } else if !log_info.stats_api_available {
-                            "Can't read the match, the stats api is not answering."
+                            t("execute-command-can-t-read-the-match-the")
                         } else {
-                            "Not in a game."
+                            t("execute-command-not-in-a-game")
                         };
                         let _ = tx.send(AppMsg::Log(format!("[Console] {reason}")));
                     }
@@ -2669,7 +2694,7 @@ impl HebnixApp {
                     .plugins
                     .iter()
                     .map(|p| {
-                        let status = if p.enabled { "Enabled" } else { "Disabled" };
+                        let status = if p.enabled { t("execute-command-enabled") } else { t("execute-command-disabled") };
                         format!(
                             "[Console] - {} v{} ({status})",
                             p.display_name(),
@@ -2758,23 +2783,23 @@ impl HebnixApp {
                         ui.selectable_value(
                             &mut self.spoofer_subtab,
                             SpooferSubTab::Settings,
-                            "Spoofer Settings",
+                            t("spoofer-spoofer-settings"),
                         );
                         ui.add_enabled_ui(self.spoofer_master, |ui| {
                             ui.selectable_value(
                                 &mut self.spoofer_subtab,
                                 SpooferSubTab::Username,
-                                "Name & Title",
+                                t("spoofer-name-title"),
                             );
                             ui.selectable_value(
                                 &mut self.spoofer_subtab,
                                 SpooferSubTab::TitleRank,
-                                "Rank",
+                                t("spoofer-rank"),
                             );
                             ui.selectable_value(
                                 &mut self.spoofer_subtab,
                                 SpooferSubTab::Friends,
-                                "Friends",
+                                t("spoofer-friends"),
                             );
                         });
                     });
@@ -2788,11 +2813,11 @@ impl HebnixApp {
                     .auto_shrink([false, false])
                     .show(ui, |ui| match self.spoofer_subtab {
                         SpooferSubTab::Settings => {
-                            ui.heading("Spoofer Settings");
+                            ui.heading(t("spoofer-spoofer-settings"));
                             ui.add_space(8.0);
 
                             if ui
-                                .checkbox(&mut self.spoofer_master, "Enable Spoofer")
+                                .checkbox(&mut self.spoofer_master, t("spoofer-enable-spoofer"))
                                 .changed()
                             {
                                 if self.spoofer_master && !spoofer::is_admin() {
@@ -2804,7 +2829,7 @@ impl HebnixApp {
                                 }
                             }
                             ui.label(
-                                egui::RichText::new("Requires Admin for hosts-file interception")
+                                egui::RichText::new(t("spoofer-requires-admin-for-hosts-file-intercepti"))
                                     .color(egui::Color32::GRAY),
                             );
 
@@ -2812,7 +2837,7 @@ impl HebnixApp {
                             ui.add_enabled_ui(self.spoofer_master, |ui| {
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .checkbox(&mut self.spoofer_http_proxy, "Account Proxy")
+                                        .checkbox(&mut self.spoofer_http_proxy, t("spoofer-account-proxy"))
                                         .changed()
                                     {
                                         self.save_config();
@@ -2821,17 +2846,17 @@ impl HebnixApp {
                                     if self.spoofer_mgr.http_running() {
                                         ui.colored_label(
                                             egui::Color32::from_rgb(34, 245, 101),
-                                            "Running",
+                                            t("spoofer-running"),
                                         );
                                     } else {
                                         ui.colored_label(
                                             egui::Color32::from_rgb(244, 113, 116),
-                                            "Stopped",
+                                            t("spoofer-stopped"),
                                         );
                                     }
                                 });
                                 ui.label(
-                                    egui::RichText::new("For Username, Friends and Rank Spoofing")
+                                    egui::RichText::new(t("spoofer-for-username-friends-and-rank-spoofing"))
                                         .color(egui::Color32::GRAY),
                                 );
 
@@ -2839,7 +2864,7 @@ impl HebnixApp {
 
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .checkbox(&mut self.spoofer_socket_proxy, "PsyNet Proxy")
+                                        .checkbox(&mut self.spoofer_socket_proxy, t("spoofer-psynet-proxy"))
                                         .changed()
                                     {
                                         self.save_config();
@@ -2848,30 +2873,30 @@ impl HebnixApp {
                                     if self.spoofer_mgr.socket_running() {
                                         ui.colored_label(
                                             egui::Color32::from_rgb(34, 245, 101),
-                                            "Running",
+                                            t("spoofer-running"),
                                         );
                                     } else {
                                         ui.colored_label(
                                             egui::Color32::from_rgb(244, 113, 116),
-                                            "Stopped",
+                                            t("spoofer-stopped"),
                                         );
                                     }
                                 });
                                 ui.label(
-                                    egui::RichText::new("For Title and Rank Spoofing")
+                                    egui::RichText::new(t("spoofer-for-title-and-rank-spoofing"))
                                         .color(egui::Color32::GRAY),
                                 );
                             });
 
                             ui.add_space(10.0);
                             ui.horizontal(|ui| {
-                                ui.label("Certificate Status: ");
+                                ui.label(format!("{} ", t("spoofer-certificate-status")));
                                 if self.spoofer_cert_installed {
                                     ui.colored_label(
                                         egui::Color32::from_rgb(34, 245, 101),
-                                        "Installed",
+                                        t("spoofer-installed"),
                                     );
-                                    if ui.button("Remove").clicked() {
+                                    if ui.button(t("spoofer-remove")).clicked() {
                                         match spoofer::ca::uninstall() {
                                             Ok(()) => {
                                                 self.console
@@ -2889,9 +2914,9 @@ impl HebnixApp {
                                 } else {
                                     ui.colored_label(
                                         egui::Color32::from_rgb(244, 113, 116),
-                                        "Missing",
+                                        t("spoofer-missing"),
                                     );
-                                    if ui.button("Install Certificate").clicked() {
+                                    if ui.button(t("spoofer-install-certificate")).clicked() {
                                         match spoofer::ca::install(&self.base_dir) {
                                             Ok(()) => {
                                                 self.console
@@ -2906,7 +2931,7 @@ impl HebnixApp {
                                             )),
                                         }
                                     }
-                                    if ui.button("↻").on_hover_text("Refresh Status").clicked() {
+                                    if ui.button("↻").on_hover_text(t("spoofer-refresh-status")).clicked() {
                                         self.spoofer_cert_installed =
                                             spoofer::ca::is_current_installed(&self.base_dir);
                                     }
@@ -2914,7 +2939,7 @@ impl HebnixApp {
                             });
                         }
                         SpooferSubTab::Username => {
-                            ui.heading("Name & Title Spoofing");
+                            ui.heading(t("spoofer-name-title-spoofing"));
                             ui.add_space(8.0);
 
                             ui.add_enabled_ui(self.spoofer_http_proxy, |ui| {
@@ -2922,7 +2947,7 @@ impl HebnixApp {
                                     if ui
                                         .checkbox(
                                             &mut self.spoofer_username_enabled,
-                                            "Enable Username Spoof",
+                                            t("spoofer-enable-username-spoof"),
                                         )
                                         .changed()
                                     {
@@ -2974,7 +2999,7 @@ impl HebnixApp {
                                                 self.spoofer_username_enabled,
                                                 egui::Button::new(&name).small(),
                                             )
-                                            .on_hover_text("Use recent spoofed name")
+                                            .on_hover_text(t("spoofer-use-recent-spoofed-name"))
                                             .clicked()
                                         {
                                             self.spoofer_username = name;
@@ -2990,7 +3015,7 @@ impl HebnixApp {
                                 let mut title_changed = false;
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .checkbox(&mut self.spoofer_title_enabled, "Titles")
+                                        .checkbox(&mut self.spoofer_title_enabled, t("spoofer-titles"))
                                         .changed()
                                     {
                                         if !self.spoofer_title_enabled {
@@ -3035,7 +3060,7 @@ impl HebnixApp {
                                             self.spoofer_title_enabled,
                                             egui::Checkbox::new(
                                                 &mut self.spoofer_title_glow,
-                                                "Glow",
+                                                t("spoofer-glow"),
                                             ),
                                         )
                                         .changed()
@@ -3045,7 +3070,7 @@ impl HebnixApp {
 
                                     });
                                     ui.horizontal(|ui| {
-                                    ui.label("Title to replace:");
+                                    ui.label(t("spoofer-title-to-replace"));
                                     let selected_title = self
                                         .spoofer_title_target
                                         .as_ref()
@@ -3056,7 +3081,7 @@ impl HebnixApp {
                                             egui::RichText::new(&title.text)
                                                 .color(title.game_color())
                                         })
-                                        .unwrap_or_else(|| egui::RichText::new("All"));
+                                        .unwrap_or_else(|| egui::RichText::new(t("spoofer-all")));
                                     egui::ComboBox::from_id_salt("title_spoof_target")
                                         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
                                         .width(210.0)
@@ -3064,15 +3089,15 @@ impl HebnixApp {
                                         .selected_text(selected_title)
                                         .show_ui(ui, |ui| {
                                             ui.horizontal(|ui| {
-                                                ui.label("Filter:");
+                                                ui.label(t("spoofer-filter"));
                                                 ui.add(
                                                     egui::TextEdit::singleline(
                                                         &mut self.spoofer_title_filter,
                                                     )
-                                                    .hint_text("Search titles...")
+                                                    .hint_text(t("spoofer-search-titles"))
                                                     .desired_width(145.0),
                                                 );
-                                                if ui.small_button("Clear").clicked() {
+                                                if ui.small_button(t("spoofer-clear")).clicked() {
                                                     self.spoofer_title_filter.clear();
                                                 }
                                             });
@@ -3081,7 +3106,7 @@ impl HebnixApp {
                                                 .selectable_value(
                                                     &mut self.spoofer_title_target,
                                                     None,
-                                                    "All",
+                                                    t("spoofer-all"),
                                                 )
                                                 .changed()
                                             {
@@ -3112,7 +3137,7 @@ impl HebnixApp {
                                         });
                                 });
                                 ui.horizontal(|ui| {
-                                    ui.label("Copy title:");
+                                    ui.label(t("spoofer-copy-title"));
                                     let copy_label = self
                                         .spoofer_title_copy
                                         .as_ref()
@@ -3124,7 +3149,7 @@ impl HebnixApp {
                                                 .color(title.game_color())
                                         })
                                         .unwrap_or_else(|| {
-                                            egui::RichText::new("Choose a title...")
+                                            egui::RichText::new(t("spoofer-choose-a-title"))
                                         });
                                     egui::ComboBox::from_id_salt("title_spoof_copy")
                                         .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
@@ -3133,15 +3158,15 @@ impl HebnixApp {
                                         .selected_text(copy_label)
                                         .show_ui(ui, |ui| {
                                             ui.horizontal(|ui| {
-                                                ui.label("Filter:");
+                                                ui.label(t("spoofer-filter"));
                                                 ui.add(
                                                     egui::TextEdit::singleline(
                                                         &mut self.spoofer_title_copy_filter,
                                                     )
-                                                    .hint_text("Search titles...")
+                                                    .hint_text(t("spoofer-search-titles"))
                                                     .desired_width(145.0),
                                                 );
-                                                if ui.small_button("Clear").clicked() {
+                                                if ui.small_button(t("spoofer-clear")).clicked() {
                                                     self.spoofer_title_copy_filter.clear();
                                                 }
                                             });
@@ -3149,7 +3174,7 @@ impl HebnixApp {
                                             ui.selectable_value(
                                                 &mut self.spoofer_title_copy,
                                                 None,
-                                                "Choose a title...",
+                                                t("spoofer-choose-a-title"),
                                             );
                                             let query = self
                                                 .spoofer_title_copy_filter
@@ -3210,7 +3235,7 @@ impl HebnixApp {
                                     if ui
                                         .add_enabled(
                                             self.spoofer_title_enabled,
-                                            egui::Button::new("Hebnix"),
+                                            egui::Button::new(t("about-hebnix")),
                                         )
                                         .clicked()
                                     {
@@ -3230,7 +3255,7 @@ impl HebnixApp {
                                         && target_is_available;
                                     let add_response = ui.add_enabled(
                                         can_add,
-                                        egui::Button::new("Add title to list"),
+                                        egui::Button::new(t("spoofer-add-title-to-list")),
                                     );
                                     if add_response.clicked() {
                                         self.spoofer_titles.push(TitleSpoofSettings {
@@ -3257,14 +3282,14 @@ impl HebnixApp {
                                         && !target_is_available
                                     {
                                         add_response.on_disabled_hover_text(
-                                            "This title is already being replaced",
+                                            t("spoofer-this-title-is-already-being-replaced"),
                                         );
                                     }
                                 });
                                 ui.add_space(6.0);
-                                ui.label(egui::RichText::new("Enabled titles:").strong());
+                                ui.label(egui::RichText::new(t("spoofer-enabled-titles")).strong());
                                 if self.spoofer_titles.is_empty() {
-                                    ui.weak("No titles added");
+                                    ui.weak(t("spoofer-no-titles-added"));
                                 } else {
                                     let mut remove_title = None;
                                     for (index, title) in self.spoofer_titles.iter().enumerate() {
@@ -3277,9 +3302,9 @@ impl HebnixApp {
                                                     )),
                                             );
                                             if title.glow {
-                                                ui.weak("Glow");
+                                                ui.weak(t("spoofer-glow"));
                                             }
-                                            ui.weak("replaces");
+                                            ui.weak(t("spoofer-replaces"));
                                             let target = title
                                                 .target_id
                                                 .as_ref()
@@ -3293,7 +3318,7 @@ impl HebnixApp {
                                             ui.label(target);
                                             if ui
                                                 .small_button("x")
-                                                .on_hover_text("Remove this title")
+                                                .on_hover_text(t("spoofer-remove-this-title"))
                                                 .clicked()
                                             {
                                                 remove_title = Some(index);
@@ -3315,7 +3340,7 @@ impl HebnixApp {
                             });
                         }
                         SpooferSubTab::Friends => {
-                            ui.heading("Friend Spoofing");
+                            ui.heading(t("spoofer-friend-spoofing"));
                             ui.add_space(8.0);
 
                             ui.add_enabled_ui(self.spoofer_http_proxy, |ui| {
@@ -3323,7 +3348,7 @@ impl HebnixApp {
                                     if ui
                                         .checkbox(
                                             &mut self.spoofer_friends_enabled,
-                                            "Enable Friend Name Spoof",
+                                            t("spoofer-enable-friend-name-spoof"),
                                         )
                                         .changed()
                                     {
@@ -3334,7 +3359,7 @@ impl HebnixApp {
                                 ui.add_space(8.0);
 
                                 ui.horizontal(|ui| {
-                                    ui.label("Search:");
+                                    ui.label(t("spoofer-search"));
                                     ui.add(
                                         egui::TextEdit::singleline(&mut self.friends_search)
                                             .desired_width(150.0),
@@ -3342,7 +3367,7 @@ impl HebnixApp {
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
-                                            if ui.button("Revert All").clicked() {
+                                            if ui.button(t("spoofer-revert-all")).clicked() {
                                                 for state in self.spoofer_friends.values_mut() {
                                                     state.enabled = false;
                                                     state.spoofed_name.clear();
@@ -3397,7 +3422,7 @@ impl HebnixApp {
                                 if discovered.is_empty() && friends_vec.is_empty() {
                                     ui.label(
                                         egui::RichText::new(
-                                            "Start Rocket League to populate friends list",
+                                            t("spoofer-start-rocket-league-to-populate-friends"),
                                         )
                                         .color(egui::Color32::GRAY),
                                     );
@@ -3430,7 +3455,7 @@ impl HebnixApp {
                                                         egui::TextEdit::singleline(
                                                             &mut state.spoofed_name,
                                                         )
-                                                        .hint_text("Spoofed Name"),
+                                                        .hint_text(t("spoofer-spoofed-name")),
                                                     );
                                                     if text_resp.changed() {
                                                         any_interaction = true;
@@ -3446,14 +3471,14 @@ impl HebnixApp {
                             });
                         }
                         SpooferSubTab::TitleRank => {
-                            ui.heading("Rank Spoofing");
+                            ui.heading(t("spoofer-rank-spoofing"));
                             ui.add_space(8.0);
 
                             ui.add_enabled_ui(self.spoofer_http_proxy, |ui| {
                                 if ui
                                     .checkbox(
                                         &mut self.spoofer_rank_enabled,
-                                        "Enable Rank Spoofing",
+                                        t("spoofer-enable-rank-spoofing"),
                                     )
                                     .changed()
                                 {
@@ -3523,7 +3548,7 @@ impl HebnixApp {
                                                                 &mut state.mmr,
                                                             )
                                                             .desired_width(60.0)
-                                                            .hint_text("MMR"),
+                                                            .hint_text(t("spoofer-mmr")),
                                                         );
                                                         if mmr_resp.changed() {
                                                             changed = true;
@@ -3576,10 +3601,10 @@ impl HebnixApp {
             .collect();
 
         let mut moved: Option<(usize, usize)> = None;
-        egui::CollapsingHeader::new(format!("Overlay order ({} layers)", rows.len()))
+        egui::CollapsingHeader::new(t_args("overlay-order-overlay-order-rows-layers", &[("rows", (rows.len()).to_string().into())]))
             .id_salt("overlay_order")
             .show(ui, |ui| {
-                ui.label("Drag to reorder. Renders based on number order.");
+                ui.label(t("overlay-order-drag-to-reorder-renders-based-on"));
                 ui.add_space(4.0);
                 for (index, (slug, name, kind)) in rows.iter().enumerate() {
                     let row_id = egui::Id::new(("overlay_layer", slug));
@@ -3617,10 +3642,10 @@ impl HebnixApp {
 
     fn render_plugins_tab(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            if ui.button("Open Plugins Folder").clicked() {
+            if ui.button(t("action-open-plugins-folder")).clicked() {
                 let _ = open::that(&self.plugin_dir);
             }
-            if ui.button("Install Plugin").clicked() {
+            if ui.button(t("plugins-install-plugin")).clicked() {
                 self.install_modal = InstallModal {
                     open: true,
                     ..Default::default()
@@ -3629,7 +3654,7 @@ impl HebnixApp {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui
                     .add(
-                        egui::Button::new("Reload").fill(egui::Color32::from_rgb(0xd3, 0x54, 0x00)),
+                        egui::Button::new(t("plugins-reload")).fill(egui::Color32::from_rgb(0xd3, 0x54, 0x00)),
                     )
                     .clicked()
                 {
@@ -3684,7 +3709,7 @@ impl HebnixApp {
                                                     egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
                                                 ),
                                             ))
-                                            .on_hover_text("Delete plugin")
+                                            .on_hover_text(t("plugins-delete-plugin"))
                                             .clicked()
                                         {
                                             self.plugin_delete_prompt = Some(plugin.slug.clone());
@@ -3708,7 +3733,7 @@ impl HebnixApp {
                 if self.plugin_mgr.plugins.is_empty() {
                     ui.add_space(30.0);
                     ui.vertical_centered(|ui| {
-                        ui.label("No plugins installed. Drop a plugin folder into plugins/.");
+                        ui.label(t("plugins-no-plugins-installed-drop-a-plugin"));
                     });
                 }
             });
@@ -3935,7 +3960,7 @@ impl HebnixApp {
                                 can_toggle,
                                 egui::Checkbox::new(&mut entry.enabled, entry.action.label()),
                             )
-                            .on_disabled_hover_text("At least one action must remain selected.")
+                            .on_disabled_hover_text(t("action-keep-one"))
                             .changed()
                         {
                             changed = true;
@@ -3960,20 +3985,18 @@ impl HebnixApp {
     }
 
     fn render_action_button_settings(&mut self, ui: &mut egui::Ui) {
-        ui.label("Choose the actions available for each Rocket League state.");
-        ui.weak(
-            "Drag the :: handle to reorder. The first checked action is the main button action.",
-        );
+        ui.label(t("action-settings-intro"));
+        ui.weak(t("action-settings-hint"));
         ui.add_space(12.0);
 
-        ui.strong("State: Rocket League Closed");
+        ui.strong(t("action-state-closed"));
         let closed_changed = Self::render_action_button_state_editor(
             ui,
             "action_button_closed",
             &mut self.config.action_button.rocket_league_closed,
         );
         ui.add_space(12.0);
-        ui.strong("State: Rocket League Open");
+        ui.strong(t("action-state-open"));
         let open_changed = Self::render_action_button_state_editor(
             ui,
             "action_button_open",
@@ -3989,12 +4012,12 @@ impl HebnixApp {
             ui.selectable_value(
                 &mut self.settings_subtab,
                 SettingsSubTab::Hebnix,
-                "Hebnix Settings",
+                t("settings-subtab-hebnix"),
             );
             ui.selectable_value(
                 &mut self.settings_subtab,
                 SettingsSubTab::Plugin,
-                "Plugin Settings",
+                t("settings-subtab-plugin"),
             );
         });
         ui.separator();
@@ -4010,7 +4033,9 @@ impl HebnixApp {
 
         egui::Panel::left("hebnix_settings_list")
             .resizable(false)
-            .exact_size(200.0)
+            // min_size not exact_size so longer translated names can widen it
+            .default_size(200.0)
+            .size_range(200.0..=320.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("hebnix_settings_names")
@@ -4018,27 +4043,27 @@ impl HebnixApp {
                         ui.selectable_value(
                             &mut self.hebnix_settings_tab,
                             HebnixSettingsTab::Interface,
-                            "Interface",
+                            t("settings-nav-interface"),
                         );
                         ui.selectable_value(
                             &mut self.hebnix_settings_tab,
                             HebnixSettingsTab::Directories,
-                            "Directories & Files",
+                            t("settings-nav-directories"),
                         );
                         ui.selectable_value(
                             &mut self.hebnix_settings_tab,
                             HebnixSettingsTab::System,
-                            "System",
+                            t("settings-nav-system"),
                         );
                         ui.selectable_value(
                             &mut self.hebnix_settings_tab,
                             HebnixSettingsTab::Discord,
-                            "Discord",
+                            t("settings-nav-discord"),
                         );
                         ui.selectable_value(
                             &mut self.hebnix_settings_tab,
                             HebnixSettingsTab::ActionButton,
-                            "Action Button",
+                            t("settings-nav-action-button"),
                         );
                     });
             });
@@ -4051,18 +4076,27 @@ impl HebnixApp {
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
                     ui.heading(match self.hebnix_settings_tab {
-                        HebnixSettingsTab::Interface => "Interface Configuration",
-                        HebnixSettingsTab::Directories => "Directories & Files Configuration",
-                        HebnixSettingsTab::Discord => "Discord",
-                        HebnixSettingsTab::ActionButton => "Action Button",
-                        HebnixSettingsTab::System => "System Configuration",
+                        HebnixSettingsTab::Interface => t("settings-heading-interface"),
+                        HebnixSettingsTab::Directories => t("settings-heading-directories"),
+                        HebnixSettingsTab::Discord => t("settings-heading-discord"),
+                        HebnixSettingsTab::ActionButton => t("settings-heading-action-button"),
+                        HebnixSettingsTab::System => t("settings-heading-system"),
                     });
                     ui.add_space(8.0);
 
                     match self.hebnix_settings_tab {
                         HebnixSettingsTab::Interface => {
+                            let label_w = label_column_width(
+                                ui,
+                                &[
+                                    t("settings-keybind-label"),
+                                    t("settings-language-label"),
+                                    t("settings-theme-label"),
+                                    t("settings-opacity-label"),
+                                ],
+                            );
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Open/Close Keybind:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("settings-keybind-label")));
                                 let display = if self.capturing_hotkey {
                                     "...".to_string()
                                 } else {
@@ -4073,9 +4107,9 @@ impl HebnixApp {
                                     egui::TextEdit::singleline(&mut display.clone()).desired_width(120.0),
                                 );
                                 let btn_text = if self.capturing_hotkey {
-                                    "Listening..."
+                                    t("settings-keybind-listening")
                                 } else {
-                                    "Set Keybind"
+                                    t("settings-keybind-set")
                                 };
                                 if ui
                                     .add_enabled(!self.capturing_hotkey, egui::Button::new(btn_text))
@@ -4086,7 +4120,46 @@ impl HebnixApp {
                             });
 
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Theme:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("settings-language-label")));
+                                let mut chosen = self.config.settings.language.clone();
+                                let mut language_changed = false;
+                                let known = crate::i18n::available();
+                                let shown = if chosen.eq_ignore_ascii_case(crate::i18n::AUTO) {
+                                    t("settings-language-auto")
+                                } else {
+                                    known
+                                        .iter()
+                                        .find(|l| l.code.eq_ignore_ascii_case(&chosen))
+                                        .map(crate::i18n::display_name)
+                                        .unwrap_or_else(|| chosen.clone())
+                                };
+                                egui::ComboBox::from_id_salt("language_select")
+                                    .selected_text(shown)
+                                    .show_ui(ui, |ui| {
+                                        language_changed |= ui
+                                            .selectable_value(
+                                                &mut chosen,
+                                                crate::i18n::AUTO.to_string(),
+                                                t("settings-language-auto"),
+                                            )
+                                            .changed();
+                                        for locale in &known {
+                                            language_changed |= ui
+                                                .selectable_value(
+                                                    &mut chosen,
+                                                    locale.code.clone(),
+                                                    crate::i18n::display_name(locale),
+                                                )
+                                                .changed();
+                                        }
+                                    });
+                                if language_changed {
+                                    self.change_language(&ctx, &chosen);
+                                }
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("settings-theme-label")));
                                 let mut selected = self.config.settings.theme.clone();
                                 let mut changed = false;
                                 egui::ComboBox::from_id_salt("theme_select")
@@ -4105,21 +4178,23 @@ impl HebnixApp {
                                 if changed {
                                     self.change_theme(&ctx, &selected);
                                 }
-                                if ui.button("Refresh").clicked() {
+                                if ui.button(t("btn-refresh")).clicked() {
                                     self.theme_options = theme::list_themes(&self.themes_dir);
-                                    self.console
-                                        .write("[Console] Themes directory rescanned and updated.");
+                                    self.console.write(format!(
+                                        "[Console] {}",
+                                        t("console-themes-rescanned")
+                                    ));
                                 }
-                                if ui.button("Open Folder").clicked() {
+                                if ui.button(t("btn-open-folder")).clicked() {
                                     let _ = open::that(&self.themes_dir);
                                 }
-                                if ui.button("Open Fonts Folder").clicked() {
+                                if ui.button(t("settings-open-fonts-folder")).clicked() {
                                     let _ = open::that(&self.fonts_dir);
                                 }
                             });
 
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Window Opacity:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("settings-opacity-label")));
                                 let slider = ui.add(
                                     egui::Slider::new(
                                         &mut self.config.settings.window_opacity,
@@ -4148,20 +4223,31 @@ impl HebnixApp {
 
                         HebnixSettingsTab::Directories => {
                             ui.label(
-                                egui::RichText::new("(auto-detected from the running game)")
+                                egui::RichText::new(t("settings-dirs-autodetected"))
                                     .size(11.0)
                                     .color(egui::Color32::GRAY),
                             );
                             ui.add_space(8.0);
 
+                            // ini key names are technical, they stay untranslated
+                            let label_w = label_column_width(
+                                ui,
+                                &[
+                                    t("settings-rl-folder-label"),
+                                    t("settings-statsapi-ini-label"),
+                                    "PacketSendRate:".to_string(),
+                                    "Port:".to_string(),
+                                    "WebPort:".to_string(),
+                                ],
+                            );
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Rocket League Folder:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("settings-rl-folder-label")));
                                 ui.add_enabled(
                                     false,
                                     egui::TextEdit::singleline(&mut self.config.settings.rl_path)
                                         .desired_width(480.0),
                                 );
-                                if ui.button("Browse").clicked() {
+                                if ui.button(t("btn-browse")).clicked() {
                                     if let Some(dir) = rfd::FileDialog::new()
                                         .set_directory(&self.config.settings.rl_path)
                                         .pick_folder()
@@ -4175,20 +4261,20 @@ impl HebnixApp {
                             });
 
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("DefaultStatsAPI.ini:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("settings-statsapi-ini-label")));
                                 ui.add_enabled(
                                     false,
                                     egui::TextEdit::singleline(&mut self.config.settings.statsapi_path)
                                         .desired_width(480.0),
                                 );
-                                if ui.button("Browse").clicked() {
+                                if ui.button(t("btn-browse")).clicked() {
                                     let start_dir = std::path::Path::new(&self.config.settings.statsapi_path)
                                         .parent()
                                         .map(|p| p.to_path_buf())
                                         .unwrap_or_default();
                                     if let Some(file) = rfd::FileDialog::new()
                                         .set_directory(start_dir)
-                                        .add_filter("INI files", &["ini"])
+                                        .add_filter(t("filter-ini-files"), &["ini"])
                                         .pick_file()
                                     {
                                         self.config.settings.statsapi_path =
@@ -4200,10 +4286,10 @@ impl HebnixApp {
                             });
 
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("PacketSendRate:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("hebnix-settings-packetsendrate")));
                                 let resp = ui.add(
                                     egui::TextEdit::singleline(&mut self.packet_rate_edit)
-                                        .hint_text("Not Found")
+                                        .hint_text(t("settings-not-found"))
                                         .desired_width(100.0),
                                 );
                                 if resp.changed() {
@@ -4219,17 +4305,17 @@ impl HebnixApp {
                                     }
                                 }
                                 if self.packet_rate.as_deref() != Some("20")
-                                    && ui.add(egui::Button::new("Set 20").fill(egui::Color32::from_rgb(0xd3, 0x54, 0x00))).clicked()
+                                    && ui.add(egui::Button::new(t_args("settings-set-value", &[("value", "20".into())])).fill(egui::Color32::from_rgb(0xd3, 0x54, 0x00))).clicked()
                                 {
                                     self.update_ini_setting("PacketSendRate", "20");
                                 }
                             });
 
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Port:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("hebnix-settings-port")));
                                 let resp = ui.add(
                                     egui::TextEdit::singleline(&mut self.port_edit)
-                                        .hint_text("Not Found")
+                                        .hint_text(t("settings-not-found"))
                                         .desired_width(100.0),
                                 );
                                 if resp.changed() {
@@ -4246,20 +4332,20 @@ impl HebnixApp {
                                     }
                                 }
                                 if self.port_value.as_deref() != Some("49123")
-                                    && ui.add(egui::Button::new("Reset").fill(egui::Color32::from_rgb(0xc0, 0x39, 0x2b))).clicked()
+                                    && ui.add(egui::Button::new(t("btn-reset")).fill(egui::Color32::from_rgb(0xc0, 0x39, 0x2b))).clicked()
                                 {
                                     self.update_ini_setting("Port", "49123");
                                 }
-                                if ui.button("Refresh").clicked() {
+                                if ui.button(t("btn-refresh")).clicked() {
                                     self.refresh_stats_api_viewer();
                                 }
                             });
 
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("WebPort:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("hebnix-settings-webport")));
                                 let resp = ui.add(
                                     egui::TextEdit::singleline(&mut self.web_port_edit)
-                                        .hint_text("Not Found")
+                                        .hint_text(t("settings-not-found"))
                                         .desired_width(100.0),
                                 );
                                 if resp.changed() {
@@ -4276,14 +4362,14 @@ impl HebnixApp {
                                     }
                                 }
                                 if self.web_port_value.as_deref() != Some("49124")
-                                    && ui.add(egui::Button::new("Set 49124").fill(egui::Color32::from_rgb(0xd3, 0x54, 0x00))).clicked()
+                                    && ui.add(egui::Button::new(t_args("settings-set-value", &[("value", "49124".into())])).fill(egui::Color32::from_rgb(0xd3, 0x54, 0x00))).clicked()
                                 {
                                     self.update_ini_setting("WebPort", "49124");
                                 }
                             });
 
                             ui.label(
-                                egui::RichText::new("Changes to the ini apply after restarting Rocket League.")
+                                egui::RichText::new(t("settings-ini-restart-note"))
                                     .size(11.0)
                                     .color(egui::Color32::GRAY),
                             );
@@ -4291,25 +4377,34 @@ impl HebnixApp {
                             ui.add_space(12.0);
                             ui.separator();
                             ui.add_space(4.0);
-                            ui.strong("Rocket League Launch");
+                            ui.strong(t("settings-rl-launch-heading"));
                             ui.label(
-                                egui::RichText::new(
-                                    "Tells Hebnix how to restart Rocket League - used by the Restart Rocket League button and Workshop LAN's Host/Join. Leave as auto-detect unless you use Heroic.",
-                                )
-                                .size(11.0)
-                                .color(egui::Color32::GRAY),
+                                egui::RichText::new(t("settings-rl-launch-desc"))
+                                    .size(11.0)
+                                    .color(egui::Color32::GRAY),
                             );
                             let mode_label = match self.config.rl_launch.mode {
-                                crate::config::RlLaunchMode::Unconfigured => "Auto-detect (Steam or Epic)",
-                                crate::config::RlLaunchMode::SteamNative => "Real Steam game",
-                                crate::config::RlLaunchMode::EpicDirect => "Epic Games Launcher",
-                                crate::config::RlLaunchMode::SteamShortcutToHeroic => {
-                                    "Non-Steam shortcut to Heroic"
+                                crate::config::RlLaunchMode::Unconfigured => {
+                                    t("settings-rl-mode-unconfigured")
                                 }
-                                crate::config::RlLaunchMode::HeroicDirect => "Heroic directly",
+                                crate::config::RlLaunchMode::SteamNative => {
+                                    t("settings-rl-mode-steam-native")
+                                }
+                                crate::config::RlLaunchMode::EpicDirect => {
+                                    t("settings-rl-mode-epic-direct")
+                                }
+                                crate::config::RlLaunchMode::SteamShortcutToHeroic => {
+                                    t("settings-rl-mode-steam-shortcut")
+                                }
+                                crate::config::RlLaunchMode::HeroicDirect => {
+                                    t("settings-rl-mode-heroic-direct")
+                                }
                             };
-                            ui.label(format!("Current setup: {mode_label}"));
-                            if ui.button("Rocket League Launch Setup...").clicked() {
+                            ui.label(t_args(
+                                "settings-rl-current-setup",
+                                &[("mode", mode_label.as_str().into())],
+                            ));
+                            if ui.button(t("settings-rl-launch-setup-button")).clicked() {
                                 self.rl_launch_draft = self.config.rl_launch.clone();
                                 self.rl_launch_shortcut_candidates.clear();
                                 self.rl_launch_setup_open = true;
@@ -4321,7 +4416,7 @@ impl HebnixApp {
                             if ui
                                 .checkbox(
                                     &mut self.config.settings.discord_rich_presence,
-                                    "Enable Discord Rich Presence",
+                                    t("discord-enable"),
                                 )
                                 .changed()
                             {
@@ -4332,16 +4427,16 @@ impl HebnixApp {
                             if ui
                                 .checkbox(
                                     &mut self.config.settings.discord_rocket_league_only,
-                                    "Limit Discord RPC to Rocket League only",
+                                    t("discord-rl-only"),
                                 )
                                 .changed()
                             {
                                 changed = true;
                             }
                             ui.add_space(8.0);
-                            ui.label("Message:");
+                            ui.label(t("discord-message-label"));
                             let mut game_state = self.config.settings.discord_game_state;
-                            if ui.checkbox(&mut game_state, "Game State").changed() {
+                            if ui.checkbox(&mut game_state, t("discord-game-state")).changed() {
                                 self.config.settings.discord_game_state = game_state;
                                 changed = true;
                             }
@@ -4360,7 +4455,7 @@ impl HebnixApp {
                                                     || selected > 1,
                                                 egui::Checkbox::new(
                                                     &mut self.config.settings.discord_show_score,
-                                                    "Show score",
+                                                    t("discord-show-score"),
                                                 ),
                                             )
                                             .changed()
@@ -4377,7 +4472,7 @@ impl HebnixApp {
                                                     || selected > 1,
                                                 egui::Checkbox::new(
                                                     &mut self.config.settings.discord_show_map,
-                                                    "Show map",
+                                                    t("discord-show-map"),
                                                 ),
                                             )
                                             .changed()
@@ -4394,7 +4489,7 @@ impl HebnixApp {
                                                     || selected > 1,
                                                 egui::Checkbox::new(
                                                     &mut self.config.settings.discord_show_gamemode,
-                                                    "Show gamemode",
+                                                    t("discord-show-gamemode"),
                                                 ),
                                             )
                                             .changed()
@@ -4407,7 +4502,7 @@ impl HebnixApp {
 
                             ui.horizontal(|ui| {
                                 let mut custom = !self.config.settings.discord_game_state;
-                                if ui.checkbox(&mut custom, "Custom").changed() {
+                                if ui.checkbox(&mut custom, t("discord-custom")).changed() {
                                     self.config.settings.discord_game_state = !custom;
                                     changed = true;
                                 }
@@ -4417,7 +4512,7 @@ impl HebnixApp {
                                         egui::TextEdit::singleline(
                                             &mut self.config.settings.discord_custom_message,
                                         )
-                                        .hint_text("Custom message")
+                                        .hint_text(t("discord-custom-hint"))
                                         .desired_width(280.0),
                                     )
                                     .changed()
@@ -4427,9 +4522,7 @@ impl HebnixApp {
                             });
                             if self.config.settings.discord_game_state {
                                 ui.label(
-                                    egui::RichText::new(
-                                        "The custom message is disabled while Game State is selected.",
-                                    )
+                                    egui::RichText::new(t("discord-custom-disabled-note"))
                                     .size(11.0)
                                     .color(egui::Color32::GRAY),
                                 );
@@ -4445,29 +4538,50 @@ impl HebnixApp {
                         }
 
                         HebnixSettingsTab::System => {
+                            let label_w = label_column_width(
+                                ui,
+                                &[
+                                    t("system-start-with-windows"),
+                                    t("system-start-in-tray"),
+                                    t("system-close-to-tray"),
+                                    t("system-p2p"),
+                                    t("system-suppress-left"),
+                                    t("system-fullscreen-warning"),
+                                    t("system-allow-draw-focus"),
+                                    t("system-limit-hotkey"),
+                                    t("system-statsapi-rate"),
+                                    t("system-default-tab"),
+                                ],
+                            );
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Start with Windows:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("system-start-with-windows")));
                                 if ui.checkbox(&mut self.startup_enabled, "").changed() {
                                     if let Err(e) = winutil::set_startup_enabled(self.startup_enabled) {
-                                        self.console.write(format!("[Console] Failed to update startup entry: {e}"));
+                                        self.console.write(format!(
+                                            "[Console] {}",
+                                            t_args(
+                                                "console-startup-failed",
+                                                &[("error", e.to_string().into())]
+                                            )
+                                        ));
                                         self.startup_enabled = winutil::is_startup_enabled();
                                     }
                                 }
                             });
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Start in Tray:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("system-start-in-tray")));
                                 if ui.checkbox(&mut self.config.settings.start_in_tray, "").changed() {
                                     self.save_config();
                                 }
                             });
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Close to Tray:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("system-close-to-tray")));
                                 if ui.checkbox(&mut self.config.settings.close_to_tray, "").changed() {
                                     self.save_config();
                                 }
                             });
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("P2P File Sharing:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("system-p2p")));
                                 if ui.checkbox(&mut self.config.settings.p2p_file_sharing, "").changed() {
                                     self.workshop
                                         .set_share_files(self.config.settings.p2p_file_sharing);
@@ -4475,20 +4589,18 @@ impl HebnixApp {
                                 }
                             });
                             ui.label(
-                                egui::RichText::new(
-                                    "Turning this off stops other players in Workshop multiplayer from                                      downloading maps from your PC. Custom maps that aren't on the Hebnix                                      Workshop can then no longer be downloaded by other players.",
-                                )
+                                egui::RichText::new(t("system-p2p-note"))
                                 .size(11.0)
                                 .color(egui::Color32::GRAY),
                             );
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Suppress Left Alerts:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("system-suppress-left")));
                                 if ui.checkbox(&mut self.config.settings.suppress_left_alerts, "").changed() {
                                     self.save_config();
                                 }
                             });
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Fullscreen Warning:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("system-fullscreen-warning")));
                                 let mut show = !self.config.settings.suppress_fullscreen_warning;
                                 if ui.checkbox(&mut show, "").changed() {
                                     self.config.settings.suppress_fullscreen_warning = !show;
@@ -4499,14 +4611,14 @@ impl HebnixApp {
                                 }
                             });
                             ui.label(
-                                egui::RichText::new("Warns when the game is fullscreen and the overlay can't draw.")
+                                egui::RichText::new(t("system-fullscreen-note"))
                                     .size(11.0)
                                     .color(egui::Color32::GRAY),
                             );
                             ui.horizontal(|ui| {
                                 ui.add_sized(
-                                    [130.0, 20.0],
-                                    egui::Label::new("Allow Draw on Hebnix Focus:"),
+                                    [label_w, 20.0],
+                                    egui::Label::new(t("system-allow-draw-focus")),
                                 );
                                 if ui
                                     .checkbox(
@@ -4520,8 +4632,8 @@ impl HebnixApp {
                             });
                             ui.horizontal(|ui| {
                                 ui.add_sized(
-                                    [130.0, 20.0],
-                                    egui::Label::new("Limit Hotkey to Hebnix/Rocket League:"),
+                                    [label_w, 20.0],
+                                    egui::Label::new(t("system-limit-hotkey")),
                                 );
                                 if ui
                                     .checkbox(
@@ -4534,7 +4646,7 @@ impl HebnixApp {
                                 }
                             });
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("StatsAPI Rate Warning:"));
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("system-statsapi-rate")));
                                 let mut show = !self.config.settings.suppress_statsapi_rate_warning;
                                 if ui.checkbox(&mut show, "").changed() {
                                     self.config.settings.suppress_statsapi_rate_warning = !show;
@@ -4542,12 +4654,12 @@ impl HebnixApp {
                                 }
                             });
                             ui.label(
-                                egui::RichText::new("Warns when PacketSendRate isn't 20. Rates of 10 and under always warn.")
+                                egui::RichText::new(t("system-statsapi-note"))
                                     .size(11.0)
                                     .color(egui::Color32::GRAY),
                             );
                             ui.add_space(8.0);
-                            if ui.add_enabled(!self.epic_repair.running, egui::Button::new("Fix Epic Connection")).clicked() {
+                            if ui.add_enabled(!self.epic_repair.running, egui::Button::new(t("action-fix-epic-connection"))).clicked() {
                                 self.epic_repair.begin(ui.ctx());
                                 if self.epic_repair.running {
                                     self.spoofer_mgr.shutdown();
@@ -4555,8 +4667,8 @@ impl HebnixApp {
                             }
                             ui.add_space(8.0);
                             ui.horizontal(|ui| {
-                                ui.add_sized([130.0, 20.0], egui::Label::new("Default Tab:"));
-                                let mut selected = Tab::from_label(&self.config.settings.default_tab);
+                                ui.add_sized([label_w, 20.0], egui::Label::new(t("system-default-tab")));
+                                let mut selected = Tab::from_config_key(&self.config.settings.default_tab);
                                 egui::ComboBox::from_id_salt("default_tab")
                                     .selected_text(selected.label())
                                     .show_ui(ui, |ui| {
@@ -4564,8 +4676,8 @@ impl HebnixApp {
                                             ui.selectable_value(&mut selected, tab, tab.label());
                                         }
                                     });
-                                if self.config.settings.default_tab != selected.label() {
-                                    self.config.settings.default_tab = selected.label().to_string();
+                                if self.config.settings.default_tab != selected.config_key() {
+                                    self.config.settings.default_tab = selected.config_key().to_string();
                                     self.save_config();
                                 }
                             });
@@ -4582,8 +4694,10 @@ impl HebnixApp {
                 let _ = std::fs::remove_file(&error_file);
                 self.config.settings.theme = choice.to_string();
                 self.save_config();
-                self.console
-                    .write(format!("[Console] Theme changed to '{choice}'."));
+                self.console.write(format!(
+                    "[Console] {}",
+                    t_args("console-theme-changed", &[("theme", choice.into())])
+                ));
             }
             Err(e) => {
                 let _ = std::fs::write(
@@ -4594,11 +4708,29 @@ impl HebnixApp {
                 self.config.settings.theme = "Dark".to_string();
                 self.save_config();
                 self.console.write(format!(
-                    "[Console] Theme '{choice}' failed to load. Defaulted to Dark mode. Check theme_errors.txt"
+                    "[Console] {}",
+                    t_args("console-theme-failed", &[("theme", choice.into())])
                 ));
             }
         }
         theme::apply_window_opacity(ctx, self.config.settings.window_opacity);
+    }
+
+    /// switch the UI language right away and remember it
+    fn change_language(&mut self, ctx: &egui::Context, choice: &str) {
+        crate::i18n::set_language(choice);
+        self.config.settings.language = choice.to_string();
+        self.save_config();
+
+        // glyph fallback fonts depend on the language, so rebuild the fonts
+        let theme_name = self.config.settings.theme.clone();
+        let _ = theme::apply_theme(ctx, &self.themes_dir, &self.fonts_dir, &theme_name);
+        theme::apply_window_opacity(ctx, self.config.settings.window_opacity);
+
+        if let Some(tray) = &self.tray {
+            tray.refresh_labels(self.hidden);
+        }
+        ctx.request_repaint();
     }
 
     fn render_plugin_settings(&mut self, ui: &mut egui::Ui) {
@@ -4613,9 +4745,9 @@ impl HebnixApp {
         if with_settings.is_empty() {
             ui.add_space(50.0);
             ui.vertical_centered(|ui| {
-                ui.label("No Plugins with Settings Enabled");
+                ui.label(t("plugin-settings-none"));
                 ui.add_space(8.0);
-                if ui.button("Go to Plugins").clicked() {
+                if ui.button(t("plugin-settings-go")).clicked() {
                     self.tab = Tab::Plugins;
                 }
             });
@@ -4660,7 +4792,7 @@ impl HebnixApp {
                     .id_salt("plugin_settings_view")
                     .auto_shrink([false, false])
                     .show(ui, |ui| {
-                        ui.heading(format!("{display_name} Configuration"));
+                        ui.heading(t_args("plugin-settings-display-name-configuration", &[("display_name", display_name.to_string().into())]));
                         ui.add_space(8.0);
                         if let Err(e) = self.plugin_mgr.render_settings(&selected, ui) {
                             self.console.write(format!(
@@ -4674,14 +4806,11 @@ impl HebnixApp {
     fn render_about_tab(&mut self, ui: &mut egui::Ui) {
         ui.add_space(40.0);
         ui.vertical_centered(|ui| {
-            ui.heading("Hebnix");
+            ui.heading(t("about-hebnix"));
             ui.add_space(10.0);
-            ui.label(format!(
-                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League with integrated Spoofer & Item Changer.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide Hebnix.",
-                self.config.settings.hotkey.to_uppercase()
-            ));
+            ui.label(t_args("about-version-app-version-a-safe-eac", &[("version", APP_VERSION.to_string().into()), ("hotkey", (self.config.settings.hotkey.to_uppercase()).to_string().into())]));
             ui.separator();
-            ui.label("Built with help from the community\nContributors:\nxplodingeggo");
+            ui.label(t("about-built-with-help-from-the-community"));
         });
     }
 
@@ -4711,7 +4840,7 @@ impl HebnixApp {
 
         let mut apply = false;
         let mut dismiss = false;
-        egui::Window::new("StatsAPI configuration")
+        egui::Window::new(t("statsapi-notice-statsapi-configuration")).id(egui::Id::new("StatsAPI configuration"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -4721,20 +4850,20 @@ impl HebnixApp {
                     ui.add_space(6.0);
                     ui.colored_label(
                         egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
-                        format!("Couldn't write the file:\n{err}"),
+                        t_args("statsapi-notice-couldn-t-write-the-file-err", &[("err", err.to_string().into())]),
                     );
                     ui.label(
-                        egui::RichText::new("Edit it by hand, or restart Hebnix as administrator.")
+                        egui::RichText::new(t("statsapi-notice-edit-it-by-hand-or-restart"))
                             .size(11.0)
                             .color(egui::Color32::GRAY),
                     );
                 }
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Set 20").clicked() {
+                    if ui.button(t("statsapi-notice-set-20")).clicked() {
                         apply = true;
                     }
-                    let dismiss_label = if blocking { "Quit Hebnix" } else { "Proceed" };
+                    let dismiss_label = if blocking { t("statsapi-notice-quit-hebnix") } else { t("statsapi-notice-proceed") };
                     if ui.button(dismiss_label).clicked() {
                         dismiss = true;
                     }
@@ -4742,7 +4871,7 @@ impl HebnixApp {
                 if !blocking {
                     ui.add_space(4.0);
                     ui.label(
-                        egui::RichText::new("Turn this off in Settings > System.")
+                        egui::RichText::new(t("statsapi-notice-turn-this-off-in-settings-system"))
                             .size(11.0)
                             .color(egui::Color32::GRAY),
                     );
@@ -4779,7 +4908,7 @@ impl HebnixApp {
         let mut apply = false;
         let mut dismiss = false;
 
-        egui::Window::new("WebPort configuration")
+        egui::Window::new(t("web-port-notice-webport-configuration")).id(egui::Id::new("WebPort configuration"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -4787,10 +4916,10 @@ impl HebnixApp {
                 ui.label(body);
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Set 49124").clicked() {
+                    if ui.button(t("web-port-notice-set-49124")).clicked() {
                         apply = true;
                     }
-                    if ui.button("Dismiss").clicked() {
+                    if ui.button(t("web-port-notice-dismiss")).clicked() {
                         dismiss = true;
                     }
                 });
@@ -4869,19 +4998,19 @@ impl HebnixApp {
         }
         let mut enable = false;
         let mut cancel = false;
-        egui::Window::new("Read the Item Spawner tutorial")
+        egui::Window::new(t("spawner-enable-prompt-read-the-item-spawner-tutorial")).id(egui::Id::new("spawner-enable-prompt-read-the-item-spawner-tutorial"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label("Read the Tutorial tab before enabling Item Spawner.");
-                ui.label("Rocket League must be closed first. Item spawning is temporary.");
+                ui.label(t("spawner-enable-prompt-read-the-tutorial-tab-before-enabling"));
+                ui.label(t("spawner-enable-prompt-rocket-league-must-be-closed-first"));
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Continue").clicked() {
+                    if ui.button(t("spawner-enable-prompt-continue")).clicked() {
                         enable = true;
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
                         cancel = true;
                     }
                 });
@@ -4901,25 +5030,24 @@ impl HebnixApp {
         let mut ok = false;
         let mut cancel = false;
 
-        egui::Window::new("Administrator required")
+        egui::Window::new(t("admin-prompt-administrator-required")).id(egui::Id::new("admin-prompt-administrator-required"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.label(if self.spawner_admin_requested {
-                    "Item Spawner needs Administrator access to update the hosts file. Hebnix will restart as Administrator."
+                    t("admin-prompt-item-spawner-needs-administrator-access")
                 } else if self.owned_admin_requested {
-                    "Filtering replacements by ownership needs the Hebnix proxy.\n\
-                     Hebnix will restart as Administrator, enable the proxy, and build your owned-item catalog."
+                    t("admin-prompt-owned-filter-needs-proxy")
                 } else {
-                    "This action requires Hebnix to be run as Administrator."
+                    t("admin-prompt-this-action-requires-hebnix-to-be")
                 });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("OK").clicked() {
+                    if ui.button(t("btn-ok")).clicked() {
                         ok = true;
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
                         cancel = true;
                     }
                 });
@@ -4965,20 +5093,20 @@ impl HebnixApp {
         }
         let mut relaunch = false;
         let mut cancel = false;
-        egui::Window::new("Administrator required")
+        egui::Window::new(t("admin-prompt-administrator-required")).id(egui::Id::new("admin-prompt-administrator-required"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.label(
-                    "Windows denied write access to TAGame.upk. Restart Hebnix as Administrator, then return to Colours and apply again.",
+                    t("colour-admin-prompt-windows-denied-write-access-to-tagame"),
                 );
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Restart as Administrator").clicked() {
+                    if ui.button(t("colour-admin-prompt-restart-as-administrator")).clicked() {
                         relaunch = true;
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
                         cancel = true;
                     }
                 });
@@ -5010,18 +5138,18 @@ impl HebnixApp {
             .unwrap_or(slug.clone());
         let mut confirm = false;
         let mut cancel = false;
-        egui::Window::new("Delete plugin?")
+        egui::Window::new(t("plugin-delete-prompt-delete-plugin")).id(egui::Id::new("plugin-delete-prompt-delete-plugin"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label(format!("Are you sure you want to delete {plugin_name}?"));
+                ui.label(t_args("plugin-delete-prompt-are-you-sure-you-want-to", &[("plugin_name", plugin_name.to_string().into())]));
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Yes").clicked() {
+                    if ui.button(t("plugin-delete-prompt-yes")).clicked() {
                         confirm = true;
                     }
-                    if ui.button("No").clicked() {
+                    if ui.button(t("plugin-delete-prompt-no")).clicked() {
                         cancel = true;
                     }
                 });
@@ -5044,18 +5172,18 @@ impl HebnixApp {
         let mut quit_rocket_league = false;
         let mut close = false;
 
-        egui::Window::new("Rocket League is open")
+        egui::Window::new(t("item-action-prompt-rocket-league-is-open")).id(egui::Id::new("item-action-prompt-rocket-league-is-open"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label("Rocket League must be closed to swap items, patch, or change colours.");
+                ui.label(t("item-action-prompt-rocket-league-must-be-closed-to"));
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Quit Rocket League").clicked() {
+                    if ui.button(t("item-action-prompt-quit-rocket-league")).clicked() {
                         quit_rocket_league = true;
                     }
-                    if ui.button("Close Prompt").clicked() {
+                    if ui.button(t("item-action-prompt-close-prompt")).clicked() {
                         close = true;
                     }
                 });
@@ -5087,25 +5215,24 @@ impl HebnixApp {
         }
         let mut enable = false;
         let mut cancel = false;
-        egui::Window::new("Enable owned-item catalog")
+        egui::Window::new(t("owned-proxy-prompt-enable-owned-item-catalog")).id(egui::Id::new("owned-proxy-prompt-enable-owned-item-catalog"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.label(
-                    "Hebnix needs its local proxy to read your Rocket League inventory.\n\
-                     The response is observed locally and is not modified or uploaded.",
+                    t("owned-proxy-prompt-hebnix-needs-its-local-proxy-to"),
                 );
                 if !self.spoofer_cert_installed {
                     ui.add_space(4.0);
-                    ui.label("The Hebnix proxy certificate will also be installed.");
+                    ui.label(t("owned-proxy-prompt-the-hebnix-proxy-certificate-will-also"));
                 }
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Enable Proxy").clicked() {
+                    if ui.button(t("owned-proxy-prompt-enable-proxy")).clicked() {
                         enable = true;
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
                         cancel = true;
                     }
                 });
@@ -5146,23 +5273,22 @@ impl HebnixApp {
         let mut close = false;
         let mut never = self.config.settings.suppress_fullscreen_warning;
 
-        egui::Window::new("Overlay unavailable")
+        egui::Window::new(t("fullscreen-notice-overlay-unavailable")).id(egui::Id::new("fullscreen-notice-overlay-unavailable"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.label(
-                    "Rocket League is set to Fullscreen, so the overlay won't draw over it.\n\
-                     Switch the game's video settings to Borderless or Windowed.",
+                    t("fullscreen-notice-rocket-league-is-set-to-fullscreen"),
                 );
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.checkbox(&mut never, "Never show again").changed() {
+                    if ui.checkbox(&mut never, t("fullscreen-notice-never-show-again")).changed() {
                         self.config.settings.suppress_fullscreen_warning = never;
                         self.save_config();
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("Close").clicked() {
+                        if ui.button(t("tray-close")).clicked() {
                             close = true;
                         }
                     });
@@ -5180,13 +5306,17 @@ impl HebnixApp {
             return;
         };
 
-        egui::Window::new("Update Required")
+        egui::Window::new(t("update-required-title"))
+            .id(egui::Id::new("update_required_window"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.heading(format!("Hebnix v{} is required", info.version));
-                ui.label("Hebnix is locked until the required update is installed.");
+                ui.heading(t_args(
+                    "update-required-heading",
+                    &[("version", info.version.as_str().into())],
+                ));
+                ui.label(t("update-locked-note"));
                 ui.add_space(8.0);
 
                 if let Some(err) = &self.update_error {
@@ -5195,11 +5325,11 @@ impl HebnixApp {
                 }
 
                 if self.update_downloading {
-                    ui.add_enabled(false, egui::Button::new("Downloading & Installing..."));
+                    ui.add_enabled(false, egui::Button::new(t("update-downloading")));
                     ui.spinner();
                 } else if ui
                     .add(
-                        egui::Button::new("Update Hebnix")
+                        egui::Button::new(t("update-button"))
                             .fill(egui::Color32::from_rgb(0x2e, 0xcc, 0x71)),
                     )
                     .clicked()
@@ -5227,7 +5357,8 @@ impl HebnixApp {
             return;
         };
         let mut open = true;
-        egui::Window::new("Change Log")
+        egui::Window::new(t("changelog-title"))
+            .id(egui::Id::new("changelog_window"))
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
@@ -5244,13 +5375,13 @@ impl HebnixApp {
             return;
         }
         let mut close = false;
-        egui::Window::new("Rocket League")
+        egui::Window::new(t("launch-path-notice-rocket-league")).id(egui::Id::new("launch-path-notice-rocket-league"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label("You must start Rocket League at least once with Hebnix running to use this function.");
-                if ui.button("OK").clicked() {
+                ui.label(t("launch-notice-body"));
+                if ui.button(t("btn-ok")).clicked() {
                     close = true;
                 }
             });
@@ -5266,7 +5397,7 @@ impl HebnixApp {
         use crate::config::RlLaunchMode;
 
         let mut open = true;
-        egui::Window::new("Rocket League Launch Setup")
+        egui::Window::new(t("rl-launch-setup-rocket-league-launch-setup")).id(egui::Id::new("rl-launch-setup-rocket-league-launch-setup"))
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
@@ -5274,39 +5405,34 @@ impl HebnixApp {
             .show(ctx, |ui| {
                 ui.set_max_width(420.0);
                 ui.label(
-                    "How do you actually launch Rocket League? This decides how the Restart \
-                     Rocket League button and Workshop LAN's Host/Join work. Auto-detect (the \
-                     default) works for real Steam and Epic Games Launcher installs already - \
-                     only pick something else here if you use Heroic.",
+                    t("rl-launch-setup-how-do-you-actually-launch-rocket"),
                 );
                 ui.add_space(8.0);
 
                 ui.radio_value(
                     &mut self.rl_launch_draft.mode,
                     RlLaunchMode::Unconfigured,
-                    "Auto-detect (Steam or Epic Games Launcher)",
+                    t("rl-launch-setup-auto-detect-steam-or-epic-games"),
                 );
                 ui.radio_value(
                     &mut self.rl_launch_draft.mode,
                     RlLaunchMode::SteamNative,
-                    "Real Steam game",
+                    t("settings-rl-mode-steam-native"),
                 );
                 ui.radio_value(
                     &mut self.rl_launch_draft.mode,
                     RlLaunchMode::EpicDirect,
-                    "Epic Games Launcher",
+                    t("settings-rl-mode-epic-direct"),
                 );
                 ui.radio_value(
                     &mut self.rl_launch_draft.mode,
                     RlLaunchMode::SteamShortcutToHeroic,
-                    "Non-Steam shortcut that opens Heroic",
+                    t("rl-launch-setup-non-steam-shortcut-that-opens-heroic"),
                 );
                 if self.rl_launch_draft.mode == RlLaunchMode::SteamShortcutToHeroic {
                     ui.label(
                         egui::RichText::new(
-                            "Non-Steam shortcuts can't pass launch arguments (a Steam \
-                             limitation). Workshop LAN's -multihome relaunch will launch Heroic \
-                             directly instead, bypassing Steam for that session.",
+                            t("rl-launch-setup-non-steam-shortcuts-can-t-pass"),
                         )
                         .size(11.0)
                         .color(egui::Color32::from_rgb(0xe6, 0xa8, 0x3c)),
@@ -5315,24 +5441,24 @@ impl HebnixApp {
                 ui.radio_value(
                     &mut self.rl_launch_draft.mode,
                     RlLaunchMode::HeroicDirect,
-                    "Heroic directly, no Steam or Epic Games Launcher involved",
+                    t("rl-launch-setup-heroic-directly-no-steam-or-epic"),
                 );
                 ui.add_space(8.0);
 
                 match self.rl_launch_draft.mode {
                     RlLaunchMode::Unconfigured | RlLaunchMode::EpicDirect => {}
                     RlLaunchMode::SteamNative => {
-                        ui.label("Steam App ID (252950 is Rocket League's own real listing):");
+                        ui.label(t("rl-launch-setup-steam-app-id-252950-is-rocket"));
                         ui.text_edit_singleline(&mut self.rl_launch_draft.steam_id);
                     }
                     RlLaunchMode::SteamShortcutToHeroic => {
-                        if ui.button("Scan Steam shortcuts for Heroic").clicked() {
+                        if ui.button(t("rl-launch-setup-scan-steam-shortcuts-for-heroic")).clicked() {
                             self.rl_launch_shortcut_candidates =
                                 crate::rl_launch::find_heroic_shortcuts();
                         }
                         if self.rl_launch_shortcut_candidates.is_empty() {
                             ui.small(
-                                "No candidates found yet - click Scan, or enter the ID manually below.",
+                                t("rl-launch-setup-no-candidates-found-yet-click-scan"),
                             );
                         } else {
                             for candidate in &self.rl_launch_shortcut_candidates {
@@ -5354,18 +5480,15 @@ impl HebnixApp {
                             }
                         }
                         ui.add_space(4.0);
-                        ui.label("Steam shortcut ID:");
+                        ui.label(t("rl-launch-setup-steam-shortcut-id"));
                         ui.text_edit_singleline(&mut self.rl_launch_draft.steam_id);
                         if !self.rl_launch_draft.heroic_binary.is_empty() {
                             ui.add_space(4.0);
-                            ui.label(format!(
-                                "Heroic binary: {}",
-                                self.rl_launch_draft.heroic_binary
-                            ));
+                            ui.label(t_args("rl-launch-setup-heroic-binary-rl-launch-draft", &[("heroic_binary", self.rl_launch_draft.heroic_binary.to_string().into())]));
                         }
                     }
                     RlLaunchMode::HeroicDirect => {
-                        ui.label("Heroic binary path (e.g. the full path to Heroic.exe):");
+                        ui.label(t("rl-launch-setup-heroic-binary-path-e-g-the"));
                         ui.text_edit_singleline(&mut self.rl_launch_draft.heroic_binary);
                     }
                 }
@@ -5375,22 +5498,22 @@ impl HebnixApp {
                     RlLaunchMode::SteamShortcutToHeroic | RlLaunchMode::HeroicDirect
                 ) {
                     ui.add_space(4.0);
-                    ui.label("Epic catalog app name (Sugar is Rocket League's, same for everyone):");
+                    ui.label(t("rl-launch-setup-epic-catalog-app-name-sugar-is"));
                     ui.text_edit_singleline(&mut self.rl_launch_draft.heroic_app_name);
-                    ui.label("Runner:");
+                    ui.label(t("rl-launch-setup-runner"));
                     ui.text_edit_singleline(&mut self.rl_launch_draft.heroic_runner);
                 }
 
                 ui.add_space(12.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Save").clicked() {
+                    if ui.button(t("rl-launch-setup-save")).clicked() {
                         self.config.rl_launch = self.rl_launch_draft.clone();
                         self.save_config();
                         self.console
                             .write("[Core] Rocket League launch setup saved.");
                         self.rl_launch_setup_open = false;
                     }
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
                         self.rl_launch_setup_open = false;
                     }
                 });
@@ -5408,7 +5531,7 @@ impl HebnixApp {
         let mut close_requested = false;
 
         let window = if self.install_modal.hebnix_stage {
-            egui::Window::new("Install Plugin")
+            egui::Window::new(t("plugins-install-plugin"))
                 .id(egui::Id::new("install_plugin_catalog"))
                 .open(&mut open)
                 .collapsible(false)
@@ -5416,7 +5539,7 @@ impl HebnixApp {
                 .fixed_size([900.0, 550.0])
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         } else {
-            egui::Window::new("Install Plugin")
+            egui::Window::new(t("plugins-install-plugin"))
                 .id(egui::Id::new("install_plugin_prompt"))
                 .open(&mut open)
                 .collapsible(false)
@@ -5431,7 +5554,7 @@ impl HebnixApp {
                     if ui
                         .add_sized(
                             [160.0, 120.0],
-                            egui::Button::new("☁\n\nInstall from Hebnix"),
+                            egui::Button::new(t("install-modal-install-from-hebnix")),
                         )
                         .clicked()
                     {
@@ -5439,10 +5562,10 @@ impl HebnixApp {
                         self.fetch_hebnix_plugin();
                     }
                     if ui
-                        .add_sized([160.0, 120.0], egui::Button::new("📁\n\nInstall from .ZIP"))
+                        .add_sized([160.0, 120.0], egui::Button::new(t("install-modal-install-from-zip")))
                         .clicked()
                     {
-                        let dialog = rfd::FileDialog::new().add_filter("Plugin Archives", &["zip"]);
+                        let dialog = rfd::FileDialog::new().add_filter(t("install-modal-plugin-archives"), &["zip"]);
                         if let Some(file) = winutil::parent_file_dialog(dialog).pick_file() {
                             match install_zip(&file, &self.plugin_dir) {
                                 Ok(()) => {
@@ -5480,21 +5603,21 @@ impl HebnixApp {
         let ctx = ui.ctx().clone();
 
         ui.horizontal(|ui| {
-            if ui.button("< Back").clicked() {
+            if ui.button(t("hebnix-install-back")).clicked() {
                 self.install_modal.hebnix_stage = false;
                 self.install_modal.catalog.clear();
                 self.install_modal.error = None;
                 self.install_modal.search_query.clear();
                 self.install_modal.current_page = 0;
             }
-            if ui.button("Refresh").clicked() {
+            if ui.button(t("btn-refresh")).clicked() {
                 self.fetch_hebnix_plugin();
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let search_resp = ui.add(
                     egui::TextEdit::singleline(&mut self.install_modal.search_query)
-                        .hint_text("🔍 Search plugins...")
+                        .hint_text(t("hebnix-install-search-plugins"))
                         .desired_width(200.0),
                 );
                 if search_resp.changed() {
@@ -5509,7 +5632,7 @@ impl HebnixApp {
                 ui.add_space(20.0);
                 ui.spinner();
                 ui.add_space(8.0);
-                ui.label("Fetching plugins...");
+                ui.label(t("hebnix-install-fetching-plugins"));
             });
             return;
         }
@@ -5590,7 +5713,7 @@ impl HebnixApp {
                     ui.add_space(20.0);
                     ui.centered_and_justified(|ui| {
                         ui.label(
-                            egui::RichText::new("No plugins found.")
+                            egui::RichText::new(t("hebnix-install-no-plugins-found"))
                                 .italics()
                                 .color(egui::Color32::GRAY),
                         );
@@ -5666,7 +5789,7 @@ impl HebnixApp {
                                     egui::Layout::top_down(egui::Align::Min),
                                     |ui| {
                                         ui.strong(format!("{name} v{version}"));
-                                        ui.weak(format!("by {author}"));
+                                        ui.weak(t_args("hebnix-install-by-author", &[("author", author.to_string().into())]));
                                         ui.add_sized(
                                             [details_width, 34.0],
                                             egui::Label::new(short_desc)
@@ -5687,11 +5810,11 @@ impl HebnixApp {
                                         if let Some(existing) = existing {
                                             let slug = existing.slug.clone();
                                             if existing.enabled {
-                                                if ui.button("Disable").clicked() {
+                                                if ui.button(t("hebnix-install-disable")).clicked() {
                                                     action = Some(ModalAction::Disable(slug));
                                                 }
                                             } else if ui
-                                                .add(egui::Button::new("Enable").fill(
+                                                .add(egui::Button::new(t("hebnix-install-enable")).fill(
                                                     egui::Color32::from_rgb(0x2e, 0xcc, 0x71),
                                                 ))
                                                 .clicked()
@@ -5703,9 +5826,9 @@ impl HebnixApp {
                                         {
                                             ui.add_enabled(
                                                 false,
-                                                egui::Button::new("Installing..."),
+                                                egui::Button::new(t("hebnix-install-installing")),
                                             );
-                                        } else if ui.button("Install").clicked() {
+                                        } else if ui.button(t("hebnix-install-install")).clicked() {
                                             action = Some(ModalAction::Download(id.to_string()));
                                         }
                                     },
@@ -5721,7 +5844,7 @@ impl HebnixApp {
                 if ui
                     .add_enabled(
                         self.install_modal.current_page + 1 < total_pages,
-                        egui::Button::new("Next >"),
+                        egui::Button::new(t("hebnix-install-next")),
                     )
                     .clicked()
                 {
@@ -5733,12 +5856,12 @@ impl HebnixApp {
                 } else {
                     self.install_modal.current_page + 1
                 };
-                ui.label(format!("Page {} of {}", display_page, total_pages));
+                ui.label(t_args("hebnix-install-page-display-page-of-total-pages", &[("display_page", display_page.to_string().into()), ("total_pages", total_pages.to_string().into())]));
 
                 if ui
                     .add_enabled(
                         self.install_modal.current_page > 0,
-                        egui::Button::new("< Prev"),
+                        egui::Button::new(t("hebnix-install-prev")),
                     )
                     .clicked()
                 {
@@ -6092,7 +6215,7 @@ impl HebnixApp {
                         );
                         if ui
                             .put(close_rect, egui::Button::new("×").frame(false))
-                            .on_hover_text("Close")
+                            .on_hover_text(t("tray-close"))
                             .clicked()
                         {
                             self.plugin_mgr.close_window(&slug);
@@ -6107,7 +6230,7 @@ impl HebnixApp {
                             if let Err(e) = self.plugin_mgr.render_window(&slug, ui) {
                                 ui.colored_label(
                                     egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
-                                    format!("window error: {e}"),
+                                    t_args("plugin-windows-window-error-e", &[("e", e.to_string().into())]),
                                 );
                             }
                         });
@@ -6266,7 +6389,7 @@ impl eframe::App for HebnixApp {
             egui::CentralPanel::default().show(ui, |ui| {
                 ui.disable();
                 ui.centered_and_justified(|ui| {
-                    ui.heading("A required Hebnix update is available");
+                    ui.heading(t("update-required-banner"));
                 });
             });
             self.render_update_modal(ctx);
@@ -6278,15 +6401,20 @@ impl eframe::App for HebnixApp {
             egui::CentralPanel::default().show(ui, |ui| {
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.tab, Tab::Console, "Console");
-                    ui.selectable_value(&mut self.tab, Tab::Workshop, "Maps");
-                    ui.selectable_value(&mut self.tab, Tab::Spoofer, "Spoofer");
-                    ui.selectable_value(&mut self.tab, Tab::Colours, "Colours");
-                    ui.selectable_value(&mut self.tab, Tab::Patcher, "Items");
-                    ui.selectable_value(&mut self.tab, Tab::Settings, "Settings");
-                    ui.selectable_value(&mut self.tab, Tab::Plugins, "Plugins");
-                    ui.selectable_value(&mut self.tab, Tab::RlApi, "Experimental");
-                    ui.selectable_value(&mut self.tab, Tab::About, "About");
+                    // same order as the original hardcoded bar
+                    for tab in [
+                        Tab::Console,
+                        Tab::Workshop,
+                        Tab::Spoofer,
+                        Tab::Colours,
+                        Tab::Patcher,
+                        Tab::Settings,
+                        Tab::Plugins,
+                        Tab::RlApi,
+                        Tab::About,
+                    ] {
+                        ui.selectable_value(&mut self.tab, tab, tab.label());
+                    }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(
@@ -6311,28 +6439,28 @@ impl eframe::App for HebnixApp {
                     Tab::Spoofer => self.render_spoofer_tab(ui),
                     Tab::Patcher => {
                         ui.horizontal(|ui| {
-                            ui.selectable_value(&mut self.items_mode, ItemsMode::Swapper, "Items Swapper");
-                            ui.selectable_value(&mut self.items_mode, ItemsMode::Spawner, "Items Spawner");
+                            ui.selectable_value(&mut self.items_mode, ItemsMode::Swapper, t("app-items-swapper"));
+                            ui.selectable_value(&mut self.items_mode, ItemsMode::Spawner, t("app-items-spawner"));
                         });
                         ui.separator();
                         if self.items_mode == ItemsMode::Spawner {
                             ui.horizontal(|ui| {
                                 let mut enabled = self.item_spawner_enabled;
-                                if ui.checkbox(&mut enabled, "Enable Items Spawner").changed() {
+                                if ui.checkbox(&mut enabled, t("app-enable-items-spawner")).changed() {
                                     if enabled {
                                         self.spawner_enable_prompt_open = true;
                                     } else {
                                         self.disable_item_spawner();
                                     }
                                 }
-                                ui.weak("Read Tutorial before enabling.");
+                                ui.weak(t("app-read-tutorial-before-enabling"));
                             });
                             let cooked_pc = std::path::Path::new(&self.config.settings.rl_path)
                                 .join("TAGame").join("CookedPCConsole");
                             egui::Panel::left("spawner_categories")
                                 .resizable(false).exact_size(150.0).show(ui, |ui| {
                                     egui::ScrollArea::vertical().id_salt("spawner_subtabs").show(ui, |ui| {
-                                        ui.selectable_value(&mut self.spawner_subtab, SpawnerSubTab::Tutorial, "Tutorial");
+                                        ui.selectable_value(&mut self.spawner_subtab, SpawnerSubTab::Tutorial, t("app-tutorial"));
                                         ui.separator();
                                         ui.add_enabled_ui(self.item_spawner_enabled && !self.spawn_restart_pending, |ui| {
                                             for category in crate::swapper::SwapCategory::ALL {
@@ -6348,31 +6476,31 @@ impl eframe::App for HebnixApp {
                                 }
                                 match self.spawner_subtab {
                                     SpawnerSubTab::Tutorial => {
-                                        ui.heading("Item Spawner Tutorial");
+                                        ui.heading(t("app-item-spawner-tutorial"));
                                         ui.add_space(8.0);
-                                        ui.label("Rocket League must be closed before you enable the Item Spawner.");
+                                        ui.label(t("app-rocket-league-must-be-closed-before"));
                                         ui.add_space(8.0);
-                                        ui.label("If you close Hebnix while Rocket League is open, its network watchdog stays active until the game exits.");
+                                        ui.label(t("app-if-you-close-hebnix-while-rocket"));
                                         ui.add_space(8.0);
-                                        ui.label("If you have problems connecting to Epic, open Hebnix while Rocket League is closed, enable Item Spawner and disable it again, then open Rocket League.");
+                                        ui.label(t("app-if-you-have-problems-connecting-to"));
                                         ui.add_space(8.0);
-                                        ui.label("Spawned items can persist locally or disappear, including mid match.");
+                                        ui.label(t("app-spawned-items-can-persist-locally-or"));
                                         ui.add_space(8.0);
-                                        ui.label("Disabling Item Spawner stops interception but does not edit Rocket League account saves.");
+                                        ui.label(t("app-disabling-item-spawner-stops-interceptio"));
                                         ui.add_space(8.0);
                                         if self.spawn_restart_pending {
                                             ui.add_space(12.0);
-                                            ui.weak("Start Rocket League to use the item categories.");
+                                            ui.weak(t("app-start-rocket-league-to-use-the"));
                                         }
                                     }
                                     SpawnerSubTab::Category(category) => {
                                         if self.catalogs_loading {
-                                            ui.horizontal(|ui| { ui.spinner(); ui.label("Loading item catalogs..."); });
+                                            ui.horizontal(|ui| { ui.spinner(); ui.label(t("app-loading-item-catalogs")); });
                                         }
                                         if let Some(error) = self.catalogs_error.clone() {
                                             ui.colored_label(egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
-                                                format!("Catalog download failed: {error}"));
-                                            if ui.button("Reload Catalogs").clicked() { self.reload_catalogs(ctx); }
+                                                t_args("app-catalog-download-failed-error", &[("error", error.to_string().into())]));
+                                            if ui.button(t("app-reload-catalogs")).clicked() { self.reload_catalogs(ctx); }
                                         }
                                         if self.catalogs_loaded {
                                             if let Some((product_id, paint)) = self.swapper.render_spawn_tab(
@@ -6409,17 +6537,17 @@ impl eframe::App for HebnixApp {
                                         ui.selectable_value(
                                             &mut self.patcher_subtab,
                                             PatcherSubTab::Ball,
-                                            "Ball Patcher",
+                                            t("app-ball-patcher"),
                                         );
                                         ui.selectable_value(
                                             &mut self.patcher_subtab,
                                             PatcherSubTab::BoostMeter,
-                                            "Boost Patcher",
+                                            t("app-boost-patcher"),
                                         );
                                         ui.selectable_value(
                                             &mut self.patcher_subtab,
                                             PatcherSubTab::Decal,
-                                            "Decal Patcher",
+                                            t("app-decal-patcher"),
                                         );
                                         ui.separator();
                                         for category in crate::swapper::SwapCategory::ALL {
@@ -6433,12 +6561,12 @@ impl eframe::App for HebnixApp {
                                         ui.selectable_value(
                                             &mut self.patcher_subtab,
                                             PatcherSubTab::Active,
-                                            "Active",
+                                            t("app-active"),
                                         );
                                         ui.selectable_value(
                                             &mut self.patcher_subtab,
                                             PatcherSubTab::Presets,
-                                            "Presets",
+                                            t("presets-presets"),
                                         );
                                     });
                             });
@@ -6454,16 +6582,16 @@ impl eframe::App for HebnixApp {
                                 if self.catalogs_loading {
                                     ui.horizontal(|ui| {
                                         ui.spinner();
-                                        ui.label("Loading item catalogs...");
+                                        ui.label(t("app-loading-item-catalogs"));
                                     });
                                     ui.add_space(8.0);
                                 }
                                 if let Some(error) = self.catalogs_error.clone() {
                                     ui.colored_label(
                                         egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
-                                        format!("Catalog download failed: {error}"),
+                                        t_args("app-catalog-download-failed-error", &[("error", error.to_string().into())]),
                                     );
-                                    if ui.button("Reload Catalogs").clicked() {
+                                    if ui.button(t("app-reload-catalogs")).clicked() {
                                         self.reload_catalogs(ctx);
                                     }
                                     ui.add_space(8.0);
@@ -6538,7 +6666,7 @@ impl eframe::App for HebnixApp {
                                         .id_salt("active_items")
                                         .auto_shrink([false, false])
                                         .show(ui, |ui| {
-                                    ui.heading("Active Items");
+                                    ui.heading(t("app-active-items"));
                                     let swap_count = self.swapper.active_count(&backups_dir);
                                     let active_count = swap_count
                                         + usize::from(self.patcher_ball.active_ball.is_some())
@@ -6546,14 +6674,14 @@ impl eframe::App for HebnixApp {
                                         + self.patcher_decal.active_decals.len()
                                         + self.patcher_car.active_cars.len();
                                     ui.horizontal(|ui| {
-                                        ui.label(format!("{active_count} active change(s)"));
+                                        ui.label(t_n("items-active-changes", active_count as i64));
                                         ui.with_layout(
                                             egui::Layout::right_to_left(egui::Align::Center),
                                             |ui| {
                                                 if ui
                                                     .add_enabled(
                                                         active_count > 0,
-                                                        egui::Button::new("Restore All"),
+                                                        egui::Button::new(t("app-restore-all")),
                                                     )
                                                     .clicked()
                                                 {
@@ -6600,7 +6728,8 @@ impl eframe::App for HebnixApp {
                                                     ) {
                                                         Ok(count) if count > 0 => {
                                                             let _ = self.tx.send(AppMsg::Log(format!(
-                                                                "[Swapper] Restored {count} active swap(s)."
+                                                                "[Swapper] {}",
+                                                                t_n("console-swapper-restored", count as i64)
                                                             )));
                                                         }
                                                         Err(error) => {
@@ -6616,7 +6745,7 @@ impl eframe::App for HebnixApp {
                                     });
                                     ui.separator();
                                     if active_count == 0 {
-                                        ui.vertical_centered(|ui| ui.weak("No patches or swaps are active."));
+                                        ui.vertical_centered(|ui| ui.weak(t("app-no-patches-or-swaps-are-active")));
                                     }
 
                                     let active_ball = self.patcher_ball.active_ball.clone();
@@ -6635,9 +6764,9 @@ impl eframe::App for HebnixApp {
                                             }
                                             ui.vertical(|ui| {
                                                 ui.strong(&name);
-                                                ui.weak("Replaced the default ball");
+                                                ui.weak(t("app-replaced-the-default-ball"));
                                             });
-                                            if ui.button("Restore").clicked() {
+                                            if ui.button(t("app-restore")).clicked() {
                                                 self.patcher_ball.begin_restore(
                                                     &cooked_pc, &backups_dir, &self.tx, ctx,
                                                 );
@@ -6688,9 +6817,9 @@ impl eframe::App for HebnixApp {
                                             }
                                             ui.vertical(|ui| {
                                                 ui.strong(&name);
-                                                ui.weak("Replaced the default boost meter");
+                                                ui.weak(t("app-replaced-the-default-boost-meter"));
                                             });
-                                            if ui.button("Restore").clicked() {
+                                            if ui.button(t("app-restore")).clicked() {
                                                 self.patcher_boost.begin_restore(
                                                     &cooked_pc, &backups_dir, &self.tx, ctx,
                                                 );
@@ -6719,9 +6848,9 @@ impl eframe::App for HebnixApp {
                                             }
                                             ui.vertical(|ui| {
                                                 ui.strong(&name);
-                                                ui.weak(format!("Replaced {target_label}"));
+                                                ui.weak(t_args("app-replaced-target-label", &[("target_label", target_label.to_string().into())]));
                                             });
-                                            if ui.button("Restore").clicked() {
+                                            if ui.button(t("app-restore")).clicked() {
                                                 restore_decal = target.split_once('|')
                                                     .map(|(car, skin)| (car.to_string(), skin.to_string()));
                                             }
@@ -6743,9 +6872,9 @@ impl eframe::App for HebnixApp {
                                         ui.horizontal(|ui| {
                                             ui.vertical(|ui| {
                                                 ui.strong(&name);
-                                                ui.weak(format!("Replaced {target} for its BodyID car"));
+                                                ui.weak(t_args("app-replaced-target-for-its-bodyid-car", &[("target", target.to_string().into())]));
                                             });
-                                            if ui.button("Restore").clicked() {
+                                            if ui.button(t("app-restore")).clicked() {
                                                 restore_car = Some(target.clone());
                                             }
                                         });
@@ -6825,22 +6954,22 @@ impl eframe::App for HebnixApp {
                                         ui.selectable_value(
                                             &mut self.experimental_subtab,
                                             ExperimentalSubTab::BallAppearance,
-                                            "Ball Appearance",
+                                            t("app-ball-appearance"),
                                         );
                                         ui.selectable_value(
                                             &mut self.experimental_subtab,
                                             ExperimentalSubTab::CarPatcher,
-                                            "Car Patcher",
+                                            t("app-car-patcher"),
                                         );
                                         ui.selectable_value(
                                             &mut self.experimental_subtab,
                                             ExperimentalSubTab::WheelAlignment,
-                                            "Wheel Alignment",
+                                            t("app-wheel-alignment"),
                                         );
                                         ui.selectable_value(
                                             &mut self.experimental_subtab,
                                             ExperimentalSubTab::SpeedPatch,
-                                            "Animation Speed",
+                                            t("app-speed-patch"),
                                         );
                                     });
                             });
@@ -6897,15 +7026,15 @@ impl eframe::App for HebnixApp {
                                     if self.catalogs_loading {
                                         ui.horizontal(|ui| {
                                             ui.spinner();
-                                            ui.label("Loading item catalogs...");
+                                            ui.label(t("app-loading-item-catalogs"));
                                         });
                                     }
                                     if let Some(error) = self.catalogs_error.clone() {
                                         ui.colored_label(
                                             egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
-                                            format!("Catalog download failed: {error}"),
+                                            t_args("app-catalog-download-failed-error", &[("error", error.to_string().into())]),
                                         );
-                                        if ui.button("Reload Catalogs").clicked() {
+                                        if ui.button(t("app-reload-catalogs")).clicked() {
                                             self.reload_catalogs(ctx);
                                         }
                                     }
@@ -6929,17 +7058,17 @@ impl eframe::App for HebnixApp {
 
         if self.restart_notice && !self.hidden {
             let mut close = false;
-            egui::Window::new("Hebnix")
+            egui::Window::new(t("about-hebnix")).id(egui::Id::new("Hebnix"))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     ui.label(
-                        "Hebnix has initialised StatsAPI. Please restart Rocket League to initialise Hebnix.",
+                        t("app-hebnix-has-initialised-statsapi-please-r"),
                     );
                     ui.add_space(8.0);
                     ui.vertical_centered(|ui| {
-                        if ui.button("Restart Rocket League").clicked() {
+                        if ui.button(t("action-restart-rocket-league")).clicked() {
                             let path = self.config.settings.rl_path.clone();
                             let _ = crate::winutil::restart_rocket_league(
                                 &self.config.rl_launch,
@@ -6947,7 +7076,7 @@ impl eframe::App for HebnixApp {
                             );
                             close = true;
                         }
-                        if ui.button("OK").clicked() {
+                        if ui.button(t("btn-ok")).clicked() {
                             close = true;
                         }
                     });

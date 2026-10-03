@@ -11,6 +11,7 @@ use serde_json::Value;
 
 use crate::config::Config;
 use crate::hotkey::ToggleHotkey;
+use crate::i18n::{t, t_args};
 use crate::messages::AppMsg;
 use crate::monitor::{Monitor, MonitorShared};
 use crate::overlay::Overlay;
@@ -36,6 +37,17 @@ enum Tab {
     Plugins,
     Settings,
     About,
+}
+
+impl Tab {
+    fn label(self) -> String {
+        match self {
+            Self::Console => t("tab-console"),
+            Self::Plugins => t("tab-plugins"),
+            Self::Settings => t("tab-settings"),
+            Self::About => t("tab-about"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -626,7 +638,7 @@ impl LiteApp {
                             self.install_modal.catalog =
                                 catalog.as_array().cloned().unwrap_or_default();
                             self.install_modal.error = (!catalog.is_array()).then(|| {
-                                "Plugin catalog returned an invalid response.".to_string()
+                                t("handle-messages-plugin-catalog-returned-an-invalid-respo").to_string()
                             });
                         }
                         Err(error) => self.install_modal.error = Some(error),
@@ -785,6 +797,26 @@ impl LiteApp {
         }
     }
 
+    /// switch the UI language right away and remember it
+    fn change_language(&mut self, ctx: &egui::Context, choice: &str) {
+        crate::i18n::set_language(choice);
+        self.config.settings.language = choice.to_string();
+        self.save_config();
+
+        // glyph fallback fonts depend on the language, so rebuild the fonts
+        let _ = theme::apply_theme(
+            ctx,
+            &self.themes_dir,
+            &self.fonts_dir,
+            &self.config.settings.theme,
+        );
+        theme::apply_window_opacity(ctx, self.config.settings.window_opacity);
+        if let Some(tray) = &self.tray {
+            tray.refresh_labels(self.hidden);
+        }
+        ctx.request_repaint();
+    }
+
     fn set_hidden(&mut self, ctx: &egui::Context, hidden: bool) {
         let rocket_league_had_focus = !hidden && hebnix_sdk::process::is_rocket_league_focused();
         if !hidden {
@@ -919,16 +951,16 @@ impl LiteApp {
                     let info = hebnix_sdk::log::parse_launch_log(None, true, "INT");
                     let Some(game) = info.game else {
                         let reason = if !hebnix_sdk::process::is_rocket_league_running() {
-                            "Rocket League is not running."
+                            t("execute-command-rocket-league-is-not-running")
                         } else if !info.stats_api_available {
-                            "Can't read the match, the stats api is not answering."
+                            t("execute-command-can-t-read-the-match-the")
                         } else {
-                            "Not in a game."
+                            t("execute-command-not-in-a-game")
                         };
                         let _ = tx.send(AppMsg::Log(format!("[Console] {reason}")));
                         return;
                     };
-                    let unknown = || "Unknown".to_string();
+                    let unknown = || t("execute-command-unknown").to_string();
                     let name = game.server_name.unwrap_or_else(unknown);
                     let ip = game.server_ip.unwrap_or_else(unknown);
                     let port = game.server_port.map(|p| p.to_string()).unwrap_or_else(unknown);
@@ -1033,10 +1065,10 @@ impl LiteApp {
             .collect();
 
         let mut moved: Option<(usize, usize)> = None;
-        egui::CollapsingHeader::new(format!("Overlay order ({} layers)", rows.len()))
+        egui::CollapsingHeader::new(t_args("overlay-order-overlay-order-rows-layers", &[("rows", (rows.len()).to_string().into())]))
             .id_salt("overlay_order")
             .show(ui, |ui| {
-                ui.label("Drag to reorder. The top one draws over the ones below it.");
+                ui.label(t("overlay-order-drag-to-reorder-the-top-one"));
                 ui.add_space(4.0);
                 for (index, (slug, name, kind)) in rows.iter().enumerate() {
                     let row_id = egui::Id::new(("overlay_layer", slug));
@@ -1074,17 +1106,17 @@ impl LiteApp {
 
     fn render_plugins(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            if ui.button("Open Plugins Folder").clicked() {
+            if ui.button(t("action-open-plugins-folder")).clicked() {
                 let _ = open::that(&self.plugin_dir);
             }
-            if ui.button("Install Plugin").clicked() {
+            if ui.button(t("plugins-install-plugin")).clicked() {
                 self.install_modal = InstallModal {
                     open: true,
                     ..Default::default()
                 };
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Reload").clicked() {
+                if ui.button(t("plugins-reload")).clicked() {
                     self.plugin_mgr.reload_all(&mut self.config);
                     self.save_config();
                 }
@@ -1125,14 +1157,10 @@ impl LiteApp {
                                 ui.with_layout(
                                     egui::Layout::right_to_left(egui::Align::Center),
                                     |ui| {
-                                        if ui
-                                            .add(egui::Button::new(
-                                                egui::RichText::new("🗑")
-                                                    .color(Color32::from_rgb(0xe7, 0x4c, 0x3c)),
-                                            ))
-                                            .on_hover_text("Delete plugin")
-                                            .clicked()
-                                        {
+                                        if ui.add(egui::Button::new(
+                                            egui::RichText::new("🗑")
+                                                .color(Color32::from_rgb(0xe7, 0x4c, 0x3c)),
+                                        )).on_hover_text(t("plugins-delete-plugin")).clicked() {
                                             deletes.push(plugin.slug.clone());
                                         }
                                         if plugin.load_error.is_none()
@@ -1158,7 +1186,7 @@ impl LiteApp {
                 if self.plugin_mgr.plugins.is_empty() {
                     ui.add_space(30.0);
                     ui.vertical_centered(|ui| {
-                        ui.label("No plugins installed. Drop a plugin folder into plugins/.");
+                        ui.label(t("plugins-no-plugins-installed-drop-a-plugin"));
                     });
                 }
             });
@@ -1206,18 +1234,18 @@ impl LiteApp {
             .unwrap_or(slug.clone());
         let mut confirm = false;
         let mut cancel = false;
-        egui::Window::new("Delete plugin?")
+        egui::Window::new(t("plugin-delete-prompt-delete-plugin")).id(egui::Id::new("plugin-delete-prompt-delete-plugin"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label(format!("Are you sure you want to delete {plugin_name}?"));
+                ui.label(t_args("plugin-delete-prompt-are-you-sure-you-want-to", &[("plugin_name", plugin_name.to_string().into())]));
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Yes").clicked() {
+                    if ui.button(t("plugin-delete-prompt-yes")).clicked() {
                         confirm = true;
                     }
-                    if ui.button("No").clicked() {
+                    if ui.button(t("plugin-delete-prompt-no")).clicked() {
                         cancel = true;
                     }
                 });
@@ -1237,24 +1265,28 @@ impl LiteApp {
         let Some(info) = self.update_info.clone() else {
             return;
         };
-        egui::Window::new("Update Required")
+        egui::Window::new(t("update-required-title"))
+            .id(egui::Id::new("lite_update_required_window"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.heading(format!("Hebnix Lite v{} is required", info.version));
-                ui.label("Hebnix Lite is locked until the required update is installed.");
+                ui.heading(t_args(
+                    "lite-update-required-heading",
+                    &[("version", info.version.as_str().into())],
+                ));
+                ui.label(t("lite-update-locked-note"));
                 ui.add_space(8.0);
                 if let Some(error) = &self.update_error {
                     ui.colored_label(Color32::from_rgb(0xe7, 0x4c, 0x3c), error);
                     ui.add_space(8.0);
                 }
                 if self.update_downloading {
-                    ui.add_enabled(false, egui::Button::new("Downloading & Installing..."));
+                    ui.add_enabled(false, egui::Button::new(t("update-downloading")));
                     ui.spinner();
                 } else if ui
                     .add(
-                        egui::Button::new("Update Hebnix")
+                        egui::Button::new(t("update-button"))
                             .fill(Color32::from_rgb(0x2e, 0xcc, 0x71)),
                     )
                     .clicked()
@@ -1282,7 +1314,8 @@ impl LiteApp {
             return;
         };
         let mut open = true;
-        egui::Window::new("Change Log")
+        egui::Window::new(t("changelog-title"))
+            .id(egui::Id::new("lite_changelog_window"))
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
@@ -1299,13 +1332,13 @@ impl LiteApp {
             return;
         }
         let mut close = false;
-        egui::Window::new("Rocket League")
+        egui::Window::new(t("launch-path-notice-rocket-league")).id(egui::Id::new("launch-path-notice-rocket-league"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label("You must start Rocket League at least once with Hebnix running to use this function.");
-                if ui.button("OK").clicked() {
+                ui.label(t("launch-notice-body"));
+                if ui.button(t("btn-ok")).clicked() {
                     close = true;
                 }
             });
@@ -1319,11 +1352,11 @@ impl LiteApp {
         }
         let mut open = true;
         let window = if self.install_modal.catalog_open {
-            egui::Window::new("Install Plugin")
+            egui::Window::new(t("plugins-install-plugin")).id(egui::Id::new("plugins-install-plugin"))
                 .resizable(false)
                 .fixed_size([900.0, 550.0])
         } else {
-            egui::Window::new("Install Plugin")
+            egui::Window::new(t("plugins-install-plugin")).id(egui::Id::new("plugins-install-plugin"))
                 .resizable(false)
                 .fixed_size([350.0, 160.0])
         };
@@ -1338,7 +1371,7 @@ impl LiteApp {
                         if ui
                             .add_sized(
                                 [160.0, 120.0],
-                                egui::Button::new("☁\n\nInstall from Hebnix"),
+                                egui::Button::new(t("install-modal-install-from-hebnix")),
                             )
                             .clicked()
                         {
@@ -1346,11 +1379,11 @@ impl LiteApp {
                             self.fetch_plugin_catalog();
                         }
                         if ui
-                            .add_sized([160.0, 120.0], egui::Button::new("📁\n\nInstall from .ZIP"))
+                            .add_sized([160.0, 120.0], egui::Button::new(t("install-modal-install-from-zip")))
                             .clicked()
                         {
                             let dialog =
-                                rfd::FileDialog::new().add_filter("Plugin archive", &["zip"]);
+                                rfd::FileDialog::new().add_filter(t("install-modal-plugin-archive"), &["zip"]);
                             if let Some(file) = winutil::parent_file_dialog(dialog).pick_file() {
                                 match install_zip(&file, &self.plugin_dir) {
                                     Ok(()) => {
@@ -1375,17 +1408,17 @@ impl LiteApp {
                 }
 
                 ui.horizontal(|ui| {
-                    if ui.button("< Back").clicked() {
+                    if ui.button(t("hebnix-install-back")).clicked() {
                         self.install_modal.catalog_open = false;
                     }
-                    if ui.button("Refresh").clicked() {
+                    if ui.button(t("btn-refresh")).clicked() {
                         self.fetch_plugin_catalog();
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
                             .add(
                                 egui::TextEdit::singleline(&mut self.install_modal.search)
-                                    .hint_text("Search plugins")
+                                    .hint_text(t("install-modal-search-plugins"))
                                     .desired_width(220.0),
                             )
                             .changed()
@@ -1397,7 +1430,7 @@ impl LiteApp {
                 ui.separator();
                 if self.install_modal.fetching {
                     ui.spinner();
-                    ui.label("Fetching plugins...");
+                    ui.label(t("hebnix-install-fetching-plugins"));
                     return;
                 }
                 if let Some(error) = &self.install_modal.error {
@@ -1517,7 +1550,7 @@ impl LiteApp {
                                             egui::Layout::top_down(egui::Align::Min),
                                             |ui| {
                                                 ui.strong(format!("{name} v{version}"));
-                                                ui.weak(format!("by {author}"));
+                                                ui.weak(t_args("hebnix-install-by-author", &[("author", author.to_string().into())]));
                                                 ui.add_sized(
                                                     [details_width, 34.0],
                                                     egui::Label::new(short_description)
@@ -1536,10 +1569,10 @@ impl LiteApp {
                                                     });
                                                 if let Some(plugin) = existing {
                                                     if plugin.enabled {
-                                                        if ui.button("Disable").clicked() {
+                                                        if ui.button(t("hebnix-install-disable")).clicked() {
                                                             disable = Some(plugin.slug.clone());
                                                         }
-                                                    } else if ui.button("Enable").clicked() {
+                                                    } else if ui.button(t("hebnix-install-enable")).clicked() {
                                                         enable = Some(plugin.slug.clone());
                                                     }
                                                 } else if self
@@ -1550,12 +1583,12 @@ impl LiteApp {
                                                 {
                                                     ui.add_enabled(
                                                         false,
-                                                        egui::Button::new("Installing..."),
+                                                        egui::Button::new(t("hebnix-install-installing")),
                                                     );
                                                 } else if ui
                                                     .add_enabled(
                                                         !id.is_empty(),
-                                                        egui::Button::new("Install"),
+                                                        egui::Button::new(t("hebnix-install-install")),
                                                     )
                                                     .clicked()
                                                 {
@@ -1570,20 +1603,16 @@ impl LiteApp {
                     });
                 ui.horizontal(|ui| {
                     if ui
-                        .add_enabled(self.install_modal.page > 0, egui::Button::new("< Prev"))
+                        .add_enabled(self.install_modal.page > 0, egui::Button::new(t("hebnix-install-prev")))
                         .clicked()
                     {
                         self.install_modal.page -= 1;
                     }
-                    ui.label(format!(
-                        "Page {} of {}",
-                        self.install_modal.page + 1,
-                        total_pages
-                    ));
+                    ui.label(t_args("install-modal-page-install-modal-of-total-pages", &[("page", (self.install_modal.page + 1).to_string().into()), ("total_pages", total_pages.to_string().into())]));
                     if ui
                         .add_enabled(
                             self.install_modal.page + 1 < total_pages,
-                            egui::Button::new("Next >"),
+                            egui::Button::new(t("hebnix-install-next")),
                         )
                         .clicked()
                     {
@@ -1790,12 +1819,12 @@ impl LiteApp {
             ui.selectable_value(
                 &mut self.settings_tab,
                 SettingsTab::Hebnix,
-                "Hebnix Settings",
+                t("settings-subtab-hebnix"),
             );
             ui.selectable_value(
                 &mut self.settings_tab,
                 SettingsTab::Plugin,
-                "Plugin Settings",
+                t("settings-subtab-plugin"),
             );
         });
         ui.separator();
@@ -1808,35 +1837,36 @@ impl LiteApp {
     fn render_hebnix_settings(&mut self, ui: &mut egui::Ui) {
         egui::Panel::left("lite_hebnix_settings_list")
             .resizable(false)
-            .exact_size(200.0)
+            .default_size(200.0)
+            .size_range(200.0..=320.0)
             .show(ui, |ui| {
                 ui.selectable_value(
                     &mut self.hebnix_settings_tab,
                     HebnixSettingsTab::Interface,
-                    "Interface",
+                    t("settings-nav-interface"),
                 );
                 ui.selectable_value(
                     &mut self.hebnix_settings_tab,
                     HebnixSettingsTab::Directories,
-                    "Directories & Files",
+                    t("settings-nav-directories"),
                 );
                 ui.selectable_value(
                     &mut self.hebnix_settings_tab,
                     HebnixSettingsTab::System,
-                    "System",
+                    t("settings-nav-system"),
                 );
                 ui.selectable_value(
                     &mut self.hebnix_settings_tab,
                     HebnixSettingsTab::Discord,
-                    "Discord",
+                    t("settings-nav-discord"),
                 );
             });
         ui.vertical(|ui| {
             ui.heading(match self.hebnix_settings_tab {
-                HebnixSettingsTab::Interface => "Interface Configuration",
-                HebnixSettingsTab::Directories => "Directories & Files Configuration",
-                HebnixSettingsTab::Discord => "Discord",
-                HebnixSettingsTab::System => "System Configuration",
+                HebnixSettingsTab::Interface => t("settings-heading-interface"),
+                HebnixSettingsTab::Directories => t("settings-heading-directories"),
+                HebnixSettingsTab::Discord => t("settings-heading-discord"),
+                HebnixSettingsTab::System => t("settings-heading-system"),
             });
             ui.add_space(8.0);
             match self.hebnix_settings_tab {
@@ -1851,15 +1881,15 @@ impl LiteApp {
     fn render_interface_settings(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         ui.horizontal(|ui| {
-            ui.label("Open/Close Keybind:");
+            ui.label(t("settings-keybind-label"));
             ui.label(self.config.settings.hotkey.to_uppercase());
             if ui
                 .add_enabled(
                     !self.capturing_hotkey,
                     egui::Button::new(if self.capturing_hotkey {
-                        "Listening..."
+                        t("settings-keybind-listening")
                     } else {
-                        "Set Keybind"
+                        t("settings-keybind-set")
                     }),
                 )
                 .clicked()
@@ -1868,7 +1898,45 @@ impl LiteApp {
             }
         });
         ui.horizontal(|ui| {
-            ui.label("Theme:");
+            ui.label(t("settings-language-label"));
+            let mut chosen = self.config.settings.language.clone();
+            let mut language_changed = false;
+            let known = crate::i18n::available();
+            let shown = if chosen.eq_ignore_ascii_case(crate::i18n::AUTO) {
+                t("settings-language-auto")
+            } else {
+                known
+                    .iter()
+                    .find(|l| l.code.eq_ignore_ascii_case(&chosen))
+                    .map(crate::i18n::display_name)
+                    .unwrap_or_else(|| chosen.clone())
+            };
+            egui::ComboBox::from_id_salt("lite_language")
+                .selected_text(shown)
+                .show_ui(ui, |ui| {
+                    language_changed |= ui
+                        .selectable_value(
+                            &mut chosen,
+                            crate::i18n::AUTO.to_string(),
+                            t("settings-language-auto"),
+                        )
+                        .changed();
+                    for locale in &known {
+                        language_changed |= ui
+                            .selectable_value(
+                                &mut chosen,
+                                locale.code.clone(),
+                                crate::i18n::display_name(locale),
+                            )
+                            .changed();
+                    }
+                });
+            if language_changed {
+                self.change_language(&ctx, &chosen);
+            }
+        });
+        ui.horizontal(|ui| {
+            ui.label(t("settings-theme-label"));
             let mut choice = self.config.settings.theme.clone();
             egui::ComboBox::from_id_salt("lite_theme")
                 .selected_text(&choice)
@@ -1884,18 +1952,18 @@ impl LiteApp {
                 }
                 theme::apply_window_opacity(&ctx, self.config.settings.window_opacity);
             }
-            if ui.button("Refresh").clicked() {
+            if ui.button(t("btn-refresh")).clicked() {
                 self.theme_options = theme::list_themes(&self.themes_dir);
             }
-            if ui.button("Open Folder").clicked() {
+            if ui.button(t("btn-open-folder")).clicked() {
                 let _ = open::that(&self.themes_dir);
             }
-            if ui.button("Open Fonts Folder").clicked() {
+            if ui.button(t("settings-open-fonts-folder")).clicked() {
                 let _ = open::that(&self.fonts_dir);
             }
         });
         ui.horizontal(|ui| {
-            ui.label("Window Opacity:");
+            ui.label(t("settings-opacity-label"));
             if ui
                 .add(egui::Slider::new(
                     &mut self.config.settings.window_opacity,
@@ -1916,15 +1984,15 @@ impl LiteApp {
     }
 
     fn render_stats_settings(&mut self, ui: &mut egui::Ui) {
-        ui.weak("(auto-detected from the running game)");
+        ui.weak(t("settings-dirs-autodetected"));
         ui.add_space(8.0);
         ui.horizontal(|ui| {
-            ui.label("Rocket League Folder:");
+            ui.label(t("settings-rl-folder-label"));
             ui.add_enabled(
                 false,
                 egui::TextEdit::singleline(&mut self.config.settings.rl_path).desired_width(420.0),
             );
-            if ui.button("Browse").clicked() {
+            if ui.button(t("btn-browse")).clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     self.config.settings.rl_path = path.to_string_lossy().to_string();
                     self.refresh_statsapi();
@@ -1933,20 +2001,20 @@ impl LiteApp {
             }
         });
         ui.horizontal(|ui| {
-            ui.label("DefaultStatsAPI.ini:");
+            ui.label(t("settings-statsapi-ini-label"));
             ui.add_enabled(
                 false,
                 egui::TextEdit::singleline(&mut self.config.settings.statsapi_path)
                     .desired_width(420.0),
             );
-            if ui.button("Browse").clicked() {
+            if ui.button(t("btn-browse")).clicked() {
                 let start_dir = Path::new(&self.config.settings.statsapi_path)
                     .parent()
                     .map(Path::to_path_buf)
                     .unwrap_or_default();
                 if let Some(path) = rfd::FileDialog::new()
                     .set_directory(start_dir)
-                    .add_filter("INI files", &["ini"])
+                    .add_filter(t("filter-ini-files"), &["ini"])
                     .pick_file()
                 {
                     self.config.settings.statsapi_path = path.to_string_lossy().to_string();
@@ -1993,10 +2061,10 @@ impl LiteApp {
             self.update_ini_setting("WebPort", &value);
         }
         self.web_port_edit = web_port_edit;
-        if ui.button("Refresh StatsAPI values").clicked() {
+        if ui.button(t("lite-refresh-statsapi")).clicked() {
             self.refresh_statsapi();
         }
-        ui.weak("Changes to the ini apply after restarting Rocket League.");
+        ui.weak(t("settings-ini-restart-note"));
     }
 
     fn render_discord_settings(&mut self, ui: &mut egui::Ui) {
@@ -2004,7 +2072,7 @@ impl LiteApp {
         if ui
             .checkbox(
                 &mut self.config.settings.discord_rich_presence,
-                "Enable Discord Rich Presence",
+                t("discord-enable"),
             )
             .changed()
         {
@@ -2015,16 +2083,16 @@ impl LiteApp {
         if ui
             .checkbox(
                 &mut self.config.settings.discord_rocket_league_only,
-                "Limit Discord RPC to Rocket League only",
+                t("discord-rl-only"),
             )
             .changed()
         {
             changed = true;
         }
         ui.add_space(8.0);
-        ui.label("Message:");
+        ui.label(t("discord-message-label"));
         let mut game_state = self.config.settings.discord_game_state;
-        if ui.checkbox(&mut game_state, "Game State").changed() {
+        if ui.checkbox(&mut game_state, t("discord-game-state")).changed() {
             self.config.settings.discord_game_state = game_state;
             changed = true;
         }
@@ -2039,7 +2107,7 @@ impl LiteApp {
                         !self.config.settings.discord_show_score || selected > 1,
                         egui::Checkbox::new(
                             &mut self.config.settings.discord_show_score,
-                            "Show score",
+                            t("discord-show-score"),
                         ),
                     )
                     .changed()
@@ -2052,7 +2120,7 @@ impl LiteApp {
                 if ui
                     .add_enabled(
                         !self.config.settings.discord_show_map || selected > 1,
-                        egui::Checkbox::new(&mut self.config.settings.discord_show_map, "Show map"),
+                        egui::Checkbox::new(&mut self.config.settings.discord_show_map, t("discord-show-map")),
                     )
                     .changed()
                 {
@@ -2066,7 +2134,7 @@ impl LiteApp {
                         !self.config.settings.discord_show_gamemode || selected > 1,
                         egui::Checkbox::new(
                             &mut self.config.settings.discord_show_gamemode,
-                            "Show gamemode",
+                            t("discord-show-gamemode"),
                         ),
                     )
                     .changed()
@@ -2078,7 +2146,7 @@ impl LiteApp {
 
         ui.horizontal(|ui| {
             let mut custom = !self.config.settings.discord_game_state;
-            if ui.checkbox(&mut custom, "Custom").changed() {
+            if ui.checkbox(&mut custom, t("discord-custom")).changed() {
                 self.config.settings.discord_game_state = !custom;
                 changed = true;
             }
@@ -2086,7 +2154,7 @@ impl LiteApp {
                 .add_enabled(
                     custom,
                     egui::TextEdit::singleline(&mut self.config.settings.discord_custom_message)
-                        .hint_text("Custom message")
+                        .hint_text(t("discord-custom-hint"))
                         .desired_width(280.0),
                 )
                 .changed()
@@ -2095,7 +2163,7 @@ impl LiteApp {
             }
         });
         if self.config.settings.discord_game_state {
-            ui.weak("The custom message is disabled while Game State is selected.");
+            ui.weak(t("discord-custom-disabled-note"));
         }
         if changed {
             self.save_config();
@@ -2104,28 +2172,43 @@ impl LiteApp {
     }
 
     fn render_system_settings(&mut self, ui: &mut egui::Ui) {
+        let label_w = crate::i18n::layout::label_column_width(
+            ui,
+            &[
+                t("system-start-with-windows"),
+                t("lite-system-start-hidden"),
+                t("system-suppress-left"),
+                t("system-fullscreen-warning"),
+                t("system-allow-draw-focus"),
+                t("system-limit-hotkey"),
+                t("system-statsapi-rate"),
+            ],
+            180.0,
+        );
         ui.horizontal(|ui| {
-            ui.add_sized([180.0, 20.0], egui::Label::new("Start with Windows:"));
+            ui.add_sized([label_w, 20.0], egui::Label::new(t("system-start-with-windows")));
             if ui.checkbox(&mut self.startup_enabled, "").changed() {
                 if let Err(error) = winutil::set_startup_enabled(self.startup_enabled) {
-                    self.console
-                        .write(format!("[Console] Failed to update startup entry: {error}"));
+                    self.console.write(format!(
+                        "[Console] {}",
+                        t_args("console-startup-failed", &[("error", error.to_string().into())])
+                    ));
                     self.startup_enabled = winutil::is_startup_enabled();
                 }
             }
         });
         ui.horizontal(|ui| {
-            ui.add_sized([180.0, 20.0], egui::Label::new("Start Hidden:"));
+            ui.add_sized([label_w, 20.0], egui::Label::new(t("lite-system-start-hidden")));
             if ui
                 .checkbox(&mut self.config.settings.start_in_tray, "")
-                .on_hover_text("Starts minimised. Use the toggle hotkey to show it.")
+                .on_hover_text(t("lite-system-start-hidden-hover"))
                 .changed()
             {
                 self.save_config();
             }
         });
         ui.horizontal(|ui| {
-            ui.add_sized([180.0, 20.0], egui::Label::new("Suppress Left Alerts:"));
+            ui.add_sized([label_w, 20.0], egui::Label::new(t("system-suppress-left")));
             if ui
                 .checkbox(&mut self.config.settings.suppress_left_alerts, "")
                 .changed()
@@ -2134,7 +2217,7 @@ impl LiteApp {
             }
         });
         ui.horizontal(|ui| {
-            ui.add_sized([180.0, 20.0], egui::Label::new("Fullscreen Warning:"));
+            ui.add_sized([label_w, 20.0], egui::Label::new(t("system-fullscreen-warning")));
             let mut show = !self.config.settings.suppress_fullscreen_warning;
             if ui.checkbox(&mut show, "").changed() {
                 self.config.settings.suppress_fullscreen_warning = !show;
@@ -2144,11 +2227,11 @@ impl LiteApp {
                 self.save_config();
             }
         });
-        ui.weak("Warns when the game is fullscreen and overlays cannot draw.");
+        ui.weak(t("lite-system-fullscreen-note"));
         ui.horizontal(|ui| {
             ui.add_sized(
-                [180.0, 20.0],
-                egui::Label::new("Allow Draw on Hebnix Focus:"),
+                [label_w, 20.0],
+                egui::Label::new(t("system-allow-draw-focus")),
             );
             if ui
                 .checkbox(&mut self.config.settings.allow_draw_on_hebnix_focus, "")
@@ -2159,8 +2242,8 @@ impl LiteApp {
         });
         ui.horizontal(|ui| {
             ui.add_sized(
-                [180.0, 20.0],
-                egui::Label::new("Limit Hotkey to Hebnix/Rocket League:"),
+                [label_w, 20.0],
+                egui::Label::new(t("system-limit-hotkey")),
             );
             if ui
                 .checkbox(
@@ -2176,22 +2259,16 @@ impl LiteApp {
             }
         });
         ui.horizontal(|ui| {
-            ui.add_sized([180.0, 20.0], egui::Label::new("StatsAPI Rate Warning:"));
+            ui.add_sized([label_w, 20.0], egui::Label::new(t("system-statsapi-rate")));
             let mut show = !self.config.settings.suppress_statsapi_rate_warning;
             if ui.checkbox(&mut show, "").changed() {
                 self.config.settings.suppress_statsapi_rate_warning = !show;
                 self.save_config();
             }
         });
-        ui.weak("Warns when PacketSendRate is not 20.");
+        ui.weak(t("lite-system-statsapi-note"));
         ui.add_space(8.0);
-        if ui
-            .add_enabled(
-                !self.epic_repair.running,
-                egui::Button::new("Fix Epic Connection"),
-            )
-            .clicked()
-        {
+        if ui.add_enabled(!self.epic_repair.running, egui::Button::new(t("action-fix-epic-connection"))).clicked() {
             self.epic_repair.begin(ui.ctx());
         }
     }
@@ -2208,9 +2285,9 @@ impl LiteApp {
         if with_settings.is_empty() {
             ui.add_space(50.0);
             ui.vertical_centered(|ui| {
-                ui.label("No Plugins with Settings Enabled");
+                ui.label(t("plugin-settings-none"));
                 ui.add_space(8.0);
-                if ui.button("Go to Plugins").clicked() {
+                if ui.button(t("plugin-settings-go")).clicked() {
                     self.tab = Tab::Plugins;
                 }
             });
@@ -2251,7 +2328,7 @@ impl LiteApp {
             .id_salt("lite_plugin_settings_view")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                ui.heading(format!("{display_name} Configuration"));
+                ui.heading(t_args("plugin-settings-display-name-configuration", &[("display_name", display_name.to_string().into())]));
                 ui.add_space(8.0);
                 if let Err(error) = self.plugin_mgr.render_settings(&selected, ui) {
                     self.console.write(format!(
@@ -2264,14 +2341,11 @@ impl LiteApp {
     fn render_about(&self, ui: &mut egui::Ui) {
         ui.add_space(40.0);
         ui.vertical_centered(|ui| {
-            ui.heading("Hebnix Lite");
+            ui.heading(t("about-hebnix-lite"));
             ui.add_space(10.0);
-            ui.label(format!(
-                "Version {APP_VERSION}\n\nA safe, EAC-compliant Mod Loader for Rocket League.\n\nhebnix.com\n\nBuilt by Hebbins & nixvio64.\n\nPress {} to show/hide Hebnix Lite.",
-                self.config.settings.hotkey.to_uppercase()
-            ));
+            ui.label(t_args("about-version-app-version-a-safe-eac-2", &[("version", APP_VERSION.to_string().into()), ("hotkey", (self.config.settings.hotkey.to_uppercase()).to_string().into())]));
             ui.separator();
-            ui.label("Built with help from the community\nContributors:\nxplodingeggo");
+            ui.label(t("about-built-with-help-from-the-community"));
         });
     }
 
@@ -2280,20 +2354,19 @@ impl LiteApp {
         if self.fullscreen_notice && self.statsapi_notice.is_none() {
             let mut dismiss = false;
             let mut suppress = false;
-            egui::Window::new("Fullscreen warning")
+            egui::Window::new(t("notices-fullscreen-warning")).id(egui::Id::new("notices-fullscreen-warning"))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     ui.label(
-                        "Rocket League is set to Fullscreen, so the overlay won't draw over it.\n\
-                         Switch the game's video settings to Borderless or Windowed.",
+                        t("fullscreen-notice-rocket-league-is-set-to-fullscreen"),
                     );
                     ui.horizontal(|ui| {
-                        if ui.button("OK").clicked() {
+                        if ui.button(t("btn-ok")).clicked() {
                             dismiss = true;
                         }
-                        if ui.button("Don't show again").clicked() {
+                        if ui.button(t("notices-don-t-show-again")).clicked() {
                             suppress = true;
                         }
                     });
@@ -2315,24 +2388,24 @@ impl LiteApp {
                 let blocking = self.statsapi_blocking;
                 let mut dismiss = false;
                 let mut suppress = false;
-                egui::Window::new("StatsAPI configuration")
+                egui::Window::new(t("statsapi-notice-statsapi-configuration")).id(egui::Id::new("StatsAPI configuration"))
                     .collapsible(false)
                     .resizable(false)
                     .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                     .show(ctx, |ui| {
                         ui.label(message);
                         if blocking {
-                            ui.label("No game data reaches plugins until this is fixed.");
+                            ui.label(t("notices-no-game-data-reaches-plugins-until"));
                         }
                         ui.horizontal(|ui| {
-                            if ui.button("Set PacketSendRate to 20").clicked() {
+                            if ui.button(t("notices-set-packetsendrate-to-20")).clicked() {
                                 self.update_ini_setting("PacketSendRate", "20");
                                 dismiss = true;
                             }
-                            if ui.button("Later").clicked() {
+                            if ui.button(t("notices-later")).clicked() {
                                 dismiss = true;
                             }
-                            if !blocking && ui.button("Don't show again").clicked() {
+                            if !blocking && ui.button(t("notices-don-t-show-again")).clicked() {
                                 suppress = true;
                             }
                         });
@@ -2579,7 +2652,7 @@ impl LiteApp {
                         );
                         if ui
                             .put(close_rect, egui::Button::new("×").frame(false))
-                            .on_hover_text("Close")
+                            .on_hover_text(t("tray-close"))
                             .clicked()
                         {
                             self.plugin_mgr.close_window(&slug);
@@ -2588,7 +2661,7 @@ impl LiteApp {
                     }
                     ui.separator();
                     if let Err(error) = self.plugin_mgr.render_window(&slug, ui) {
-                        ui.colored_label(Color32::LIGHT_RED, format!("window error: {error}"));
+                        ui.colored_label(Color32::LIGHT_RED, t_args("plugin-windows-window-error-error", &[("error", error.to_string().into())]));
                     }
                 });
                 if let Some(rect) = ctx.input(|input| input.viewport().outer_rect) {
@@ -2624,7 +2697,10 @@ fn ini_row(
         if response.lost_focus() && !value.is_empty() && value != current {
             apply = Some(value.clone());
         }
-        if ui.button(format!("Set {default}")).clicked() {
+        if ui
+            .button(t_args("settings-set-value", &[("value", default.into())]))
+            .clicked()
+        {
             apply = Some(default.to_string());
         }
     });
@@ -2678,7 +2754,7 @@ impl eframe::App for LiteApp {
             egui::CentralPanel::default().show(ui, |ui| {
                 ui.disable();
                 ui.centered_and_justified(|ui| {
-                    ui.heading("A required Hebnix Lite update is available");
+                    ui.heading(t("lite-update-required-banner"));
                 });
             });
             self.render_update_modal(&ctx);
@@ -2687,10 +2763,9 @@ impl eframe::App for LiteApp {
         }
         egui::CentralPanel::default().show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.tab, Tab::Console, "Console");
-                ui.selectable_value(&mut self.tab, Tab::Settings, "Settings");
-                ui.selectable_value(&mut self.tab, Tab::Plugins, "Plugins");
-                ui.selectable_value(&mut self.tab, Tab::About, "About");
+                for tab in [Tab::Console, Tab::Settings, Tab::Plugins, Tab::About] {
+                    ui.selectable_value(&mut self.tab, tab, tab.label());
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
                         egui::RichText::new(&self.status_text)
@@ -2700,9 +2775,9 @@ impl eframe::App for LiteApp {
                     );
                     let running = self.last_rl_open;
                     let label = if running {
-                        "Restart Rocket League"
+                        t("action-restart-rocket-league")
                     } else {
-                        "Start Rocket League"
+                        t("action-start-rocket-league")
                     };
                     if ui.button(label).clicked() {
                         let path = self.config.settings.rl_path.clone();
