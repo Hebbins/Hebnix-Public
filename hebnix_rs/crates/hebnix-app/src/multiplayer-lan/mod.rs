@@ -21,7 +21,7 @@ pub use firewall::{
 // session type
 pub use hosting::HostSession;
 pub use map_sync::{
-    LocalInfo, MAP_SYNC_PORT, MAX_MAP_BYTES, MapFileProvider, MapProvider, SlotMap,
+    LocalInfo, MAP_SYNC_PORT, MAX_MAP_BYTES, MapFileProvider, MapProvider, PeerOffer, SlotMap,
     TransferProgress, fetch_map_file, hash_file, is_local_map_id, local_map_id, valid_map_id,
 };
 pub use models::{
@@ -29,7 +29,7 @@ pub use models::{
     RoomCredentials, TsnetAuthKey, UpdatePlayerRequest,
 };
 pub use room_api::RoomClient;
-pub use tsnet_sidecar::{PeerInfo, TsState, TsnetSidecarHandle};
+pub use tsnet_sidecar::{PeerInfo, TsState, TsnetSidecarHandle, find_sidecar_dir, redact};
 
 /// Where the headscale coordination server for Workshop LAN lives. Harry
 /// said he'll likely just run headscale on the existing api.hebnix.com box
