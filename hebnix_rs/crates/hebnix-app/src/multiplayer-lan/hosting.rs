@@ -50,12 +50,15 @@ impl HostSession {
         let host_octets = parse_ipv4(&host_tailnet_ip)?;
         let host_ip: std::net::IpAddr = host_tailnet_ip
             .parse()
-            .map_err(|_| format!("invalid tailnet address: {host_tailnet_ip}"))?;
+            .map_err(|_| "invalid tailnet address".to_string())?;
         let relay = BeaconRelay::bind(host_ip)?;
         let map_sync = match MapSync::start(sidecar.clone(), host_ip, map_provider, map_files) {
             Ok(sync) => Some(sync),
             Err(error) => {
-                let _ = tx.send(AppMsg::Log(format!("[Core] Map sync unavailable: {error}")));
+                let _ = tx.send(AppMsg::Log(format!(
+                    "[Core] Map sync unavailable: {}",
+                    super::redact(&error)
+                )));
                 None
             }
         };
@@ -63,10 +66,6 @@ impl HostSession {
         let (stop_sender, stop_receiver) = mpsc::channel();
         let worker_stats = stats.clone();
         let worker_sidecar = sidecar.clone();
-        let _ = tx.send(AppMsg::Log(format!(
-            "[Core] Beacon relay bound to {host_ip}, watching UDP {:?}",
-            super::RL_DISCOVERY_PORTS
-        )));
         let worker = thread::spawn(move || {
             // refreshed from the tailnet's own peer list, not a room -
             // relaying to everyone currently connected is the point. Just
@@ -99,7 +98,7 @@ impl HostSession {
                 }
                 if let Some((payload, source, port)) = relay.try_receive() {
                     let _ = tx.send(AppMsg::Log(format!(
-                        "[Core] Beacon relay captured {} bytes on UDP {port} from {source} - {} known peer(s) to relay to",
+                        "[Core] Beacon relay captured {} bytes on UDP {port} - {} known peer(s) to relay to",
                         payload.len(),
                         guest_ips.len()
                     )));
@@ -124,7 +123,8 @@ impl HostSession {
                             }
                             Err(error) => {
                                 let _ = tx.send(AppMsg::Log(format!(
-                                    "[Core] Beacon relay failed to send to {guest}: {error}"
+                                    "[Core] Beacon relay failed to send to a peer: {}",
+                                    super::redact(&error.to_string())
                                 )));
                             }
                         }
@@ -216,7 +216,7 @@ fn parse_ipv4(address: &str) -> Result<[u8; 4], String> {
     address
         .parse::<std::net::Ipv4Addr>()
         .map(|value| value.octets())
-        .map_err(|_| format!("invalid tailnet address: {address}"))
+        .map_err(|_| "invalid tailnet address".to_string())
 }
 
 /// Rewrites the host's real LAN ip:port embedded in Rocket League's LAN

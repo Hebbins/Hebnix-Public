@@ -25,18 +25,26 @@ pub use map_sync::{
     TransferProgress, fetch_map_file, hash_file, is_local_map_id, local_map_id, valid_map_id,
 };
 pub use models::{
-    CreateRoomRequest, JoinRoomRequest, JoinedRoom, LeaveRoomRequest, MapDescriptor, Room,
-    RoomCredentials, TsnetAuthKey, UpdatePlayerRequest,
+    CreateRoomRequest, JoinRoomRequest, JoinedRoom, LeaveRoomRequest, Room,
+    RoomCredentials, UpdatePlayerRequest,
 };
-pub use room_api::RoomClient;
 pub use tsnet_sidecar::{PeerInfo, TsState, TsnetSidecarHandle, find_sidecar_dir, redact};
 
-/// Where the headscale coordination server for Workshop LAN lives. Harry
-/// said he'll likely just run headscale on the existing api.hebnix.com box
-/// rather than standing up a separate subdomain, so this points there by
-/// default -- update this one constant if he ends up hosting it elsewhere.
-pub const TSNET_CONTROL_URL: &str = "https://hs.xplodingeggo.space"; // TEST ONLY, do not commit
-pub const ROOM_API_BASE_URL: &str = "https://hs.xplodingeggo.space"; // TEST ONLY, do not commit
+mod hs_auth {
+    include!(concat!(env!("OUT_DIR"), "/hs_key.rs"));
+}
+
+pub fn tailnet_auth_key() -> Result<&'static str, String> {
+    let key = hs_auth::KEY.trim();
+    if key.is_empty() {
+        Err("Headscale auth key is missing; add hs_key.txt at the repository root and rebuild Hebnix.".into())
+    } else {
+        Ok(key)
+    }
+}
+
+/// Headscale coordination server for Workshop multiplayer.
+pub const TSNET_CONTROL_URL: &str = "https://mp.hebnix.com";
 
 /// Rocket League's actual game traffic port. This is the value rewritten
 /// *inside* the beacon payload (the "join me at ip:port" the packet

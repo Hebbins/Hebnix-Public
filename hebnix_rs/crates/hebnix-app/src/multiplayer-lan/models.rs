@@ -88,14 +88,3 @@ pub struct Room {
     #[serde(default)]
     pub players: Vec<PlayerInfo>,
 }
-
-/// speculative: the response shape for the not-yet-built
-/// `?request=tsnet/authkey` endpoint (see the tsnet-multiplayer rework
-/// plan). `control_url` is included per-response rather than hardcoded so
-/// the backend can move headscale without a client update.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct TsnetAuthKey {
-    pub auth_key: String,
-    pub control_url: String,
-    pub expires_at: String,
-}

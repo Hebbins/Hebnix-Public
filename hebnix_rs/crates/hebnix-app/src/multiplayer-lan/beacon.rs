@@ -30,14 +30,20 @@
 // sockets -- that direction was always fine, confirmed working
 // host-to-guest over the tunnel independently of this whole issue.
 
-use std::ffi::CString;
+use std::ffi::{CString, c_void};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender};
 
+use libloading::Library;
 use socket2::{Domain, Socket, Type};
-use windivert_sys as sys;
-use windows_windivert_handle::Win32::Foundation::HANDLE;
+use windows::Win32::Foundation::HANDLE;
+use windows::core::BOOL;
+
+const WINDIVERT_LAYER_NETWORK: u32 = 0;
+const WINDIVERT_FLAG_SNIFF: u64 = 0x0001;
+const WINDIVERT_FLAG_RECV_ONLY: u64 = 0x0004;
+const WINDIVERT_SHUTDOWN_BOTH: u32 = 3;
 
 pub struct BeaconRelay {
     // a single socket, bound to an OS-assigned ephemeral port, used only for
@@ -78,6 +84,11 @@ pub struct BeaconRelay {
 /// now never touched at shutdown at all.
 struct RawCapture {
     handle: HANDLE,
+    // Keep the DLL mapped for every call and until after WinDivertClose().
+    _library: Library,
+    recv: unsafe extern "C" fn(HANDLE, *mut c_void, u32, *mut u32, *mut c_void) -> BOOL,
+    shutdown: unsafe extern "C" fn(HANDLE, u32) -> BOOL,
+    close: unsafe extern "C" fn(HANDLE) -> BOOL,
 }
 
 // HANDLE is just a wrapper around an isize - safe to share and use
@@ -87,20 +98,62 @@ unsafe impl Send for RawCapture {}
 unsafe impl Sync for RawCapture {}
 
 impl RawCapture {
-    fn open(filter: &str, flags: sys::WinDivertFlags) -> Result<Self, String> {
+    /// Loads WinDivert only once Hebnix is elevated and the runtime bundle has
+    /// been extracted to its AppData folder. This avoids an eager process-load
+    /// dependency on a DLL/driver that may not exist yet.
+    fn open(filter: &str, flags: u64) -> Result<Self, String> {
+        if !crate::spoofer::is_admin() {
+            return Err("WinDivert capture requires Hebnix to run as administrator".to_string());
+        }
+
+        let base_dir = crate::config::base_dir();
+        crate::multiplayer_assets::ensure_present(&base_dir)
+            .map_err(|error| format!("could not extract multiplayer components: {error}"))?;
+        let dll_path = base_dir.join("multiplayer-lan").join("WinDivert.dll");
+        let library = unsafe { Library::new(&dll_path) }
+            .map_err(|error| format!("could not load {}: {error}", dll_path.display()))?;
+
+        // Function pointers are copied out while `library` remains owned by
+        // RawCapture, so the DLL cannot unload before the final Close call.
+        let open = unsafe {
+            *library
+                .get::<unsafe extern "C" fn(*const i8, u32, i16, u64) -> HANDLE>(b"WinDivertOpen\0")
+                .map_err(|error| format!("could not find WinDivertOpen: {error}"))?
+        };
+        let recv = unsafe {
+            *library
+                .get::<unsafe extern "C" fn(HANDLE, *mut c_void, u32, *mut u32, *mut c_void) -> BOOL>(b"WinDivertRecv\0")
+                .map_err(|error| format!("could not find WinDivertRecv: {error}"))?
+        };
+        let shutdown = unsafe {
+            *library
+                .get::<unsafe extern "C" fn(HANDLE, u32) -> BOOL>(b"WinDivertShutdown\0")
+                .map_err(|error| format!("could not find WinDivertShutdown: {error}"))?
+        };
+        let close = unsafe {
+            *library
+                .get::<unsafe extern "C" fn(HANDLE) -> BOOL>(b"WinDivertClose\0")
+                .map_err(|error| format!("could not find WinDivertClose: {error}"))?
+        };
+
         let filter = CString::new(filter).map_err(|error| error.to_string())?;
-        let handle =
-            unsafe { sys::WinDivertOpen(filter.as_ptr(), sys::WinDivertLayer::Network, 0, flags) };
+        let handle = unsafe { open(filter.as_ptr(), WINDIVERT_LAYER_NETWORK, 0, flags) };
         if handle.is_invalid() {
             return Err(std::io::Error::last_os_error().to_string());
         }
-        Ok(Self { handle })
+        Ok(Self {
+            handle,
+            _library: library,
+            recv,
+            shutdown,
+            close,
+        })
     }
 
     fn recv(&self, buffer: &mut [u8]) -> std::io::Result<usize> {
         let mut recv_len: u32 = 0;
         let ok = unsafe {
-            sys::WinDivertRecv(
+            (self.recv)(
                 self.handle,
                 buffer.as_mut_ptr() as *mut _,
                 buffer.len() as u32,
@@ -119,7 +172,7 @@ impl RawCapture {
     /// struct doc comment for why this is safe to call concurrently
     fn shutdown(&self) {
         unsafe {
-            sys::WinDivertShutdown(self.handle, sys::WinDivertShutdownMode::Both);
+            let _ = (self.shutdown)(self.handle, WINDIVERT_SHUTDOWN_BOTH);
         }
     }
 }
@@ -127,7 +180,7 @@ impl RawCapture {
 impl Drop for RawCapture {
     fn drop(&mut self) {
         unsafe {
-            sys::WinDivertClose(self.handle);
+            let _ = (self.close)(self.handle);
         }
     }
 }
@@ -208,7 +261,7 @@ fn spawn_capture_thread(tx: Sender<(Vec<u8>, SocketAddr, u16)>) -> Result<Arc<Ra
     // always unicast to a specific peer, never to the broadcast address).
     let filter = format!("outbound and udp and ({port_filter}) and ip.DstAddr == 255.255.255.255");
 
-    let flags = sys::WinDivertFlags::new().set_sniff().set_recv_only();
+    let flags = WINDIVERT_FLAG_SNIFF | WINDIVERT_FLAG_RECV_ONLY;
     let capture = Arc::new(
         RawCapture::open(&filter, flags)
             .map_err(|error| format!("could not start the beacon capture (WinDivert): {error}"))?,

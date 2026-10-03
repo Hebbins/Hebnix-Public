@@ -225,7 +225,10 @@ impl TsnetSidecarHandle {
                 });
             }
             Err(error) => {
-                let _ = tx.send(AppMsg::Log(format!("[tsnet] status check failed: {error}")));
+                let _ = tx.send(AppMsg::Log(format!(
+                    "[tsnet] status check failed: {}",
+                    redact(&error)
+                )));
             }
         });
         Ok(())
