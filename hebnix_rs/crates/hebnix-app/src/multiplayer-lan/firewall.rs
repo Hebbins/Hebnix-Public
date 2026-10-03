@@ -122,7 +122,15 @@ fn ensure_udp_rule(
     remote_port: Option<&str>,
     remote_ip: Option<&str>,
 ) -> Result<(), String> {
-    ensure_rule(name, "UDP", executable, direction, local_port, remote_port, remote_ip)
+    ensure_rule(
+        name,
+        "UDP",
+        executable,
+        direction,
+        local_port,
+        remote_port,
+        remote_ip,
+    )
 }
 
 fn ensure_rule(

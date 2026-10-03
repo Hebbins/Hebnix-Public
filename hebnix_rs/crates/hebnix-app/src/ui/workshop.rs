@@ -2,8 +2,8 @@
 //! over the rocket labs placeholders.
 
 use std::collections::{HashMap, HashSet};
-use std::net::IpAddr;
 use std::io::Read;
+use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -21,17 +21,16 @@ use crate::multiplayer_lan::{
     ensure_beacon_relay_rule, ensure_map_sync_rule, ensure_rocket_league_lan_rule,
     ensure_sidecar_rule, fetch_map_file, find_sidecar_dir, is_local_map_id, redact, valid_map_id,
 };
-mod background_changer;
 mod archive;
+mod background_changer;
 mod local_import;
 mod steam_download;
-use background_changer::BackgroundChangerState;
 use archive::ArchiveBrowser;
+use background_changer::BackgroundChangerState;
 use steam_download::SteamDownloader;
 
 /// common Workshop multiplayer problems (VPNs/proxies, firewalls) and fixes
-const MULTIPLAYER_HELP_URL: &str =
-    "https://github.com/xplodingeggo/hebnix-linux/blob/feature/tsnet-multiplayer/docs/workshop-multiplayer-help.md"; // TEST ONLY: point at HebnixRL/Hebnix-Public main once merged
+const MULTIPLAYER_HELP_URL: &str = "https://github.com/xplodingeggo/hebnix-linux/blob/feature/tsnet-multiplayer/docs/workshop-multiplayer-help.md"; // TEST ONLY: point at HebnixRL/Hebnix-Public main once merged
 use local_import::{
     ImportWizard, LocalMap, is_local_entry, load_local_maps, record_received_map, remove_local_map,
 };
@@ -598,7 +597,8 @@ fn multiplayer_help_button(ui: &mut egui::Ui) {
         .on_hover_text("Opens the Workshop multiplayer help page on GitHub")
         .clicked()
     {
-        ui.ctx().open_url(egui::OpenUrl::new_tab(MULTIPLAYER_HELP_URL));
+        ui.ctx()
+            .open_url(egui::OpenUrl::new_tab(MULTIPLAYER_HELP_URL));
     }
 }
 
@@ -1486,9 +1486,9 @@ impl WorkshopState {
         let repaint = ctx.clone();
         std::thread::spawn(move || {
             let result = (|| -> Result<Arc<TsnetSidecarHandle>, String> {
-                let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-                let exe_dir = executable.parent().ok_or_else(|| {
-                    "could not locate Hebnix's install folder".to_string()
+                let base_dir = crate::config::base_dir();
+                crate::runtime_assets::ensure_multiplayer_present(&base_dir).map_err(|error| {
+                    format!("could not extract multiplayer components: {error}")
                 })?;
                 // the helper programs can sit in a multiplayer-lan folder in
                 // the data folder (installed) or next to the exe (portable,
@@ -1524,8 +1524,7 @@ impl WorkshopState {
         match result {
             Ok(sidecar) => {
                 self.multiplayer.sidecar = Some(sidecar);
-                self.multiplayer.status =
-                    "Connected to the private Workshop network.".to_string();
+                self.multiplayer.status = "Connected to the private Workshop network.".to_string();
             }
             Err(error) => {
                 self.multiplayer.tailnet_requested = false;
@@ -1539,8 +1538,7 @@ impl WorkshopState {
     /// authenticating and reports a tailnet address
     pub fn set_tailnet_ip(&mut self, tailnet_ip: String) {
         self.multiplayer.tailnet_ip = Some(tailnet_ip);
-        self.multiplayer.status =
-            "Ready on the private Workshop network.".to_string();
+        self.multiplayer.status = "Ready on the private Workshop network.".to_string();
     }
 
     pub fn tailnet_failed(&mut self, error: String) {
@@ -1851,7 +1849,11 @@ impl WorkshopState {
         rl_path: &str,
         ctx: &eframe::egui::Context,
     ) {
-        if self.multiplayer.map_install_busy.swap(true, Ordering::Relaxed) {
+        if self
+            .multiplayer
+            .map_install_busy
+            .swap(true, Ordering::Relaxed)
+        {
             return;
         }
         let map_data = self
@@ -1998,7 +2000,8 @@ impl WorkshopState {
                 self.multiplayer.identity_updated = false;
                 self.multiplayer.identity_update_in_flight = false;
                 self.multiplayer.status =
-                    "Relaying - host or join from Rocket League's own LAN match screen.".to_string();
+                    "Relaying - host or join from Rocket League's own LAN match screen."
+                        .to_string();
                 self.multiplayer.relay = Some(session);
             }
             Err(error) => {

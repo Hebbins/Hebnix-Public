@@ -895,10 +895,7 @@ mod tests {
         assert!(rule.rewrite(&mut body));
         let value: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
         assert_eq!(value["PlayerTitleConfig"]["Titles"][0]["Text"], "Fallback");
-        assert_eq!(
-            value["PlayerTitleConfig"]["Titles"][1]["Text"],
-            "Dedicated"
-        );
+        assert_eq!(value["PlayerTitleConfig"]["Titles"][1]["Text"], "Dedicated");
         assert_eq!(value["PlayerTitleConfig"]["Titles"][2]["Text"], "Fallback");
     }
 }

@@ -84,7 +84,8 @@ pub fn import_map(
     if meta.name.trim().is_empty() {
         return Err("Give the map a name.".to_string());
     }
-    let id = local_map_id(&hash_file(map_file).map_err(|e| format!("Could not read the map: {e}"))?);
+    let id =
+        local_map_id(&hash_file(map_file).map_err(|e| format!("Could not read the map: {e}"))?);
     let cached = cache_dir.join(format!("{id}.upk"));
     if !cached.exists() {
         std::fs::create_dir_all(cache_dir).map_err(|e| e.to_string())?;
@@ -317,7 +318,10 @@ pub fn extract_map_zip(zip_path: &Path, dest: &Path) -> Result<ZipContents, Stri
     collect_files(dest, &mut files);
     let vdf = files
         .iter()
-        .filter(|path| path.extension().is_some_and(|e| e.eq_ignore_ascii_case("vdf")))
+        .filter(|path| {
+            path.extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("vdf"))
+        })
         .find_map(|path| {
             let item = parse_workshop_vdf(&std::fs::read_to_string(path).ok()?).ok()?;
             Some((path.clone(), item))
@@ -325,8 +329,13 @@ pub fn extract_map_zip(zip_path: &Path, dest: &Path) -> Result<ZipContents, Stri
     let info = super::steam_download::read_item_info(dest).or_else(|| {
         files
             .iter()
-            .filter(|path| path.extension().is_some_and(|e| e.eq_ignore_ascii_case("json")))
-            .find_map(|path| super::steam_download::parse_item_info(&std::fs::read_to_string(path).ok()?))
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+            })
+            .find_map(|path| {
+                super::steam_download::parse_item_info(&std::fs::read_to_string(path).ok()?)
+            })
     });
 
     let pick = |from_vdf: Option<&str>, from_info: Option<&str>| {
@@ -337,7 +346,10 @@ pub fn extract_map_zip(zip_path: &Path, dest: &Path) -> Result<ZipContents, Stri
             .to_string()
     };
     let item = vdf.as_ref().map(|(_, item)| item);
-    let mut name = pick(item.map(|i| i.title.as_str()), info.as_ref().map(|i| i.title.as_str()));
+    let mut name = pick(
+        item.map(|i| i.title.as_str()),
+        info.as_ref().map(|i| i.title.as_str()),
+    );
     if name.is_empty() {
         name = map_file
             .file_stem()
@@ -361,9 +373,15 @@ pub fn extract_map_zip(zip_path: &Path, dest: &Path) -> Result<ZipContents, Stri
 
     Ok(ZipContents {
         map_file,
-        meta: ImportMeta { name, author, description },
+        meta: ImportMeta {
+            name,
+            author,
+            description,
+        },
         banner,
-        published_file_id: item.map(|i| i.published_file_id.clone()).unwrap_or_default(),
+        published_file_id: item
+            .map(|i| i.published_file_id.clone())
+            .unwrap_or_default(),
         skipped,
     })
 }
@@ -474,9 +492,10 @@ fn tokenize(text: &str) -> Result<Vec<Token>, String> {
     Ok(tokens)
 }
 
-fn parse_block(tokens: &mut std::iter::Peekable<std::vec::IntoIter<Token>>, top: bool)
-    -> Result<Vec<(String, Node)>, String>
-{
+fn parse_block(
+    tokens: &mut std::iter::Peekable<std::vec::IntoIter<Token>>,
+    top: bool,
+) -> Result<Vec<(String, Node)>, String> {
     let mut entries = Vec::new();
     loop {
         match tokens.next() {
@@ -581,7 +600,11 @@ impl ImportWizard {
             Ok(contents) => {
                 let mut notice = format!(
                     "Filled in from the zip{}.",
-                    if contents.banner.is_some() { ", including the image" } else { "" }
+                    if contents.banner.is_some() {
+                        ", including the image"
+                    } else {
+                        ""
+                    }
                 );
                 if !contents.skipped.is_empty() {
                     notice.push_str(&format!(
@@ -608,10 +631,13 @@ impl ImportWizard {
     }
 
     fn pick_map_file(&mut self) {
-        let dialog =
-            rfd::FileDialog::new().add_filter("Rocket League map or map zip", &["upk", "udk", "zip"]);
+        let dialog = rfd::FileDialog::new()
+            .add_filter("Rocket League map or map zip", &["upk", "udk", "zip"]);
         if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
-            if file.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
+            if file
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
+            {
                 self.load_zip(&file);
                 return;
             }
@@ -713,17 +739,19 @@ impl ImportWizard {
                     self.import_vdf();
                 }
                 ui.add_space(6.0);
-                egui::Grid::new("import_details").num_columns(2).show(ui, |ui| {
-                    ui.label("Name");
-                    ui.text_edit_singleline(&mut self.meta.name);
-                    ui.end_row();
-                    ui.label("Author");
-                    ui.text_edit_singleline(&mut self.meta.author);
-                    ui.end_row();
-                    ui.label("Description");
-                    ui.text_edit_multiline(&mut self.meta.description);
-                    ui.end_row();
-                });
+                egui::Grid::new("import_details")
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        ui.label("Name");
+                        ui.text_edit_singleline(&mut self.meta.name);
+                        ui.end_row();
+                        ui.label("Author");
+                        ui.text_edit_singleline(&mut self.meta.author);
+                        ui.end_row();
+                        ui.label("Description");
+                        ui.text_edit_multiline(&mut self.meta.description);
+                        ui.end_row();
+                    });
                 ui.horizontal(|ui| {
                     if ui.button("Choose image...").clicked() {
                         let dialog = rfd::FileDialog::new()
@@ -750,7 +778,10 @@ impl ImportWizard {
                         self.reset();
                     }
                     let ready = self.map_file.is_some() && !self.meta.name.trim().is_empty();
-                    if ui.add_enabled(ready, egui::Button::new("Import map")).clicked() {
+                    if ui
+                        .add_enabled(ready, egui::Button::new("Import map"))
+                        .clicked()
+                    {
                         if let Some(file) = self.map_file.clone() {
                             match import_map(
                                 cache_dir,
@@ -762,7 +793,11 @@ impl ImportWizard {
                                 Ok(map) => {
                                     let name = map.name.clone();
                                     if !self.published_file_id.is_empty() {
-                                        let _ = write_item_vdf(cache_dir, &map, &self.published_file_id);
+                                        let _ = write_item_vdf(
+                                            cache_dir,
+                                            &map,
+                                            &self.published_file_id,
+                                        );
                                     }
                                     imported = Some(map);
                                     self.reset();
@@ -858,7 +893,10 @@ mod tests {
     #[test]
     fn vdf_paths_resolve_beside_the_file() {
         let vdf = Path::new("C:/maps/item.vdf");
-        assert_eq!(resolve_beside(vdf, "art\\p.png"), PathBuf::from("C:/maps/art/p.png"));
+        assert_eq!(
+            resolve_beside(vdf, "art\\p.png"),
+            PathBuf::from("C:/maps/art/p.png")
+        );
     }
 
     #[test]
@@ -918,7 +956,8 @@ mod tests {
         use std::io::Write;
         let mut zip = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
         for (name, bytes) in files {
-            zip.start_file(*name, zip::write::SimpleFileOptions::default()).unwrap();
+            zip.start_file(*name, zip::write::SimpleFileOptions::default())
+                .unwrap();
             zip.write_all(bytes).unwrap();
         }
         zip.finish().unwrap();
@@ -926,10 +965,15 @@ mod tests {
 
     fn png_bytes() -> Vec<u8> {
         // noisy so it's comfortably over the 1 KB tiny-icon cutoff
-        let image = image::RgbImage::from_fn(64, 64, |x, y| image::Rgb([(x * 7) as u8, (y * 13) as u8, (x ^ y) as u8]));
+        let image = image::RgbImage::from_fn(64, 64, |x, y| {
+            image::Rgb([(x * 7) as u8, (y * 13) as u8, (x ^ y) as u8])
+        });
         let mut bytes = Vec::new();
         image::DynamicImage::ImageRgb8(image)
-            .write_to(&mut std::io::Cursor::new(&mut bytes), image::ImageFormat::Png)
+            .write_to(
+                &mut std::io::Cursor::new(&mut bytes),
+                image::ImageFormat::Png,
+            )
             .unwrap();
         bytes
     }
@@ -955,7 +999,12 @@ mod tests {
         assert_eq!(contents.meta.name, "Cool Map");
         assert_eq!(contents.meta.description, "Fast map");
         assert_eq!(contents.published_file_id, "123");
-        assert!(contents.banner.as_ref().is_some_and(|b| b.ends_with("thumb.png")));
+        assert!(
+            contents
+                .banner
+                .as_ref()
+                .is_some_and(|b| b.ends_with("thumb.png"))
+        );
         assert_eq!(contents.skipped.len(), 2, "{:?}", contents.skipped);
         assert!(!dir.join("out/Cool Map/installer.exe").exists());
     }
@@ -968,7 +1017,10 @@ mod tests {
         assert!(extract_map_zip(&empty, &dir.join("a")).is_err());
 
         let zip = dir.join("map.zip");
-        write_zip(&zip, &[("m.upk", b"x".to_vec()), ("preview.png", vec![7u8; 4096])]);
+        write_zip(
+            &zip,
+            &[("m.upk", b"x".to_vec()), ("preview.png", vec![7u8; 4096])],
+        );
         let contents = extract_map_zip(&zip, &dir.join("b")).unwrap();
         assert_eq!(contents.meta.name, "m");
         assert!(contents.banner.is_none());

@@ -107,7 +107,10 @@ pub fn parse_details(reply: &Value, wid: &str) -> Result<WorkshopDetails, String
     if details.get("result").map(text_of).as_deref() != Some("1") {
         return Err("Steam has no workshop item with that id.".to_string());
     }
-    let app = details.get("consumer_app_id").map(text_of).unwrap_or_default();
+    let app = details
+        .get("consumer_app_id")
+        .map(text_of)
+        .unwrap_or_default();
     if app != RL_APPID {
         return Err("That workshop item isn't for Rocket League.".to_string());
     }
@@ -134,9 +137,10 @@ pub fn strip_bbcode(text: &str) -> String {
         let after = &rest[open + 1..];
         match after.find(']') {
             Some(close)
-                if after[..close].chars().all(|c| {
-                    c.is_ascii_alphanumeric() || "=\"'.:/_ -".contains(c)
-                }) && !after[..close].is_empty() =>
+                if after[..close]
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || "=\"'.:/_ -".contains(c))
+                    && !after[..close].is_empty() =>
             {
                 rest = &after[close + 1..];
             }
@@ -235,9 +239,7 @@ pub fn find_bundled_preview(dir: &Path) -> Option<PathBuf> {
     walk_files(dir, &mut files);
     files
         .into_iter()
-        .filter(|(path, size)| {
-            *size > 1024 && IMAGE_EXTS.contains(&extension_of(path).as_str())
-        })
+        .filter(|(path, size)| *size > 1024 && IMAGE_EXTS.contains(&extension_of(path).as_str()))
         .max_by_key(|(path, size)| {
             let named = path
                 .file_name()
@@ -263,10 +265,13 @@ pub fn parse_key(text: &str) -> Option<String> {
 
 // environment
 
-/// DepotDownloaderMod lives in a `depotdownloader` folder beside hebnix.exe
+/// DepotDownloaderMod is extracted with the multiplayer bundle after the
+/// player connects to Workshop multiplayer.
 fn find_depot_downloader() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let dll = exe.parent()?.join("depotdownloader").join("DepotDownloaderMod.dll");
+    let dll = crate::config::base_dir()
+        .join("multiplayer-lan")
+        .join("depotdownloader")
+        .join("DepotDownloaderMod.dll");
     dll.is_file().then_some(dll)
 }
 
@@ -278,7 +283,15 @@ pub const DOTNET_INSTALL_COMMAND: &str = "winget install --id Microsoft.DotNet.R
 /// open afterwards so its output can be read
 fn run_in_terminal(command: &str) {
     let _ = Command::new("cmd")
-        .args(["/C", "start", "Install .NET", "powershell", "-NoExit", "-Command", command])
+        .args([
+            "/C",
+            "start",
+            "Install .NET",
+            "powershell",
+            "-NoExit",
+            "-Command",
+            command,
+        ])
         .spawn();
 }
 
@@ -374,9 +387,10 @@ pub(super) fn read_item_info(dir: &Path) -> Option<ItemInfo> {
         .into_iter()
         .filter(|(path, size)| {
             *size < 1024 * 1024
-                && path
-                    .file_name()
-                    .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case("workshopiteminfo.json"))
+                && path.file_name().is_some_and(|n| {
+                    n.to_string_lossy()
+                        .eq_ignore_ascii_case("workshopiteminfo.json")
+                })
         })
         .find_map(|(path, _)| parse_item_info(&std::fs::read_to_string(path).ok()?))
 }
@@ -476,7 +490,10 @@ fn run_depot_downloader(
     if status.success() {
         Ok(())
     } else {
-        Err(format!("The downloader failed (exit code {}).", status.code().unwrap_or(-1)))
+        Err(format!(
+            "The downloader failed (exit code {}).",
+            status.code().unwrap_or(-1)
+        ))
     }
 }
 
@@ -712,7 +729,10 @@ impl SteamDownloader {
         let ready = wid.is_some() && has_key && !busy;
         let mut start_with = None;
         ui.horizontal(|ui| {
-            if ui.add_enabled(ready, egui::Button::new("Download map")).clicked() {
+            if ui
+                .add_enabled(ready, egui::Button::new("Download map"))
+                .clicked()
+            {
                 save_settings(runtime_dir, settings);
                 start_with = wid.clone();
             }
@@ -731,7 +751,10 @@ impl SteamDownloader {
                 Some(Ok(map)) => {
                     ui.colored_label(
                         egui::Color32::LIGHT_GREEN,
-                        format!("Imported {}. Find it under Browse Maps, in View Downloaded.", map.name),
+                        format!(
+                            "Imported {}. Find it under Browse Maps, in View Downloaded.",
+                            map.name
+                        ),
                     );
                 }
                 Some(Err(error)) => {
@@ -775,7 +798,12 @@ impl SteamDownloader {
             }
         }
         if let Some(wid) = start_with {
-            self.start(wid, cache_dir.to_path_buf(), runtime_dir.to_path_buf(), ui.ctx());
+            self.start(
+                wid,
+                cache_dir.to_path_buf(),
+                runtime_dir.to_path_buf(),
+                ui.ctx(),
+            );
         }
         imported
     }
@@ -801,7 +829,10 @@ mod tests {
 
     #[test]
     fn typed_keys_are_read_strictly() {
-        assert_eq!(parse_key("  abc-DEF_1.2\r\n").as_deref(), Some("abc-DEF_1.2"));
+        assert_eq!(
+            parse_key("  abc-DEF_1.2\r\n").as_deref(),
+            Some("abc-DEF_1.2")
+        );
         assert_eq!(parse_key(""), None);
         assert_eq!(parse_key("two words"), None);
         assert_eq!(parse_key("key\nsecond-line"), None);
@@ -810,14 +841,20 @@ mod tests {
 
     #[test]
     fn workshop_ids_come_from_numbers_and_links() {
-        assert_eq!(parse_workshop_id("2968144588").as_deref(), Some("2968144588"));
         assert_eq!(
-            parse_workshop_id(" https://steamcommunity.com/sharedfiles/filedetails/?id=2968144588&searchtext=x ")
-                .as_deref(),
+            parse_workshop_id("2968144588").as_deref(),
             Some("2968144588")
         );
         assert_eq!(
-            parse_workshop_id("https://steamcommunity.com/workshop/filedetails/?l=english&id=42").as_deref(),
+            parse_workshop_id(
+                " https://steamcommunity.com/sharedfiles/filedetails/?id=2968144588&searchtext=x "
+            )
+            .as_deref(),
+            Some("2968144588")
+        );
+        assert_eq!(
+            parse_workshop_id("https://steamcommunity.com/workshop/filedetails/?l=english&id=42")
+                .as_deref(),
             Some("42")
         );
         assert_eq!(parse_workshop_id(""), None);
@@ -839,14 +876,20 @@ mod tests {
         assert_eq!(ok.description, "Hi there friend");
         // steam sometimes sends ids as strings
         assert!(parse_details(&reply(json!("252950"), 1), "1").is_ok());
-        assert!(parse_details(&reply(json!(730), 1), "1").unwrap_err().contains("Rocket League"));
+        assert!(
+            parse_details(&reply(json!(730), 1), "1")
+                .unwrap_err()
+                .contains("Rocket League")
+        );
         assert!(parse_details(&reply(json!(252950), 9), "1").is_err());
         assert!(parse_details(&json!({}), "1").is_err());
     }
 
     #[test]
     fn the_install_command_is_a_single_winget_line() {
-        assert!(DOTNET_INSTALL_COMMAND.starts_with("winget install --id Microsoft.DotNet.Runtime."));
+        assert!(
+            DOTNET_INSTALL_COMMAND.starts_with("winget install --id Microsoft.DotNet.Runtime.")
+        );
         assert!(!DOTNET_INSTALL_COMMAND.contains('\n'));
         assert!(!DOTNET_INSTALL_COMMAND.contains("  "));
     }
@@ -858,7 +901,10 @@ mod tests {
                     Microsoft.NETCore.App 10.0.8 [C:\\Program Files\\dotnet\\shared]\r\n\
                     Microsoft.WindowsDesktop.App 12.0.0 [C:\\b]\r\n";
         assert_eq!(highest_runtime_major(list), Some(10));
-        assert_eq!(highest_runtime_major("Microsoft.NETCore.App 8.0.27 [x]"), Some(8));
+        assert_eq!(
+            highest_runtime_major("Microsoft.NETCore.App 8.0.27 [x]"),
+            Some(8)
+        );
         assert_eq!(highest_runtime_major(""), None);
         assert_eq!(highest_runtime_major("No .NET runtimes found"), None);
     }
@@ -887,7 +933,10 @@ mod tests {
 
     #[test]
     fn bbcode_is_stripped_but_plain_brackets_stay() {
-        assert_eq!(strip_bbcode("[url=https://a.b]link[/url] and [i]x[/i]"), "link and x");
+        assert_eq!(
+            strip_bbcode("[url=https://a.b]link[/url] and [i]x[/i]"),
+            "link and x"
+        );
         assert_eq!(strip_bbcode("scores [1, 2] here"), "scores [1, 2] here");
         assert_eq!(strip_bbcode("open [ bracket"), "open [ bracket");
     }
@@ -912,7 +961,10 @@ mod tests {
         write(&dir, "art/Preview.jpg", 20_000);
         write(&dir, "sub/Cool.upk", 3_000);
         write(&dir, "sub/notes.txt", 7_000);
-        assert_eq!(find_map_file(&dir).unwrap().file_name().unwrap(), "Cool.upk");
+        assert_eq!(
+            find_map_file(&dir).unwrap().file_name().unwrap(),
+            "Cool.upk"
+        );
     }
 
     #[test]
@@ -930,7 +982,10 @@ mod tests {
         write(&dir, "icon.png", 100);
         write(&dir, "big.png", 9_000);
         write(&dir, "MapPreview.jpg", 3_000);
-        assert_eq!(find_bundled_preview(&dir).unwrap().file_name().unwrap(), "MapPreview.jpg");
+        assert_eq!(
+            find_bundled_preview(&dir).unwrap().file_name().unwrap(),
+            "MapPreview.jpg"
+        );
         assert_eq!(find_bundled_preview(&temp_dir("nopic")), None);
     }
 }

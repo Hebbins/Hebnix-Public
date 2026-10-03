@@ -17,8 +17,8 @@ use crate::messages::AppMsg;
 use crate::monitor::{Monitor, MonitorShared};
 use crate::plugins::PluginManager;
 use crate::spoofer;
-use crate::spoofer::rules::TitleSpoofSettings;
 use crate::spoofer::SpooferManager;
+use crate::spoofer::rules::TitleSpoofSettings;
 use crate::statsapi_ini;
 use crate::theme;
 use crate::tray::Tray;
@@ -26,7 +26,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.1.12";
+pub const APP_VERSION: &str = "2.2.0";
 
 pub const DEFAULT_WIDTH: f32 = 1250.0;
 pub const DEFAULT_HEIGHT: f32 = 700.0;
@@ -950,7 +950,7 @@ impl HebnixApp {
             hebnix_settings_tab: HebnixSettingsTab::Interface,
             spoofer_subtab: SpooferSubTab::Settings,
             patcher_subtab: PatcherSubTab::Ball,
-            experimental_subtab: ExperimentalSubTab::RlApi,
+            experimental_subtab: ExperimentalSubTab::BallAppearance,
             console: ConsoleState::default(),
             workshop,
             rlapi_panel: crate::ui::rlapi::RlApiPanel::default(),
@@ -2071,7 +2071,11 @@ impl HebnixApp {
                 // drive the console for now. See the tsnet-multiplayer rework
                 // plan's beacon-relay/firewall-scoping notes for what would
                 // consume a live peer list if this UI panel grows one later.
-                AppMsg::TsnetStatus { state, tailnet_ip, peers } => {
+                AppMsg::TsnetStatus {
+                    state,
+                    tailnet_ip,
+                    peers,
+                } => {
                     self.console.write(format!(
                         "[tsnet] status={state:?} ip={tailnet_ip:?} peers={}",
                         peers.len()
@@ -2079,13 +2083,16 @@ impl HebnixApp {
                 }
                 AppMsg::TsnetPeerEvent { online, tailnet_ip } => {
                     let word = if online { "online" } else { "offline" };
-                    self.console.write(format!("[tsnet] peer {tailnet_ip} {word}"));
+                    self.console
+                        .write(format!("[tsnet] peer {tailnet_ip} {word}"));
                 }
                 AppMsg::TsnetDownResult { ok } => {
-                    self.console.write(format!("[tsnet] tailnet down (ok={ok})"));
+                    self.console
+                        .write(format!("[tsnet] tailnet down (ok={ok})"));
                 }
                 AppMsg::TsnetSidecarDisconnected => {
-                    self.console.write("[tsnet] lost connection to the multiplayer helper".to_string());
+                    self.console
+                        .write("[tsnet] lost connection to the multiplayer helper".to_string());
                 }
             }
         }
@@ -6806,11 +6813,11 @@ impl eframe::App for HebnixApp {
                                 egui::ScrollArea::vertical()
                                     .id_salt("experimental_subtabs")
                                     .show(ui, |ui| {
-                                        ui.selectable_value(
-                                            &mut self.experimental_subtab,
-                                            ExperimentalSubTab::RlApi,
-                                            "RLAPI",
-                                        );
+                                        // ui.selectable_value(
+                                        //     &mut self.experimental_subtab,
+                                        //     ExperimentalSubTab::RlApi,
+                                        //     "RLAPI",
+                                        // );
                                         ui.selectable_value(
                                             &mut self.experimental_subtab,
                                             ExperimentalSubTab::BallAppearance,

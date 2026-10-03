@@ -32,8 +32,8 @@
 
 use std::ffi::CString;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
+use std::sync::mpsc::{self, Receiver, Sender};
 
 use socket2::{Domain, Socket, Type};
 use windivert_sys as sys;
@@ -89,7 +89,8 @@ unsafe impl Sync for RawCapture {}
 impl RawCapture {
     fn open(filter: &str, flags: sys::WinDivertFlags) -> Result<Self, String> {
         let filter = CString::new(filter).map_err(|error| error.to_string())?;
-        let handle = unsafe { sys::WinDivertOpen(filter.as_ptr(), sys::WinDivertLayer::Network, 0, flags) };
+        let handle =
+            unsafe { sys::WinDivertOpen(filter.as_ptr(), sys::WinDivertLayer::Network, 0, flags) };
         if handle.is_invalid() {
             return Err(std::io::Error::last_os_error().to_string());
         }
@@ -139,16 +140,16 @@ impl BeaconRelay {
     pub fn bind(host_tailnet_ip: IpAddr) -> Result<Self, String> {
         let socket = Socket::new(Domain::IPV4, Type::DGRAM, None)
             .map_err(|error| format!("could not create the beacon relay socket: {error}"))?;
-        socket
-            .set_broadcast(true)
-            .map_err(|error| format!("could not enable broadcast on the beacon relay socket: {error}"))?;
+        socket.set_broadcast(true).map_err(|error| {
+            format!("could not enable broadcast on the beacon relay socket: {error}")
+        })?;
         socket
             .set_nonblocking(true)
             .map_err(|error| error.to_string())?;
         let address: SocketAddr = (host_tailnet_ip, 0).into();
-        socket
-            .bind(&address.into())
-            .map_err(|error| format!("could not bind the beacon relay socket to {host_tailnet_ip}: {error}"))?;
+        socket.bind(&address.into()).map_err(|error| {
+            format!("could not bind the beacon relay socket to {host_tailnet_ip}: {error}")
+        })?;
 
         let (tx, rx) = mpsc::channel();
         let capture = spawn_capture_thread(tx)?;
