@@ -308,9 +308,13 @@ impl SwapperState {
                     Vec::new()
                 };
                 cars.sort_by(|left, right| {
-                    left.1
-                        .to_ascii_lowercase()
-                        .cmp(&right.1.to_ascii_lowercase())
+                    let left_universal = left.1.eq_ignore_ascii_case("Universal Car");
+                    let right_universal = right.1.eq_ignore_ascii_case("Universal Car");
+                    right_universal.cmp(&left_universal).then_with(|| {
+                        left.1
+                            .to_ascii_lowercase()
+                            .cmp(&right.1.to_ascii_lowercase())
+                    })
                 });
                 cars.dedup_by(|left, right| left.0 == right.0);
                 if resolution_sender

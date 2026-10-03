@@ -9,7 +9,7 @@ use eframe::egui::{self, Color32};
 use hebnix_sdk::stats::{StatsClient, StatsEvent, websocket::WsStatsClient};
 use serde_json::Value;
 
-use crate::config::Config;
+use crate::config::{ActionButtonAction, ActionButtonEntry, Config};
 use crate::hotkey::ToggleHotkey;
 use crate::i18n::{t, t_args};
 use crate::messages::AppMsg;
@@ -61,6 +61,7 @@ enum HebnixSettingsTab {
     Interface,
     Directories,
     Discord,
+    ActionButton,
     System,
 }
 
@@ -159,6 +160,24 @@ impl LiteApp {
         let _ = std::fs::create_dir_all(&plugin_dir);
 
         let mut config = Config::load(&base_dir);
+        for (entries, fallback) in [
+            (
+                &mut config.action_button.rocket_league_closed,
+                ActionButtonAction::StartRocketLeague,
+            ),
+            (
+                &mut config.action_button.rocket_league_open,
+                ActionButtonAction::RestartRocketLeague,
+            ),
+        ] {
+            if !entries.iter().any(|entry| {
+                entry.enabled && entry.action != ActionButtonAction::FixEpicConnection
+            }) {
+                if let Some(entry) = entries.iter_mut().find(|entry| entry.action == fallback) {
+                    entry.enabled = true;
+                }
+            }
+        }
         // themes name a font file, so fonts get their own dir
         if theme::apply_theme(
             &cc.egui_ctx,
@@ -1815,6 +1834,227 @@ impl LiteApp {
         }
     }
 
+    fn execute_action_button_action(&mut self, action: ActionButtonAction) {
+        match action {
+            ActionButtonAction::StartRocketLeague | ActionButtonAction::RestartRocketLeague => {
+                let path = self.config.settings.rl_path.clone();
+                if !self.config.settings.rl_path_confirmed
+                    || path.trim().is_empty()
+                    || !Path::new(&path).is_dir()
+                {
+                    self.launch_path_notice = true;
+                    return;
+                }
+                let tx = self.tx.clone();
+                std::thread::spawn(move || {
+                    let (verb, result) = match action {
+                        ActionButtonAction::StartRocketLeague =>
+                            ("start", winutil::start_rocket_league(Path::new(&path))),
+                        ActionButtonAction::RestartRocketLeague =>
+                            ("restart", winutil::restart_rocket_league(Path::new(&path))),
+                        _ => unreachable!(),
+                    };
+                    let message = match result {
+                        Ok(()) => format!("[Core] Rocket League {verb} requested."),
+                        Err(error) => format!("[Core] Rocket League {verb} failed: {error}"),
+                    };
+                    let _ = tx.send(AppMsg::Log(message));
+                });
+            }
+            ActionButtonAction::CloseRocketLeague => {
+                let tx = self.tx.clone();
+                std::thread::spawn(move || {
+                    let message = match winutil::kill_rocket_league() {
+                        Ok(()) => "[Core] Rocket League close requested.".to_string(),
+                        Err(error) => format!("[Core] Rocket League close failed: {error}"),
+                    };
+                    let _ = tx.send(AppMsg::Log(message));
+                });
+            }
+            ActionButtonAction::OpenHebnixFolder => {
+                if let Err(error) = open::that(&self.base_dir) {
+                    self.console.write(format!("[Core] Could not open Hebnix folder: {error}"));
+                }
+            }
+            ActionButtonAction::OpenPluginsFolder => {
+                if let Err(error) = open::that(&self.plugin_dir) {
+                    self.console.write(format!("[Core] Could not open Plugins folder: {error}"));
+                }
+            }
+            ActionButtonAction::ReloadPlugins => {
+                self.plugin_mgr.reload_all(&mut self.config);
+                self.save_config();
+            }
+            ActionButtonAction::FixEpicConnection => {}
+        }
+    }
+
+    fn render_action_button(&mut self, ui: &mut egui::Ui) {
+        let entries = if self.last_rl_open {
+            &self.config.action_button.rocket_league_open
+        } else {
+            &self.config.action_button.rocket_league_closed
+        };
+        let actions: Vec<ActionButtonAction> = entries
+            .iter()
+            .filter(|entry| {
+                entry.enabled && entry.action != ActionButtonAction::FixEpicConnection
+            })
+            .map(|entry| entry.action)
+            .collect();
+        let Some((&primary, secondary)) = actions.split_first() else {
+            return;
+        };
+        if secondary.is_empty() {
+            if ui.button(primary.label()).clicked() {
+                self.execute_action_button_action(primary);
+            }
+            return;
+        }
+
+        let mut run_primary = false;
+        let mut selected = None;
+        ui.scope(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            ui.horizontal(|ui| {
+                let arrow = ui.add(
+                    egui::Button::new("")
+                        .min_size(egui::vec2(24.0, 0.0))
+                        .corner_radius(egui::CornerRadius {
+                            nw: 0,
+                            ne: 3,
+                            sw: 0,
+                            se: 3,
+                        }),
+                );
+                let main = ui.add(egui::Button::new(primary.label()).corner_radius(
+                    egui::CornerRadius {
+                        nw: 3,
+                        ne: 0,
+                        sw: 3,
+                        se: 0,
+                    },
+                ));
+                run_primary = main.clicked();
+                let visuals = ui.style().interact(&arrow);
+                let center = arrow.rect.center();
+                ui.painter().line_segment(
+                    [center + egui::vec2(-3.5, -1.5), center + egui::vec2(0.0, 2.0)],
+                    visuals.fg_stroke,
+                );
+                ui.painter().line_segment(
+                    [center + egui::vec2(0.0, 2.0), center + egui::vec2(3.5, -1.5)],
+                    visuals.fg_stroke,
+                );
+
+                let combined_rect = main.rect.union(arrow.rect);
+                let popup_anchor = ui.interact(
+                    combined_rect,
+                    ui.make_persistent_id("lite_action_button_menu_anchor"),
+                    egui::Sense::hover(),
+                );
+                egui::Popup::menu(&popup_anchor)
+                    .open_memory(arrow.clicked().then_some(egui::SetOpenCommand::Toggle))
+                    .width(combined_rect.width())
+                    .show(|ui| {
+                        for &action in secondary {
+                            if ui.button(action.label()).clicked() {
+                                selected = Some(action);
+                                ui.close();
+                            }
+                        }
+                    });
+            });
+        });
+        if run_primary {
+            self.execute_action_button_action(primary);
+        } else if let Some(action) = selected {
+            self.execute_action_button_action(action);
+        }
+    }
+
+    fn render_action_button_state_editor(
+        ui: &mut egui::Ui,
+        id: &'static str,
+        entries: &mut Vec<ActionButtonEntry>,
+    ) -> bool {
+        let mut visible: Vec<ActionButtonEntry> = entries
+            .iter()
+            .copied()
+            .filter(|entry| entry.action != ActionButtonAction::FixEpicConnection)
+            .collect();
+        let enabled_count = visible.iter().filter(|entry| entry.enabled).count();
+        let mut moved = None;
+        let mut changed = false;
+        for (index, entry) in visible.iter_mut().enumerate() {
+            let row_id = egui::Id::new((id, entry.action));
+            let (_, dropped) = ui.dnd_drop_zone::<usize, _>(
+                egui::Frame::new().inner_margin(egui::Margin::symmetric(4, 2)),
+                |ui| {
+                    ui.horizontal(|ui| {
+                        ui.weak(format!("{}.", index + 1));
+                        ui.dnd_drag_source(row_id, index, |ui| {
+                            ui.weak("::");
+                        });
+                        let can_toggle = !entry.enabled || enabled_count > 1;
+                        if ui
+                            .add_enabled(
+                                can_toggle,
+                                egui::Checkbox::new(&mut entry.enabled, entry.action.label()),
+                            )
+                            .on_disabled_hover_text(t("action-keep-one"))
+                            .changed()
+                        {
+                            changed = true;
+                        }
+                    });
+                },
+            );
+            if let Some(from) = dropped {
+                moved = Some((*from, index));
+            }
+        }
+        if let Some((from, to)) = moved
+            && from != to
+            && from < visible.len()
+        {
+            let entry = visible.remove(from);
+            visible.insert(to.min(visible.len()), entry);
+            changed = true;
+        }
+        if changed {
+            let mut visible = visible.into_iter();
+            for entry in entries.iter_mut() {
+                if entry.action != ActionButtonAction::FixEpicConnection {
+                    *entry = visible.next().unwrap();
+                }
+            }
+        }
+        changed
+    }
+
+    fn render_action_button_settings(&mut self, ui: &mut egui::Ui) {
+        ui.label(t("action-settings-intro"));
+        ui.weak(t("action-settings-hint"));
+        ui.add_space(12.0);
+        ui.strong(t("action-state-closed"));
+        let closed_changed = Self::render_action_button_state_editor(
+            ui,
+            "lite_action_button_closed",
+            &mut self.config.action_button.rocket_league_closed,
+        );
+        ui.add_space(12.0);
+        ui.strong(t("action-state-open"));
+        let open_changed = Self::render_action_button_state_editor(
+            ui,
+            "lite_action_button_open",
+            &mut self.config.action_button.rocket_league_open,
+        );
+        if closed_changed || open_changed {
+            self.save_config();
+        }
+    }
+
     fn render_settings(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.selectable_value(
@@ -1861,22 +2101,32 @@ impl LiteApp {
                     HebnixSettingsTab::Discord,
                     t("settings-nav-discord"),
                 );
+                ui.selectable_value(
+                    &mut self.hebnix_settings_tab,
+                    HebnixSettingsTab::ActionButton,
+                    t("settings-nav-action-button"),
+                );
             });
-        ui.vertical(|ui| {
-            ui.heading(match self.hebnix_settings_tab {
-                HebnixSettingsTab::Interface => t("settings-heading-interface"),
-                HebnixSettingsTab::Directories => t("settings-heading-directories"),
-                HebnixSettingsTab::Discord => t("settings-heading-discord"),
-                HebnixSettingsTab::System => t("settings-heading-system"),
+        egui::ScrollArea::vertical()
+            .id_salt("lite_hebnix_settings_content")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.heading(match self.hebnix_settings_tab {
+                    HebnixSettingsTab::Interface => t("settings-heading-interface"),
+                    HebnixSettingsTab::Directories => t("settings-heading-directories"),
+                    HebnixSettingsTab::Discord => t("settings-heading-discord"),
+                    HebnixSettingsTab::ActionButton => t("settings-heading-action-button"),
+                    HebnixSettingsTab::System => t("settings-heading-system"),
+                });
+                ui.add_space(8.0);
+                match self.hebnix_settings_tab {
+                    HebnixSettingsTab::Interface => self.render_interface_settings(ui),
+                    HebnixSettingsTab::Directories => self.render_stats_settings(ui),
+                    HebnixSettingsTab::Discord => self.render_discord_settings(ui),
+                    HebnixSettingsTab::ActionButton => self.render_action_button_settings(ui),
+                    HebnixSettingsTab::System => self.render_system_settings(ui),
+                }
             });
-            ui.add_space(8.0);
-            match self.hebnix_settings_tab {
-                HebnixSettingsTab::Interface => self.render_interface_settings(ui),
-                HebnixSettingsTab::Directories => self.render_stats_settings(ui),
-                HebnixSettingsTab::Discord => self.render_discord_settings(ui),
-                HebnixSettingsTab::System => self.render_system_settings(ui),
-            }
-        });
     }
 
     fn render_interface_settings(&mut self, ui: &mut egui::Ui) {
@@ -2775,40 +3025,7 @@ impl eframe::App for LiteApp {
                             .size(12.0)
                             .color(self.status_color),
                     );
-                    let running = self.last_rl_open;
-                    let label = if running {
-                        t("action-restart-rocket-league")
-                    } else {
-                        t("action-start-rocket-league")
-                    };
-                    if ui.button(label).clicked() {
-                        let path = self.config.settings.rl_path.clone();
-                        if !self.config.settings.rl_path_confirmed
-                            || path.trim().is_empty()
-                            || !Path::new(&path).is_dir()
-                        {
-                            self.launch_path_notice = true;
-                        } else {
-                            let tx = self.tx.clone();
-                            std::thread::spawn(move || {
-                                let result = if running {
-                                    winutil::restart_rocket_league(Path::new(&path))
-                                } else {
-                                    winutil::start_rocket_league(Path::new(&path))
-                                };
-                                let action = if running { "restart" } else { "start" };
-                                let _ = tx.send(AppMsg::Log(match result {
-                                    Ok(()) => {
-                                        format!("[Console] Rocket League {} requested.", action)
-                                    }
-                                    Err(error) => format!(
-                                        "[Console] Rocket League {} failed: {}",
-                                        action, error
-                                    ),
-                                }));
-                            });
-                        }
-                    }
+                    self.render_action_button(ui);
                 });
             });
             ui.separator();

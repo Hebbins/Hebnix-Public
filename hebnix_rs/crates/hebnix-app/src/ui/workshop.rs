@@ -820,6 +820,7 @@ pub struct WorkshopState {
     steam_downloader: SteamDownloader,
     archive_browser: ArchiveBrowser,
     multiplayer: MultiplayerState,
+    multiplayer_admin_prompt_open: bool,
     rl_launch: crate::config::RlLaunchCfg,
     /// the "P2P File Sharing" system setting. read by the map sync server
     /// each time a player asks for a file, so it applies straight away.
@@ -859,6 +860,7 @@ impl WorkshopState {
             steam_downloader: SteamDownloader::default(),
             archive_browser: ArchiveBrowser::default(),
             multiplayer,
+            multiplayer_admin_prompt_open: false,
             rl_launch: crate::config::RlLaunchCfg::default(),
             share_files: Arc::new(AtomicBool::new(true)),
         }
@@ -1018,6 +1020,7 @@ impl WorkshopState {
         }
         if self.view == WorkshopView::Multiplayer {
             self.render_multiplayer(ui, rl_path, tx, &ctx);
+            self.render_multiplayer_admin_prompt(&ctx);
             return;
         }
         if self.view == WorkshopView::BackgroundChanger {
@@ -1148,10 +1151,16 @@ impl WorkshopState {
             .id_salt("workshop_grid")
             .auto_shrink([false, false])
             .show(ui, |ui| {
+                let grid_width = ui.available_width();
+                ui.set_width(grid_width);
                 for row in indices.chunks(4) {
                     ui.columns(4, |cols| {
                         for (col_idx, &map_idx) in row.iter().enumerate() {
                             let col = &mut cols[col_idx];
+                            // A card must use its column's width. Otherwise a long
+                            // button can grow this row, shifting later rows right.
+                            let card_width = col.available_width();
+                            col.set_width(card_width);
                             if let Some(act) = self.render_card(col, map_idx) {
                                 action = Some((map_idx, act));
                             }
@@ -1264,8 +1273,12 @@ impl WorkshopState {
                     .add_sized([160.0, 38.0], egui::Button::new(t("multiplayer-connect")))
                     .clicked()
                 {
-                    self.multiplayer.wizard_started = true;
-                    self.start_tailnet(tx, ctx);
+                    if crate::spoofer::is_admin() {
+                        self.multiplayer.wizard_started = true;
+                        self.start_tailnet(tx, ctx);
+                    } else {
+                        self.multiplayer_admin_prompt_open = true;
+                    }
                 }
                 ui.add_space(10.0);
                 multiplayer_help_button(ui);
@@ -1450,6 +1463,40 @@ impl WorkshopState {
             } else {
                 self.start_relay(rl_path, tx, ctx);
             }
+        }
+    }
+
+    fn render_multiplayer_admin_prompt(&mut self, ctx: &egui::Context) {
+        if !self.multiplayer_admin_prompt_open {
+            return;
+        }
+        let mut restart = false;
+        let mut cancel = false;
+        egui::Window::new(t("admin-prompt-administrator-required"))
+            .id(egui::Id::new("multiplayer_admin_prompt"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                ui.label(t("multiplayer-workshop-multiplayer-requires-hebnix-to"));
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    restart = ui
+                        .button(t("colour-admin-prompt-restart-as-administrator"))
+                        .clicked();
+                    cancel = ui.button(t("spawner-enable-prompt-cancel")).clicked();
+                });
+            });
+        if restart {
+            self.multiplayer_admin_prompt_open = false;
+            if crate::spoofer::spawn_elevated_relaunch() {
+                self.suspend_multiplayer();
+                std::process::exit(0);
+            }
+            self.multiplayer.status =
+                t("multiplayer-run-hebnix-as-administrator-to-start").to_string();
+        } else if cancel {
+            self.multiplayer_admin_prompt_open = false;
         }
     }
 
@@ -2272,10 +2319,11 @@ impl WorkshopState {
                     }
                     let show_delete = is_cached && active_targets.is_empty() && !is_busy;
                     let btn_width = if show_delete {
-                        ui.available_width() - 34.0
+                        ui.available_width() - 28.0 - ui.spacing().item_spacing.x
                     } else {
                         ui.available_width()
-                    };
+                    }
+                    .max(0.0);
                     if ui
                         .add_enabled(!is_busy, button.min_size(egui::vec2(btn_width, 24.0)))
                         .clicked()

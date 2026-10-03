@@ -66,7 +66,8 @@ pub struct Mesh {
 }
 
 pub fn inspect(package: &UpkPackage, export: &ExportEntry) -> Result<Mesh, String> {
-    let (_, native) = package.serialized_props(export)?;
+    let (props, native) = package.serialized_props(export)?;
+    let has_colors = props.iter().any(|p| p.name == "bHasVertexColors" && p.bool_value == Some(true));
     let data = &package.image[export.serial_offset..export.serial_offset + export.serial_size];
     let mut reader = Reader { data, at: native };
     reader.take(28)?;
@@ -122,19 +123,7 @@ pub fn inspect(package: &UpkPackage, export: &ExportEntry) -> Result<Mesh, Strin
         if stride == 0 || vertex_data.len() / stride != vertices {
             return Err("GPU vertex count mismatch".into());
         }
-        let extra_stride = reader.count()?;
-        if extra_stride > 0 {
-            if extra_stride > 16 {
-                return Err("Extra vertex influence stride is implausible".into());
-            }
-            let extra = reader.array(extra_stride)?;
-            if extra.len() / extra_stride != vertices {
-                return Err("Extra vertex influence count mismatch".into());
-            }
-        }
-        if extra_stride == 0 {
-            reader.indices()?;
-        }
+        read_lod_tail(&mut reader, has_colors, vertices)?;
         lods.push(start..reader.at);
     }
     Ok(Mesh {
@@ -336,24 +325,20 @@ pub fn transplant_profile(
             out.extend_from_slice(&vertex[28..32]);
         }
     }
-    let tail_start = reader.at;
-    let extra_stride = reader.count()?;
-    if extra_stride > 0 {
-        if extra_stride > 16 {
-            return Err("Extra vertex influence stride is implausible".into());
-        }
-        let extra = reader.array(extra_stride)?;
-        if extra.len() / extra_stride != vertices {
-            return Err("Extra vertex influence count mismatch".into());
-        }
-    }
-    if extra_stride == 0 {
-        reader.indices()?;
-    }
+    let (donor_props, _) = donor.serialized_props(&donor_export)?;
+    let donor_has_colors = donor_props.iter().any(|p| p.name == "bHasVertexColors" && p.bool_value == Some(true));
+    read_lod_tail(&mut reader, donor_has_colors, vertices)?;
     if reader.at != donor_mesh_info.tail {
         return Err("LOD parser disagreement".into());
     }
-    out.extend_from_slice(&donor_bytes[tail_start..reader.at]);
+    // The retained target properties do not enable donor vertex colors. A
+    // color buffer here would be read as extra vertex influences by current RL.
+    // Emit zero extra influences and the current empty adjacency index buffer.
+    let (target_props, _) = target.serialized_props(&target_export)?;
+    if target_props.iter().any(|p| p.name == "bHasVertexColors" && p.bool_value == Some(true)) {
+        return Err("Colored target meshes require an explicit color conversion".into());
+    }
+    out.extend_from_slice(&empty_influences_and_adjacency());
     out.extend_from_slice(&target_bytes[target_mesh_info.tail..]);
 
     let width = donor_bytes[index_start + 4] as usize;
@@ -400,4 +385,50 @@ pub fn transplant_profile(
         }
     }
     Ok(())
+}
+
+fn empty_influences_and_adjacency() -> [u8; 17] {
+    [0, 0, 0, 0, 1, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0, 0]
+}
+
+fn read_lod_tail(reader: &mut Reader<'_>, has_colors: bool, vertices: usize) -> Result<(), String> {
+    if has_colors {
+        let (stride, colors) = reader.bulk()?;
+        if stride != 4 || colors.len() / 4 != vertices {
+            return Err("Vertex color count or stride mismatch".into());
+        }
+    }
+    if reader.count()? != 0 {
+        return Err("Nonempty extra vertex influences are not supported".into());
+    }
+    reader.indices()?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn colored_lod_consumes_colors_then_influences_and_adjacency() {
+        let mut bytes = Vec::new();
+        put(&mut bytes, 4);
+        put(&mut bytes, 2);
+        bytes.extend_from_slice(&[255; 8]);
+        bytes.extend_from_slice(&empty_influences_and_adjacency());
+        let mut r = Reader { data: &bytes, at: 0 };
+        read_lod_tail(&mut r, true, 2).unwrap();
+        assert_eq!(r.at, bytes.len());
+        assert!(read_lod_tail(&mut Reader { data: &bytes, at: 0 }, false, 2).is_err());
+        assert!(read_lod_tail(&mut Reader { data: &bytes, at: 0 }, true, 3).is_err());
+    }
+
+    #[test]
+    fn cooked_tail_requires_complete_adjacency_header() {
+        let bytes = empty_influences_and_adjacency();
+        let mut r = Reader { data: &bytes, at: 0 };
+        read_lod_tail(&mut r, false, 77059).unwrap();
+        assert_eq!(r.at, 17);
+        assert!(read_lod_tail(&mut Reader { data: &bytes[..16], at: 0 }, false, 77059).is_err());
+    }
 }
