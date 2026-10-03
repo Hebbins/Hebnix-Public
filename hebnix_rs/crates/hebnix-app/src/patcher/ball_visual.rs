@@ -299,7 +299,7 @@ pub fn stage_for(
         put(&mut result, 0);
         put(&mut result, 0);
         put(&mut result, old.sections.len() + new.sections.len());
-        // Keep original section/material slots addressable by the untouched kDOP
+        // Keep original section slots addressable by the untouched kDOP
         // triangles. Empty draw ranges hide them; donor sections are appended.
         for original in &old.sections {
             let mut s = original.clone();
@@ -312,10 +312,11 @@ pub fn stage_for(
             }
             result.extend_from_slice(&s);
         }
-        let mat = get_i(&old.sections[0], 0);
         for section in &new.sections {
             let mut s = section.clone();
-            set_i(&mut s, 0, mat);
+            // The donor material slot is already present in Mutators_Balls_SF.
+            // Preserve it so a puck uses its own skin instead of the normal
+            // ball material applied to the newly copied geometry.
             for at in [24, 28] {
                 let n = get_i(&s, at);
                 if n < 0 || n as usize >= new.positions.count {

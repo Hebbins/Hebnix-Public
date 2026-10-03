@@ -373,7 +373,10 @@ mod tests {
         }
         println!("AUDIT: {success} decoded, {failures} unavailable");
         assert!(success > 0);
-        assert!(success * 100 >= (success + failures) * 95, "Thumbnail audit fell below 95%: {success} decoded, {failures} unavailable");
+        assert!(
+            success * 100 >= (success + failures) * 95,
+            "Thumbnail audit fell below 95%: {success} decoded, {failures} unavailable"
+        );
     }
 
     #[test]
@@ -465,7 +468,8 @@ pub(crate) fn bake_texture(
     export: &ExportEntry,
     pixels: &RgbaImage,
 ) -> Result<Vec<u8>, String> {
-    bake_texture_encoded(package, export, pixels, false)
+    let bytes = bake_texture_encoded(package, export, pixels, false)?;
+    make_texture_resident(package, export, bytes)
 }
 
 /// Preserve mask alpha using an inline DXT5 mip chain.
@@ -474,7 +478,17 @@ pub(crate) fn bake_texture_alpha(
     export: &ExportEntry,
     pixels: &RgbaImage,
 ) -> Result<Vec<u8>, String> {
-    let mut bytes = bake_texture_encoded(package, export, pixels, true)?;
+    let bytes = bake_texture_encoded(package, export, pixels, true)?;
+    make_texture_resident(package, export, bytes)
+}
+
+/// Marks rebuilt inline mip data as resident. Retaining the old TFC name lets
+/// the game stream unrelated cached pixels over the freshly embedded texture.
+fn make_texture_resident(
+    package: &UpkPackage,
+    export: &ExportEntry,
+    mut bytes: Vec<u8>,
+) -> Result<Vec<u8>, String> {
     let (props, native) = package.serialized_props(export)?;
     let name = |s: &str| {
         package
