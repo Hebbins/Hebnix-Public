@@ -10,8 +10,8 @@ mod tsnet_sidecar;
 
 use std::time::Duration;
 
-pub use dns_cleanup::clean_stale_nrpt_rule;
 pub use direct_udp::TunnelStats;
+pub use dns_cleanup::clean_stale_nrpt_rule;
 pub use firewall::{
     ensure_beacon_relay_rule, ensure_map_sync_rule, ensure_rocket_league_lan_rule,
     ensure_sidecar_rule,
