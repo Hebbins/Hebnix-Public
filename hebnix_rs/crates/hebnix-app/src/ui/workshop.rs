@@ -18,9 +18,10 @@ use sha2::{Digest, Sha256};
 use crate::messages::AppMsg;
 use crate::multiplayer_lan::{
     HostSession, LocalInfo, MAP_SYNC_PORT, MAX_MAP_BYTES, MapFileProvider, MapProvider, PeerOffer,
-    RL_LAN_PORT, RoomClient, SlotMap, TSNET_CONTROL_URL, TransferProgress, TsnetSidecarHandle,
+    SlotMap, TSNET_CONTROL_URL, TransferProgress, TsnetSidecarHandle,
     ensure_beacon_relay_rule, ensure_map_sync_rule, ensure_rocket_league_lan_rule,
-    ensure_sidecar_rule, fetch_map_file, find_sidecar_dir, is_local_map_id, redact, valid_map_id,
+    ensure_sidecar_rule, fetch_map_file, find_sidecar_dir, is_local_map_id, redact,
+    tailnet_auth_key, valid_map_id,
 };
 mod archive;
 mod background_changer;
@@ -360,12 +361,10 @@ impl MapManager {
         Ok(())
     }
 
-    /// Rocket League only picks up files in the mods folder that were there
-    /// when it started, so a map installed mid-game into a slot with no file
-    /// yet gets ignored and you load the vanilla map. before launching, put a
-    /// plain copy of the vanilla map in every empty slot; installing then just
-    /// overwrites it. a copy, never a link, or installing would overwrite the
-    /// vanilla file.
+    /// Rocket League only notices mod files that existed when it started.
+    /// Pre-seeding lets a peer later install a map into an otherwise unused
+    /// slot, but creates four vanilla-map copies and can prompt the user when
+    /// Rocket League opens. It is therefore opt-in at multiplayer launch.
     pub fn seed_empty_slots(&self, rl_path: &str) {
         let cooked = Path::new(rl_path).join("TAGame").join("CookedPCConsole");
         let mods_dir = cooked.join(WORKSHOP_MODS_DIR_NAME);
@@ -726,6 +725,10 @@ struct MultiplayerState {
     /// route everything through tailscale's relays so other players never
     /// see this machine's public address (saved in multiplayer_settings.json)
     relay_only: bool,
+    /// Pre-create vanilla files in otherwise empty Workshop map slots before
+    /// launching Rocket League. This is only needed when a peer might send a
+    /// map for a slot that is not already present in mods.
+    seed_other_map_slots: bool,
 
     // tsnet sidecar / tailnet state
     sidecar: Option<Arc<TsnetSidecarHandle>>,
@@ -783,6 +786,7 @@ impl Default for MultiplayerState {
             player_filter: String::new(),
             abandon_tailnet: false,
             relay_only: false,
+            seed_other_map_slots: false,
             sidecar: None,
             tailnet_requested: false,
             tailnet_ip: None,
@@ -1285,22 +1289,31 @@ impl WorkshopState {
                 t("multiplayer-workshop-multiplayer-requires-hebnix-to"),
             );
         }
+        let mut back = false;
         ui.horizontal(|ui| {
             if self.multiplayer.relay.is_none() && ui.button(t("multiplayer-back")).clicked() {
-                self.leave_multiplayer_setup();
-                return;
+                back = true;
             }
             ui.strong(t("multiplayer-workshop-multiplayer"));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 multiplayer_help_button(ui);
             });
         });
+        if back {
+            self.leave_multiplayer_setup();
+            return;
+        }
         ui.group(|ui| {
             ui.strong(t("multiplayer-setup"));
             if !tailnet_ready {
                 ui.label(t("multiplayer-connecting-to-the-private-workshop-netwo"));
             } else if !self.multiplayer.rl_open {
                 ui.label(t("multiplayer-step-1-start-rocket-league-on"));
+                let response = ui.checkbox(
+                    &mut self.multiplayer.seed_other_map_slots,
+                    "Seed other map slots before launch",
+                );
+                response.on_hover_text("You'll get 4 prompts when opening Rocket League");
                 if ui
                     .add_enabled(
                         !setup_in_progress && is_admin,
@@ -1428,27 +1441,7 @@ impl WorkshopState {
         }
 
         if stop {
-            if let Some(mut session) = self.multiplayer.relay.take() {
-                self.multiplayer.status = match session.stop() {
-                    Ok(()) => t("multiplayer-disconnected").to_string(),
-                    Err(error) => format!("Disconnected, but cleanup failed: {error}"),
-                };
-            }
-            let _ = crate::winutil::clear_rocket_league_multihome();
-            // this used to only stop the relay/beacon capture and leave the
-            // tailnet connection itself running until the whole app closed
-            // (self.multiplayer.sidecar was only ever cleared from
-            // suspend_multiplayer, never here) -- so the tailscale virtual
-            // adapter stayed up for the rest of the Hebnix session after
-            // every disconnect, sitting alongside the real network adapter.
-            // Confirmed live this causes real, ongoing internet flakiness
-            // for other things (Rocket League's own EOS login kept dropping
-            // and retrying) even with no -multihome argument left pointing
-            // at it, purely from the extra adapter still being there.
-            // Dropping the sidecar here runs its Drop impl, which brings
-            // the tailnet down and stops the HebnixTailscale service.
-            self.multiplayer.sidecar = None;
-            let _ = crate::multiplayer_lan::cleanup_system_state();
+            self.disconnect_multiplayer(tx);
         }
         if start_relay {
             if !is_admin {
@@ -1496,6 +1489,38 @@ impl WorkshopState {
             .ok();
     }
 
+    fn disconnect_multiplayer(&mut self, tx: &Sender<AppMsg>) {
+        let was_connected = self.multiplayer.tailnet_ip.is_some();
+        let cleanup_error = self
+            .multiplayer
+            .relay
+            .take()
+            .and_then(|mut session| session.stop().err());
+        let _ = crate::winutil::clear_rocket_league_multihome();
+        // Drop brings the tailnet down and stops the HebnixTailscale service.
+        self.multiplayer.sidecar = None;
+        let _ = crate::multiplayer_lan::cleanup_system_state();
+        self.multiplayer.tailnet_requested = false;
+        self.multiplayer.tailnet_ip = None;
+        self.multiplayer.launch_ready = false;
+        self.multiplayer.multihome_check_attempts = 0;
+        self.multiplayer.multihome_check_in_flight = false;
+        self.multiplayer.shutdown_deadline = None;
+        self.multiplayer.setup_progress = None;
+        self.multiplayer.status = match cleanup_error {
+            Some(error) => format!(
+                "Disconnected, but cleanup failed: {}",
+                redact(&error.to_string())
+            ),
+            None => t("multiplayer-disconnected").to_string(),
+        };
+        if was_connected {
+            let _ = tx.send(AppMsg::Log(
+                "[Multiplayer] Disconnected from the Hebnix Network".to_string(),
+            ));
+        }
+    }
+
     /// Spawns (or reuses) the tsnet sidecar and brings the tailnet up. This
     /// happens as soon as the user picks Host/Join, before Rocket League is
     /// touched at all, so the multihome address is known up front instead
@@ -1513,32 +1538,32 @@ impl WorkshopState {
         let repaint = ctx.clone();
         std::thread::spawn(move || {
             let result = (|| -> Result<Arc<TsnetSidecarHandle>, String> {
+                let key = tailnet_auth_key()?;
                 let base_dir = crate::config::base_dir();
                 crate::multiplayer_assets::ensure_present(&base_dir).map_err(|error| {
                     format!("could not extract multiplayer components: {error}")
                 })?;
-                let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-                let exe_dir = executable.parent().ok_or_else(|| {
-                    "could not locate Hebnix's install folder".to_string()
-                })?;
                 // the helper programs can sit in a multiplayer-lan folder in
                 // the data folder (installed) or next to the exe (portable,
                 // built from source), or loose next to the exe
-                let lan_dir = crate::config::base_dir().join("multiplayer-lan");
-                let mut search = vec![lan_dir.clone(), exe_dir.join("multiplayer-lan")];
-                search.push(exe_dir.to_path_buf());
+                let lan_dir = base_dir.join("multiplayer-lan");
+                let mut search = vec![lan_dir.clone()];
+                if let Some(exe_dir) = std::env::current_exe()
+                    .ok()
+                    .and_then(|path| path.parent().map(std::path::Path::to_path_buf))
+                {
+                    search.push(exe_dir.join("multiplayer-lan"));
+                    search.push(exe_dir);
+                }
                 search.dedup();
                 let sidecar_dir = find_sidecar_dir(&search)?;
                 ensure_sidecar_rule(&sidecar_dir.join("tailscaled.exe"))?;
                 let state_dir = lan_dir.join("tsnet-state");
                 let handle =
                     TsnetSidecarHandle::spawn(&sidecar_dir, &state_dir, relay_only, tx.clone())?;
-                // "host"/"guest" no longer means anything to Hebnix's own
-                // relay (see hosting.rs) - every peer is the same
-                let key = RoomClient::new(TSNET_CONTROL_URL).request_tsnet_authkey("peer", "")?;
                 let token = multiplayer_client_token();
                 let hostname = format!("hebnix-{}", &token[..token.len().min(8)]);
-                handle.request_up(key.auth_key, hostname, key.control_url)?;
+                handle.request_up(key.to_owned(), hostname, TSNET_CONTROL_URL.to_owned())?;
                 Ok(Arc::new(handle))
             })();
             let _ = tx.send(AppMsg::WorkshopTailnetStarted { result });
@@ -1552,6 +1577,9 @@ impl WorkshopState {
     }
 
     pub fn finish_tailnet_started(&mut self, result: Result<Arc<TsnetSidecarHandle>, String>) {
+        if !self.multiplayer.tailnet_requested {
+            return;
+        }
         match result {
             Ok(sidecar) if self.multiplayer.abandon_tailnet => {
                 // the player left the screen while this was starting
@@ -1595,6 +1623,10 @@ impl WorkshopState {
             t("set-tailnet-ip-ready-on-the-private-workshop-network").to_string();
     }
 
+    pub fn multiplayer_connection_requested(&self) -> bool {
+        self.multiplayer.tailnet_requested
+    }
+
     pub fn tailnet_failed(&mut self, error: String) {
         if !self.multiplayer.wizard_started {
             return;
@@ -1619,11 +1651,14 @@ impl WorkshopState {
             Some(t("launch-multiplayer-starting-rocket-league-on-the-workshop").to_string());
         let rl_path = rl_path.to_string();
         let rl_launch = self.rl_launch.clone();
+        let seed_other_map_slots = self.multiplayer.seed_other_map_slots;
         let manager = self.manager.clone();
         let tx = tx.clone();
         let repaint = ctx.clone();
         std::thread::spawn(move || {
-            manager.seed_empty_slots(&rl_path);
+            if seed_other_map_slots {
+                manager.seed_empty_slots(&rl_path);
+            }
             let result = crate::winutil::restart_rocket_league_multihome(
                 &rl_launch,
                 Path::new(&rl_path),
@@ -2183,16 +2218,38 @@ impl WorkshopState {
                         .color(egui::Color32::GRAY),
                 );
 
-                let status = if !active_targets.is_empty() {
-                    format!("🟢 Active on: {}", active_targets.join(", "))
-                } else if is_local_entry(map_data) {
-                    "📁 Imported".to_string()
-                } else if is_cached {
-                    "📦 Cached".to_string()
+                if !active_targets.is_empty() {
+                    ui.horizontal(|ui| {
+                        let (rect, _) =
+                            ui.allocate_exact_size(egui::vec2(13.0, 13.0), egui::Sense::hover());
+                        let stroke = egui::Stroke::new(2.0, egui::Color32::from_rgb(68, 190, 100));
+                        let origin = rect.left_top();
+                        ui.painter().line_segment(
+                            [origin + egui::vec2(1.0, 7.0), origin + egui::vec2(5.0, 11.0)],
+                            stroke,
+                        );
+                        ui.painter().line_segment(
+                            [origin + egui::vec2(5.0, 11.0), origin + egui::vec2(12.0, 2.0)],
+                            stroke,
+                        );
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "Active on: {}",
+                                active_targets.join(", ")
+                            ))
+                            .size(12.0),
+                        );
+                    });
                 } else {
-                    "☁ Cloud".to_string()
-                };
-                ui.label(egui::RichText::new(status).size(12.0));
+                    let status = if is_local_entry(map_data) {
+                        "📁 Imported".to_string()
+                    } else if is_cached {
+                        "📦 Cached".to_string()
+                    } else {
+                        "☁ Cloud".to_string()
+                    };
+                    ui.label(egui::RichText::new(status).size(12.0));
+                }
                 ui.add_space(4.0);
 
                 let (btn_text, btn_color) = if is_busy {

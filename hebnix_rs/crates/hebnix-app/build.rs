@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    embed_headscale_key();
     println!("cargo:rerun-if-changed=hebnix.rc");
     println!("cargo:rerun-if-changed=assets/hebnix.ico");
     println!("cargo:rerun-if-changed=assets/multiplayer");
@@ -118,6 +119,22 @@ fn embed_multiplayer_assets() {
     let out_path = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"))
         .join("multiplayer_assets.rs");
     std::fs::write(out_path, out).expect("failed to write multiplayer asset manifest");
+}
+
+fn embed_headscale_key() {
+    let key_file = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../hs_key.txt");
+    println!("cargo:rerun-if-changed={}", key_file.display());
+    println!("cargo:rerun-if-env-changed=HEBNIX_HS_KEY");
+    let key = std::env::var("HEBNIX_HS_KEY")
+        .ok()
+        .or_else(|| std::fs::read_to_string(&key_file).ok())
+        .unwrap_or_default();
+    let out = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
+    std::fs::write(
+        out.join("hs_key.rs"),
+        format!("pub const KEY: &str = {:?};\n", key.trim()),
+    )
+    .expect("write embedded Headscale key");
 }
 
 fn embed_version_resources() {

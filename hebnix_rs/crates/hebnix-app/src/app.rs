@@ -2085,40 +2085,54 @@ impl HebnixApp {
                     self.plugin_mgr.on_ws_close(&slug, &id, &reason);
                     ctx.request_repaint();
                 }
-                AppMsg::TsnetUpResult { result } => match result {
-                    Ok(ip) => {
-                        self.console.write(format!("[tsnet] tailnet up, IP {ip}"));
-                        self.workshop.set_tailnet_ip(ip);
-                        self.workshop.refresh_launch_status(&self.tx, ctx);
+                AppMsg::TsnetUpResult { result } => {
+                    if self.workshop.multiplayer_connection_requested() {
+                        match result {
+                            Ok(ip) => {
+                                self.console
+                                    .write("[Multiplayer] Connected to the Hebnix Network");
+                                self.workshop.set_tailnet_ip(ip);
+                                self.workshop.refresh_launch_status(&self.tx, ctx);
+                            }
+                            Err(error) => {
+                                self.console.write(format!(
+                                    "[Multiplayer] Could not connect: {}",
+                                    crate::multiplayer_lan::redact(&error)
+                                ));
+                                self.workshop.tailnet_failed(error);
+                            }
+                        }
                     }
-                    Err(error) => {
-                        self.console
-                            .write(format!("[tsnet] failed to bring the tailnet up: {error}"));
-                        self.workshop.tailnet_failed(error);
-                    }
-                },
+                }
                 // not otherwise consumed yet -- peer-level status/events only
                 // drive the console for now. See the tsnet-multiplayer rework
                 // plan's beacon-relay/firewall-scoping notes for what would
                 // consume a live peer list if this UI panel grows one later.
                 AppMsg::TsnetStatus {
                     state,
-                    tailnet_ip,
+                    tailnet_ip: _,
                     peers,
                 } => {
                     self.console.write(format!(
-                        "[tsnet] status={state:?} ip={tailnet_ip:?} peers={}",
+                        "[Multiplayer] Network status: {state:?}; peers={}",
                         peers.len()
                     ));
                 }
-                AppMsg::TsnetPeerEvent { online, tailnet_ip } => {
+                AppMsg::TsnetPeerEvent {
+                    online,
+                    tailnet_ip: _,
+                } => {
                     let word = if online { "online" } else { "offline" };
                     self.console
-                        .write(format!("[tsnet] peer {tailnet_ip} {word}"));
+                        .write(format!("[Multiplayer] Peer {word}"));
                 }
                 AppMsg::TsnetDownResult { ok } => {
-                    self.console
-                        .write(format!("[tsnet] tailnet down (ok={ok})"));
+                    if ok {
+                        self.console
+                            .write("[Multiplayer] Disconnected from the Hebnix Network");
+                    } else {
+                        self.console.write("[Multiplayer] Disconnect failed");
+                    }
                 }
                 AppMsg::TsnetSidecarDisconnected => {
                     self.console
