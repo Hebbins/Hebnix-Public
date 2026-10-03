@@ -10,6 +10,7 @@
 //!  4. the biggest non-boilerplate file is the map, it goes through the
 //!     same import as a hand-picked map (see local_import.rs).
 
+use crate::i18n::{t, t_args};
 use std::io::{BufRead, BufReader, Read};
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
@@ -419,7 +420,7 @@ fn fetch_manifest(api_key: &str, wid: &str, dir: &Path) -> Result<(ManifestInfo,
         .call()
         .map_err(|e| match e {
             ureq::Error::Status(401 | 403, _) => {
-                "The Hubcap API key was rejected. Check it and try again.".to_string()
+                t("fetch-manifest-the-hubcap-api-key-was-rejected").to_string()
             }
             ureq::Error::Status(code, _) => format!("The manifest request failed (HTTP {code})."),
             other => format!("The manifest request failed: {other}"),
@@ -527,11 +528,11 @@ fn download_item(
         "DepotDownloaderMod wasn't found. It should be in a 'depotdownloader' folder \
          next to hebnix.exe.",
     )?;
-    log("Looking up the workshop item on Steam...");
+    log(&t("download-item-looking-up-the-workshop-item-on"));
     let details = fetch_details(wid)?;
     log(&format!("Found \"{}\".", details.title));
 
-    log("Requesting the download manifest...");
+    log(&t("download-item-requesting-the-download-manifest"));
     let (info, manifest) = fetch_manifest(api_key, wid, work_dir)?;
 
     let keys = work_dir.join("depot_keys.txt");
@@ -539,7 +540,7 @@ fn download_item(
         .map_err(|e| e.to_string())?;
 
     let out_dir = work_dir.join("content");
-    log("Downloading the map...");
+    log(&t("download-item-downloading-the-map"));
     run_depot_downloader(&dotnet, &dll, &info, wid, &manifest, &keys, &out_dir, log)?;
     // the key isn't needed past the download
     let _ = std::fs::remove_file(&keys);
@@ -641,7 +642,7 @@ impl SteamDownloader {
                 .map_err(|e| e.to_string())
                 .and_then(|_| download_item(&dotnet, &api_key, &wid, &work_dir, &log))
                 .and_then(|downloaded| {
-                    log("Saving the map, its details and image...");
+                    log(&t("start-saving-the-map-its-details-and"));
                     let sidecar = downloaded.sidecar.as_ref();
                     // the author's own name from the map's info file beats
                     // steam's bare creator id
@@ -697,29 +698,28 @@ impl SteamDownloader {
             .get_or_insert_with(|| load_settings(runtime_dir));
         let busy = self.busy.load(Ordering::Relaxed);
 
-        ui.heading("Download from the Steam Workshop");
+        ui.heading(t("render-download-from-the-steam-workshop"));
         ui.label(
-            "Paste a Rocket League workshop link or id and Hebnix downloads the map and \
-             imports it. This needs your own Hubcap API key and the .NET runtime.",
+            t("render-paste-a-rocket-league-workshop-link"),
         );
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            ui.label("Hubcap API key");
+            ui.label(t("render-hubcap-api-key"));
             let key_edit = egui::TextEdit::singleline(&mut settings.hubcap_api_key)
                 .password(!self.show_key)
-                .hint_text("paste your key")
+                .hint_text(t("render-paste-your-key"))
                 .desired_width(260.0);
             if ui.add(key_edit).lost_focus() {
                 save_settings(runtime_dir, settings);
             }
-            ui.checkbox(&mut self.show_key, "Show");
-            ui.hyperlink_to("Get a key", HUBCAP_SITE);
+            ui.checkbox(&mut self.show_key, t("tray-show"));
+            ui.hyperlink_to(t("render-get-a-key"), HUBCAP_SITE);
         });
         ui.horizontal(|ui| {
-            ui.label("Workshop link or id");
+            ui.label(t("render-workshop-link-or-id"));
             ui.add(
                 egui::TextEdit::singleline(&mut self.input)
-                    .hint_text("https://steamcommunity.com/sharedfiles/filedetails/?id=...")
+                    .hint_text(t("render-https-steamcommunity-com-sharedfiles-fil"))
                     .desired_width(360.0),
             );
         });
@@ -729,19 +729,16 @@ impl SteamDownloader {
         let ready = wid.is_some() && has_key && !busy;
         let mut start_with = None;
         ui.horizontal(|ui| {
-            if ui
-                .add_enabled(ready, egui::Button::new("Download map"))
-                .clicked()
-            {
+            if ui.add_enabled(ready, egui::Button::new(t("render-download-map"))).clicked() {
                 save_settings(runtime_dir, settings);
                 start_with = wid.clone();
             }
             if busy {
                 ui.spinner();
             } else if !has_key {
-                ui.small("Enter a Hubcap API key first.");
+                ui.small(t("render-enter-a-hubcap-api-key-first"));
             } else if wid.is_none() && !self.input.trim().is_empty() {
-                ui.small("That doesn't look like a workshop link or id.");
+                ui.small(t("render-that-doesn-t-look-like-a"));
             }
         });
 
@@ -751,25 +748,22 @@ impl SteamDownloader {
                 Some(Ok(map)) => {
                     ui.colored_label(
                         egui::Color32::LIGHT_GREEN,
-                        format!(
-                            "Imported {}. Find it under Browse Maps, in View Downloaded.",
-                            map.name
-                        ),
+                        t_args("render-imported-map-find-it-under-browse", &[("map", map.name.to_string().into())]),
                     );
                 }
                 Some(Err(error)) => {
                     ui.colored_label(egui::Color32::LIGHT_RED, error);
                     if shared.needs_dotnet {
-                        ui.small("To install it with winget, run this in a terminal:");
+                        ui.small(t("render-to-install-it-with-winget-run"));
                         ui.code(DOTNET_INSTALL_COMMAND);
                         ui.horizontal(|ui| {
-                            if ui.button("Run in terminal").clicked() {
+                            if ui.button(t("render-run-in-terminal")).clicked() {
                                 run_in_terminal(DOTNET_INSTALL_COMMAND);
                             }
-                            if ui.button("Copy command").clicked() {
+                            if ui.button(t("render-copy-command")).clicked() {
                                 ui.ctx().copy_text(DOTNET_INSTALL_COMMAND.to_string());
                             }
-                            ui.small("When it finishes, click Download map again.");
+                            ui.small(t("render-when-it-finishes-click-download-map"));
                         });
                     }
                 }

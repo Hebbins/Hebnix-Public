@@ -1,3 +1,4 @@
+use crate::i18n::{t, t_args};
 use crate::{messages::AppMsg, ui::workshop::ImageState};
 use crossbeam_channel::{Receiver, Sender};
 use eframe::egui;
@@ -44,9 +45,9 @@ impl PatchCatalog {
         let _ = std::fs::create_dir_all(cache.join("downloads"));
         let items = cached_catalog(&cache).unwrap_or_default();
         let status = if items.is_empty() {
-            "Loading catalog..."
+            t("catalog-loading-catalog")
         } else {
-            "Showing cached catalog."
+            t("catalog-showing-cached-catalog")
         }
         .into();
         let (tx, rx) = crossbeam_channel::unbounded();
@@ -91,18 +92,17 @@ impl PatchCatalog {
                     self.items = items;
                     self.page = 0;
                     self.status = if self.items.is_empty() {
-                        "No catalog items found."
+                        t("poll-no-catalog-items-found")
                     } else {
-                        ""
-                    }
-                    .into();
+                        String::new()
+                    };
                 }
                 Event::Catalog(Err(error)) => {
                     self.fetching = false;
                     self.status = if self.items.is_empty() {
-                        "Failed to load catalog."
+                        t("poll-failed-to-load-catalog")
                     } else {
-                        "Showing cached catalog."
+                        t("catalog-showing-cached-catalog")
                     }
                     .into();
                     let _ = logs.send(AppMsg::Log(format!(
@@ -148,11 +148,11 @@ impl PatchCatalog {
         if self.fetching {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.weak("Refreshing catalog...");
+                ui.weak(t("render-refreshing-catalog"));
             });
         }
         if ui
-            .checkbox(&mut self.view_downloaded, "View Downloaded")
+            .checkbox(&mut self.view_downloaded, t("render-view-downloaded"))
             .changed()
         {
             self.page = 0;
@@ -178,13 +178,13 @@ impl PatchCatalog {
                 format!("Page {} of {pages}", self.page + 1)
             });
             if ui
-                .add_enabled(self.page > 0, egui::Button::new("Previous"))
+                .add_enabled(self.page > 0, egui::Button::new(t("ball-previous")))
                 .clicked()
             {
                 self.page -= 1;
             }
             if ui
-                .add_enabled(self.page + 1 < pages, egui::Button::new("Next"))
+                .add_enabled(self.page + 1 < pages, egui::Button::new(t("ball-next")))
                 .clicked()
             {
                 self.page += 1;
@@ -209,11 +209,11 @@ impl PatchCatalog {
                     ui.add_space(20.0);
                     ui.vertical_centered(|ui| {
                         ui.weak(if self.items.is_empty() {
-                            self.status.as_str()
+                            self.status.clone()
                         } else if self.view_downloaded {
-                            "No downloaded items match your search."
+                            t("render-no-downloaded-items-match-your-search")
                         } else {
-                            "No catalog items match your search."
+                            t("render-no-catalog-items-match-your-search")
                         });
                     });
                     return;
@@ -273,13 +273,13 @@ impl PatchCatalog {
                         );
                     }
                     Some(ImageState::Failed) => {
-                        ui.put(image_rect, egui::Label::new("Failed to load image"));
+                        ui.put(image_rect, egui::Label::new(t("card-failed-to-load-image")));
                     }
                     _ if banner.is_empty() => {
-                        ui.put(image_rect, egui::Label::new("No image"));
+                        ui.put(image_rect, egui::Label::new(t("card-no-image")));
                     }
                     _ => {
-                        ui.put(image_rect, egui::Label::new("Loading image..."));
+                        ui.put(image_rect, egui::Label::new(t("card-loading-image")));
                     }
                 }
                 if has_multiple {
@@ -343,18 +343,18 @@ impl PatchCatalog {
                 }
                 ui.strong(short(field(item, "name"), 28));
                 ui.label(
-                    egui::RichText::new(format!("by {}", field(item, "author")))
+                    egui::RichText::new(t_args("card-by-field", &[("field", (field(item, "author")).to_string().into())]))
                         .italics()
                         .size(11.0)
                         .color(egui::Color32::GRAY),
                 );
-                ui.weak(format!("{} downloads", number(item, "download_count")));
+                ui.weak(t_args("card-number-downloads", &[("number", (number(item, "download_count")).to_string().into())]));
                 let label = if busy {
-                    "Downloading..."
+                    t("card-downloading")
                 } else if downloaded {
-                    "Import"
+                    t("card-import")
                 } else {
-                    "Download"
+                    t("render-download")
                 };
                 clicked = ui
                     .add_enabled(

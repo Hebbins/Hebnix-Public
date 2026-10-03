@@ -27,12 +27,14 @@ mod dpi_fix;
 mod epic_connection;
 mod hosts_file;
 mod hotkey;
+mod i18n;
 #[path = "item-spawning/mod.rs"]
 mod item_spawning;
 mod messages;
 mod monitor;
 #[path = "multiplayer-lan/mod.rs"]
 mod multiplayer_lan;
+mod multiplayer_assets;
 mod overlay;
 mod veryimportantfile;
 mod patch_core {
@@ -44,6 +46,9 @@ mod rl_launch;
 mod runtime_assets;
 mod spoofer;
 mod statsapi_ini;
+mod speed_patch {
+    pub use crate::patcher::speed_patch::*;
+}
 mod swapper {
     pub use crate::patcher::swapper::*;
 }
@@ -181,10 +186,14 @@ fn main() -> eframe::Result {
     if let Err(error) = runtime_assets::ensure_present(&base_dir) {
         tracing::warn!("failed to prepare Hebnix runtime assets: {error}");
     }
+    if let Err(error) = multiplayer_assets::ensure_present(&base_dir) {
+        tracing::warn!("failed to prepare Hebnix multiplayer assets: {error}");
+    }
     setup_panic_hook(&base_dir);
     tracing::info!("Hebnix {} starting", app::APP_VERSION);
 
     let mut cfg = config::Config::load(&base_dir);
+    i18n::init(&cfg.settings.language, Some(base_dir.join("locales")));
 
     // relaunch elevated if the user asked for it. --no-elevate comes back when
     // uac was declined

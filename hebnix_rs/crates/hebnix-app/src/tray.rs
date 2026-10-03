@@ -3,12 +3,15 @@
 use std::path::Path;
 
 use tray_icon::menu::{Menu, MenuItem};
+
+use crate::i18n::t;
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 pub struct Tray {
     // keep this alive, dropping it removes the tray icon
     pub _icon: TrayIcon,
     visibility_item: MenuItem,
+    quit_item: MenuItem,
     pub open_id: tray_icon::menu::MenuId,
     pub quit_id: tray_icon::menu::MenuId,
 }
@@ -43,8 +46,8 @@ fn load_icon(base_dir: &Path) -> Icon {
 impl Tray {
     pub fn new(base_dir: &Path, tooltip: &str, hidden: bool) -> Option<Self> {
         let menu = Menu::new();
-        let open_item = MenuItem::new(if hidden { "Show" } else { "Hide" }, true, None);
-        let quit_item = MenuItem::new("Close", true, None);
+        let open_item = MenuItem::new(Self::visibility_text(hidden), true, None);
+        let quit_item = MenuItem::new(t("tray-close"), true, None);
         menu.append(&open_item).ok()?;
         menu.append(&quit_item).ok()?;
 
@@ -58,13 +61,27 @@ impl Tray {
         Some(Self {
             _icon: icon,
             visibility_item: open_item.clone(),
+            quit_item: quit_item.clone(),
             open_id: open_item.id().clone(),
             quit_id: quit_item.id().clone(),
         })
     }
 
+    fn visibility_text(hidden: bool) -> String {
+        if hidden {
+            t("tray-show")
+        } else {
+            t("tray-hide")
+        }
+    }
+
     pub fn set_hidden(&self, hidden: bool) {
-        self.visibility_item
-            .set_text(if hidden { "Show" } else { "Hide" });
+        self.visibility_item.set_text(Self::visibility_text(hidden));
+    }
+
+    /// re-read the menu texts after a language change
+    pub fn refresh_labels(&self, hidden: bool) {
+        self.set_hidden(hidden);
+        self.quit_item.set_text(t("tray-close"));
     }
 }

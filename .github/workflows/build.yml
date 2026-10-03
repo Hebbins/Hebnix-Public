@@ -18,6 +18,10 @@ jobs:
         with:
           workspaces: hebnix_rs -> target
 
+      - name: check translations
+        run: cargo test -p hebnix-app i18n
+        working-directory: hebnix_rs
+
       - name: build hebnix
         run: cargo build --release --bin hebnix
         working-directory: hebnix_rs

@@ -2,8 +2,8 @@
 //  - embed a per-monitor-v2 dpi manifest (applies before any window exists,
 //    dodges the ambiguous default-dpi mode behind the mixed-dpi drag bugs)
 //  - embed hebnix.ico as the exe icon plus a per-bin version block
-//  - copy the runtime binaries (steam_api64.dll, rlapi-bridge.exe) and the
-//    required runtime assets next to the built exe so a plain build just runs
+//  - copy the shared runtime binaries (steam_api64.dll, rlapi-bridge.exe)
+//    next to the built exe so a plain build just runs
 
 use std::path::{Path, PathBuf};
 
@@ -24,7 +24,100 @@ fn main() {
         embed_version_resources();
     }
 
+    embed_locales();
+    embed_multiplayer_assets();
     copy_runtime_binaries();
+}
+
+/// bakes every locales/<code>/*.ftl into the exe. adding a language is just
+/// adding a folder, nothing in the rust code needs to change.
+fn embed_locales() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("locales");
+    println!("cargo:rerun-if-changed={}", root.display());
+
+    let mut out = String::from("pub const EMBEDDED_FTL: &[(&str, &str)] = &[\n");
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_dir())
+        .collect();
+    dirs.sort();
+
+    for dir in dirs {
+        let Some(code) = dir.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        println!("cargo:rerun-if-changed={}", dir.display());
+        let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("ftl"))
+            .collect();
+        files.sort();
+        for file in files {
+            println!("cargo:rerun-if-changed={}", file.display());
+            out.push_str(&format!(
+                "    ({:?}, include_str!({:?})),\n",
+                code,
+                file.to_string_lossy()
+            ));
+        }
+    }
+    out.push_str("];\n");
+
+    let out_path = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR")).join("locales_embedded.rs");
+    std::fs::write(out_path, out).expect("failed to write locales_embedded.rs");
+}
+
+/// Generates a manifest that embeds every file below assets/multiplayer.
+/// Keeping this recursive means adding a support file to that folder is enough
+/// to ship it; runtime code does not need a second hard-coded file list.
+fn embed_multiplayer_assets() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("assets")
+        .join("multiplayer");
+    println!("cargo:rerun-if-changed={}", root.display());
+
+    fn collect_files(dir: &Path, files: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir)
+            .unwrap_or_else(|error| panic!("failed to read {}: {error}", dir.display()))
+        {
+            let path = entry.expect("failed to read multiplayer asset entry").path();
+            if path.is_dir() {
+                collect_files(&path, files);
+            } else if path.is_file() {
+                files.push(path);
+            }
+        }
+    }
+
+    let mut files = Vec::new();
+    collect_files(&root, &mut files);
+    files.sort();
+
+    let mut out = String::from("const MULTIPLAYER_ASSETS: &[(&str, &[u8])] = &[\n");
+    for file in files {
+        println!("cargo:rerun-if-changed={}", file.display());
+        let relative = file
+            .strip_prefix(&root)
+            .expect("multiplayer asset escaped its source directory")
+            .to_string_lossy()
+            .replace('\\', "/");
+        out.push_str(&format!(
+            "    ({:?}, include_bytes!({:?})),\n",
+            relative,
+            file.to_string_lossy()
+        ));
+    }
+    out.push_str("];\n");
+
+    let out_path = PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"))
+        .join("multiplayer_assets.rs");
+    std::fs::write(out_path, out).expect("failed to write multiplayer asset manifest");
 }
 
 fn embed_version_resources() {
@@ -144,31 +237,6 @@ fn copy_runtime_binaries() {
         "rlapi-bridge.exe missing - run rlapi_bridge/build.bat (RLAPI off until then)",
     );
 
-    let sidecar_dir = workspace_root.join("sidecar");
-    for (file_name, missing_hint) in [
-        (
-            "tailscaled.exe",
-            "tailscaled.exe missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
-        ),
-        (
-            "tailscale.exe",
-            "tailscale.exe missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
-        ),
-        (
-            "wintun.dll",
-            "wintun.dll missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
-        ),
-        (
-            "WinDivert.dll",
-            "WinDivert.dll missing from hebnix_rs/sidecar/ - the beacon capture (multiplayer-lan/beacon.rs) needs it next to the exe. Official release: https://github.com/basil00/WinDivert/releases",
-        ),
-        (
-            "WinDivert64.sys",
-            "WinDivert64.sys missing from hebnix_rs/sidecar/ - the signed driver WinDivert.dll loads, same source as WinDivert.dll above",
-        ),
-    ] {
-        copy_file(&sidecar_dir.join(file_name), &profile_dir, missing_hint);
-    }
 }
 
 fn copy_file(src: &Path, profile_dir: &Path, missing_hint: &str) {

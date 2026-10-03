@@ -100,7 +100,10 @@ pub fn fetch_info(current_version: &str) -> Result<ApiInfo, String> {
 }
 
 pub fn render_changelog(ui: &mut eframe::egui::Ui, entry: &ChangelogEntry) {
-    ui.heading(format!("Hebnix v{}", entry.version));
+    ui.heading(crate::i18n::t_args(
+        "changelog-heading",
+        &[("version", entry.version.as_str().into())],
+    ));
     if !entry.release_date.is_empty() {
         ui.label(
             eframe::egui::RichText::new(&entry.release_date)
@@ -116,30 +119,32 @@ pub fn render_changelog(ui: &mut eframe::egui::Ui, entry: &ChangelogEntry) {
         .filter(|line| !line.trim().is_empty())
     {
         let trimmed = line.trim();
+        // the [Added]/[Fixed]/[Removed] tags come from the server and stay as
+        // they are, only the label shown for them is translated
         let (prefix, body, colour) = if let Some(body) = trimmed.strip_prefix("[Added]") {
             (
-                "ADDED:",
+                crate::i18n::t("changelog-added"),
                 body.trim().trim_start_matches(':').trim(),
                 eframe::egui::Color32::from_rgb(46, 204, 113),
             )
         } else if let Some(body) = trimmed.strip_prefix("[Fixed]") {
             (
-                "FIXED:",
+                crate::i18n::t("changelog-fixed"),
                 body.trim().trim_start_matches(':').trim(),
                 eframe::egui::Color32::from_rgb(52, 152, 219),
             )
         } else if let Some(body) = trimmed.strip_prefix("[Removed]") {
             (
-                "REMOVED:",
+                crate::i18n::t("changelog-removed"),
                 body.trim().trim_start_matches(':').trim(),
                 eframe::egui::Color32::from_rgb(231, 76, 60),
             )
         } else {
-            ("", trimmed, ui.visuals().text_color())
+            (String::new(), trimmed, ui.visuals().text_color())
         };
         ui.horizontal_wrapped(|ui| {
             if !prefix.is_empty() {
-                ui.label(eframe::egui::RichText::new(prefix).strong().color(colour));
+                ui.label(eframe::egui::RichText::new(&prefix).strong().color(colour));
             }
             ui.label(body);
         });

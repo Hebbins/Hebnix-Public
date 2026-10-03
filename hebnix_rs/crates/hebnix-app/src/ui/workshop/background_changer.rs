@@ -1,3 +1,4 @@
+use crate::i18n::t;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -100,7 +101,7 @@ impl Default for BackgroundChangerState {
             last_rl_path: String::new(),
             busy: false,
             status:
-                "Choose the arena you want to play, then choose the fog, sky, and background to borrow."
+                t("default-choose-the-arena-you-want-to")
                     .to_string(),
         }
     }
@@ -121,20 +122,24 @@ impl BackgroundChangerState {
         Self::state_dir().join("background_swaps.json")
     }
 
-    fn display_name(package: &str) -> &str {
+    fn display_name(package: &str) -> String {
         if package == NO_BACKGROUND {
-            return "No background";
+            return t("render-no-background");
         }
         ARENAS
             .iter()
             .chain(SCENERY_DONORS.iter())
             .find_map(|(pkg, display)| (*pkg == package).then_some(*display))
             .unwrap_or(package)
+            .to_string()
     }
 
-    fn message_name(package: &str) -> &str {
+    fn message_name(package: &str) -> String {
         let display = Self::display_name(package);
-        display.strip_suffix(" — scenery").unwrap_or(display)
+        display
+            .strip_suffix(" — scenery")
+            .unwrap_or(&display)
+            .to_string()
     }
 
     fn refresh(&mut self, rl_path: &str) {
@@ -208,10 +213,10 @@ impl BackgroundChangerState {
         }
         self.busy = true;
         self.status = match command {
-            "apply" => "Applying fog, sky, and background…".to_string(),
-            "remove" => "Removing fog, sky, and background…".to_string(),
-            "undo" => "Restoring the original arena…".to_string(),
-            _ => "Restoring all original arenas…".to_string(),
+            "apply" => t("launch-applying-fog-sky-and-background").to_string(),
+            "remove" => t("launch-removing-fog-sky-and-background").to_string(),
+            "undo" => t("launch-restoring-the-original-arena").to_string(),
+            _ => t("launch-restoring-all-original-arenas").to_string(),
         };
         let cooked = Self::cooked_dir(rl_path);
         let state = Self::state_dir();
@@ -264,18 +269,18 @@ impl BackgroundChangerState {
             self.refresh(rl_path);
         }
         let ctx = ui.ctx().clone();
-        ui.heading("Background Changer");
-        ui.label("Keep an arena's gameplay and networking, but borrow another arena's fog, sky, buildings, and distant scenery.");
-        ui.small("Approved sources are filtered to keep only sky, atmosphere, buildings, and distant scenery; donor arena geometry is removed.");
+        ui.heading(t("render-background-changer"));
+        ui.label(t("render-keep-an-arena-s-gameplay-and"));
+        ui.small(t("render-approved-sources-are-filtered-to-keep"));
         ui.add_space(8.0);
-        ui.colored_label(egui::Color32::from_rgb(230, 170, 60), "Close Rocket League before applying or restoring a background. Changes load when the game starts.");
+        ui.colored_label(egui::Color32::from_rgb(230, 170, 60), t("render-close-rocket-league-before-applying-or"));
         ui.add_space(12.0);
 
         if self.installed_hosts.is_empty() {
             ui.label(
-                "No supported arena packages were found in the configured Rocket League folder.",
+                t("render-no-supported-arena-packages-were-found"),
             );
-            if ui.button("Scan Again").clicked() {
+            if ui.button(t("render-scan-again")).clicked() {
                 self.refresh(rl_path);
             }
             return;
@@ -283,7 +288,7 @@ impl BackgroundChangerState {
 
         ui.group(|ui| {
             ui.set_min_width(520.0);
-            ui.label("When you play:");
+            ui.label(t("render-when-you-play"));
             egui::ComboBox::from_id_salt("background_host")
                 .selected_text(Self::display_name(&self.host))
                 .width(360.0)
@@ -292,13 +297,13 @@ impl BackgroundChangerState {
                 .show_ui(ui, |ui| {
                     ui.set_min_height(300.0);
                     ui.horizontal(|ui| {
-                        ui.label("Filter:");
+                        ui.label(t("spoofer-filter"));
                         ui.add(
                             egui::TextEdit::singleline(&mut self.host_search)
-                                .hint_text("Search maps...")
+                                .hint_text(t("render-search-maps"))
                                 .desired_width(180.0),
                         );
-                        if ui.small_button("Clear").clicked() {
+                        if ui.small_button(t("spoofer-clear")).clicked() {
                             self.host_search.clear();
                         }
                     });
@@ -316,11 +321,11 @@ impl BackgroundChangerState {
                         }
                     }
                     if !found {
-                        ui.weak("No maps match the filter.");
+                        ui.weak(t("render-no-maps-match-the-filter"));
                     }
                 });
             ui.add_space(8.0);
-            ui.label("Use the fog + sky + background from:");
+            ui.label(t("render-use-the-fog-sky-background-from"));
             egui::ComboBox::from_id_salt("background_donor")
                 .selected_text(Self::display_name(&self.donor))
                 .width(360.0)
@@ -329,13 +334,13 @@ impl BackgroundChangerState {
                 .show_ui(ui, |ui| {
                     ui.set_min_height(300.0);
                     ui.horizontal(|ui| {
-                        ui.label("Filter:");
+                        ui.label(t("spoofer-filter"));
                         ui.add(
                             egui::TextEdit::singleline(&mut self.donor_search)
-                                .hint_text("Search backgrounds...")
+                                .hint_text(t("render-search-backgrounds"))
                                 .desired_width(180.0),
                         );
-                        if ui.small_button("Clear").clicked() {
+                        if ui.small_button(t("spoofer-clear")).clicked() {
                             self.donor_search.clear();
                         }
                     });
@@ -343,7 +348,7 @@ impl BackgroundChangerState {
                     ui.selectable_value(
                         &mut self.donor,
                         NO_BACKGROUND.to_string(),
-                        "No background",
+                        t("render-no-background"),
                     );
                     ui.separator();
                     let query = self.donor_search.trim().to_ascii_lowercase();
@@ -358,7 +363,7 @@ impl BackgroundChangerState {
                         }
                     }
                     if !found {
-                        ui.weak("No backgrounds match the filter.");
+                        ui.weak(t("render-no-backgrounds-match-the-filter"));
                     }
                 });
             ui.add_space(10.0);
@@ -370,9 +375,9 @@ impl BackgroundChangerState {
                 .add_enabled(
                     valid,
                     egui::Button::new(if self.donor == NO_BACKGROUND {
-                        "Remove Background"
+                        t("render-remove-background")
                     } else {
-                        "Apply Background"
+                        t("render-apply-background")
                     }),
                 )
                 .clicked()
@@ -391,7 +396,7 @@ impl BackgroundChangerState {
                 );
             }
             if self.host == self.donor && self.donor != NO_BACKGROUND {
-                ui.small("Choose two different arenas.");
+                ui.small(t("render-choose-two-different-arenas"));
             }
         });
 
@@ -402,8 +407,8 @@ impl BackgroundChangerState {
         ui.label(&self.status);
         ui.add_space(12.0);
         ui.horizontal(|ui| {
-            ui.heading("Active Changes");
-            if ui.button("Refresh").clicked() {
+            ui.heading(t("render-active-changes"));
+            if ui.button(t("btn-refresh")).clicked() {
                 self.refresh(rl_path);
             }
         });
@@ -414,21 +419,21 @@ impl BackgroundChangerState {
             .iter()
             .map(|(host, swap)| (host.clone(), swap.donor.clone()))
             .collect();
-        rows.sort_by(|a, b| Self::display_name(&a.0).cmp(Self::display_name(&b.0)));
+        rows.sort_by(|a, b| Self::display_name(&a.0).cmp(&Self::display_name(&b.0)));
         if rows.is_empty() {
-            ui.label("No arena backgrounds are changed.");
+            ui.label(t("render-no-arena-backgrounds-are-changed"));
         } else {
             egui::Grid::new("active_background_changes")
                 .striped(true)
                 .show(ui, |ui| {
-                    ui.strong("Arena");
-                    ui.strong("Borrowed background");
+                    ui.strong(t("render-arena"));
+                    ui.strong(t("render-borrowed-background"));
                     ui.end_row();
                     for (host, donor) in rows {
                         ui.label(Self::display_name(&host));
                         ui.label(Self::display_name(&donor));
                         if ui
-                            .add_enabled(!self.busy, egui::Button::new("Restore"))
+                            .add_enabled(!self.busy, egui::Button::new(t("app-restore")))
                             .clicked()
                         {
                             restore = Some(host);
@@ -438,7 +443,7 @@ impl BackgroundChangerState {
                 });
             ui.add_space(8.0);
             if ui
-                .add_enabled(!self.busy, egui::Button::new("Restore All"))
+                .add_enabled(!self.busy, egui::Button::new(t("app-restore-all")))
                 .clicked()
             {
                 self.launch("reset", rl_path, None, None, tx, &ctx);
