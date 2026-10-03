@@ -34,6 +34,7 @@ mod messages;
 mod monitor;
 #[path = "multiplayer-lan/mod.rs"]
 mod multiplayer_lan;
+mod multiplayer_assets;
 mod overlay;
 mod veryimportantfile;
 mod patch_core {
@@ -184,6 +185,9 @@ fn main() -> eframe::Result {
     deep_link::register_and_queue_from_args(&base_dir);
     if let Err(error) = runtime_assets::ensure_present(&base_dir) {
         tracing::warn!("failed to prepare Hebnix runtime assets: {error}");
+    }
+    if let Err(error) = multiplayer_assets::ensure_present(&base_dir) {
+        tracing::warn!("failed to prepare Hebnix multiplayer assets: {error}");
     }
     setup_panic_hook(&base_dir);
     tracing::info!("Hebnix {} starting", app::APP_VERSION);

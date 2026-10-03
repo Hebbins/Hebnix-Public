@@ -2,8 +2,8 @@
 //  - embed a per-monitor-v2 dpi manifest (applies before any window exists,
 //    dodges the ambiguous default-dpi mode behind the mixed-dpi drag bugs)
 //  - embed hebnix.ico as the exe icon plus a per-bin version block
-//  - copy the runtime binaries (steam_api64.dll, rlapi-bridge.exe) and the
-//    required runtime assets next to the built exe so a plain build just runs
+//  - copy the shared runtime binaries (steam_api64.dll, rlapi-bridge.exe)
+//    next to the built exe so a plain build just runs
 
 use std::path::{Path, PathBuf};
 
@@ -237,31 +237,6 @@ fn copy_runtime_binaries() {
         "rlapi-bridge.exe missing - run rlapi_bridge/build.bat (RLAPI off until then)",
     );
 
-    let sidecar_dir = workspace_root.join("sidecar");
-    for (file_name, missing_hint) in [
-        (
-            "tailscaled.exe",
-            "tailscaled.exe missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
-        ),
-        (
-            "tailscale.exe",
-            "tailscale.exe missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
-        ),
-        (
-            "wintun.dll",
-            "wintun.dll missing from hebnix_rs/sidecar/ - see sidecar/README.md (Workshop LAN multiplayer is unavailable without it)",
-        ),
-        (
-            "WinDivert.dll",
-            "WinDivert.dll missing from hebnix_rs/sidecar/ - the beacon capture (multiplayer-lan/beacon.rs) needs it next to the exe. Official release: https://github.com/basil00/WinDivert/releases",
-        ),
-        (
-            "WinDivert64.sys",
-            "WinDivert64.sys missing from hebnix_rs/sidecar/ - the signed driver WinDivert.dll loads, same source as WinDivert.dll above",
-        ),
-    ] {
-        copy_file(&sidecar_dir.join(file_name), &profile_dir, missing_hint);
-    }
 }
 
 fn copy_file(src: &Path, profile_dir: &Path, missing_hint: &str) {

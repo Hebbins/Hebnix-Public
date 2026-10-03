@@ -1487,7 +1487,7 @@ impl WorkshopState {
         std::thread::spawn(move || {
             let result = (|| -> Result<Arc<TsnetSidecarHandle>, String> {
                 let base_dir = crate::config::base_dir();
-                crate::runtime_assets::ensure_multiplayer_present(&base_dir).map_err(|error| {
+                crate::multiplayer_assets::ensure_present(&base_dir).map_err(|error| {
                     format!("could not extract multiplayer components: {error}")
                 })?;
                 let executable = std::env::current_exe().map_err(|error| error.to_string())?;

@@ -5,9 +5,6 @@ use std::path::Path;
 const STEAM_API: &[u8] = include_bytes!("../../../vendor/steam_api64.dll");
 const RLAPI_BRIDGE: &[u8] = include_bytes!("../../../../rlapi_bridge/dist/rlapi-bridge.exe");
 
-// Generated recursively by build.rs from assets/multiplayer.
-include!(concat!(env!("OUT_DIR"), "/multiplayer_assets.rs"));
-
 pub fn ensure_present(base_dir: &Path) -> std::io::Result<()> {
     std::fs::create_dir_all(base_dir)?;
     if let Err(error) = migrate_legacy_exe_data(base_dir) {
@@ -15,18 +12,7 @@ pub fn ensure_present(base_dir: &Path) -> std::io::Result<()> {
     }
     write_if_changed(&base_dir.join("steam_api64.dll"), STEAM_API)?;
     write_if_changed(&base_dir.join("rlapi-bridge.exe"), RLAPI_BRIDGE)?;
-    ensure_multiplayer_present(base_dir)?;
 
-    Ok(())
-}
-
-/// Extracts the embedded multiplayer bundle to `%AppData%\\Hebnix\\multiplayer-lan`.
-/// Existing files are updated only when their bundled contents changed.
-pub fn ensure_multiplayer_present(base_dir: &Path) -> std::io::Result<()> {
-    let multiplayer_dir = base_dir.join("multiplayer-lan");
-    for &(relative_path, bytes) in MULTIPLAYER_ASSETS {
-        write_if_changed(&multiplayer_dir.join(relative_path), bytes)?;
-    }
     Ok(())
 }
 
@@ -92,7 +78,7 @@ fn copy_missing(source: &Path, destination: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn write_if_changed(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_if_changed(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     if std::fs::read(path).is_ok_and(|existing| existing == bytes) {
         return Ok(());
     }
