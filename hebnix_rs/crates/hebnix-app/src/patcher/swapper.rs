@@ -1,3 +1,4 @@
+use crate::i18n::{t, t_args};
 use crate::messages::AppMsg;
 use crate::patcher::painted_swap::{self, SwapPaint};
 use crossbeam_channel::{Receiver, Sender, unbounded};
@@ -43,21 +44,21 @@ impl SwapCategory {
         Self::Wheels,
     ];
 
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> String {
         match self {
-            Self::Antennas => "Antennas",
-            Self::Anthems => "Anthems",
-            Self::Borders => "Borders",
-            Self::Bodies => "Bodies",
-            Self::Boosts => "Boosts",
-            Self::Engines => "Engines",
-            Self::Goals => "Goals",
-            Self::Finishes => "Finishes",
-            Self::Banners => "Banners",
-            Self::Skins => "Decals",
-            Self::Toppers => "Toppers",
-            Self::Trails => "Trails",
-            Self::Wheels => "Wheels",
+            Self::Antennas => t("label-antennas"),
+            Self::Anthems => t("label-anthems"),
+            Self::Borders => t("label-borders"),
+            Self::Bodies => t("label-bodies"),
+            Self::Boosts => t("label-boosts"),
+            Self::Engines => t("label-engines"),
+            Self::Goals => t("label-goals"),
+            Self::Finishes => t("label-finishes"),
+            Self::Banners => t("label-banners"),
+            Self::Skins => t("label-decals"),
+            Self::Toppers => t("label-toppers"),
+            Self::Trails => t("label-trails"),
+            Self::Wheels => t("label-wheels"),
         }
     }
 
@@ -261,6 +262,9 @@ pub struct SwapperState {
     spawn_page: HashMap<SwapCategory, usize>,
     spawn_paint: HashMap<(SwapCategory, i64), usize>,
     swap_paint: HashMap<String, SwapPaint>,
+    swap_speed: HashMap<String, f32>,
+    /// set from the Experimental tab; shows the speed picker on swap rows
+    pub speed_enabled: bool,
 }
 
 impl SwapperState {
@@ -344,6 +348,8 @@ impl SwapperState {
             spawn_page: HashMap::new(),
             spawn_paint: HashMap::new(),
             swap_paint: HashMap::new(),
+            swap_speed: HashMap::new(),
+            speed_enabled: false,
         }
     }
 
@@ -366,8 +372,8 @@ impl SwapperState {
         let failures: Vec<_> = self.failed_thumbnails.keys().filter(|key|key.starts_with(&prefix)).cloned().collect();
         if failures.is_empty() { return; }
         ui.horizontal(|ui| {
-            ui.weak(format!("{} previews unavailable; items remain selectable", failures.len()));
-            if ui.small_button("Retry previews").clicked() {
+            ui.weak(t_args("thumbnail-status-failures-previews-unavailable-items-rema", &[("failures", (failures.len()).to_string().into())]));
+            if ui.small_button(t("thumbnail-status-retry-previews")).clicked() {
                 for key in failures { self.failed_thumbnails.remove(&key); self.thumbnails.remove(&key); }
             }
         });
@@ -438,7 +444,7 @@ impl SwapperState {
             .get(&category)
             .and_then(|entry| entry.items.clone());
         if resolved.is_none() {
-            ui.weak("Preparing items...");
+            ui.weak(t("resolved-items-preparing-items"));
         }
         resolved
     }
@@ -610,6 +616,7 @@ impl SwapperState {
         source: &SwapItem,
         target: &SwapItem,
         paint: SwapPaint,
+        speed: f32,
         cooked_pc: &Path,
         backups_dir: &Path,
     ) -> Result<(), String> {
@@ -656,6 +663,13 @@ impl SwapperState {
             paint,
         )
         .map_err(|error| format!("Failed to patch {} for {}: {error}", source.upk, target.upk))?;
+        if crate::speed_patch::is_active(speed) {
+            match crate::speed_patch::apply(&target_live, Some(&target_backup), speed) {
+                Ok(0) => {}
+                Ok(count) => tracing::info!("[Speed] {}: scaled {count} animation values", target.upk),
+                Err(error) => tracing::warn!("[Speed] {}: {error}", target.upk),
+            }
+        }
         let mut target_bnk = None;
         if category == SwapCategory::Boosts {
             if let (Some(source_name), Some(target_name)) =
@@ -916,7 +930,7 @@ impl SwapperState {
         if self.active.is_empty() {
             return;
         }
-        ui.strong("Item swaps");
+        ui.strong(t("active-swaps-item-swaps"));
         ui.add_space(4.0);
         let fallback: Arc<[u8]> = fs::read(self.base_dir.join("assets").join("hebnix.png"))
             .unwrap_or_else(|_| include_bytes!("../../assets/hebnix.png").to_vec())
@@ -1019,7 +1033,7 @@ impl SwapperState {
                                     "{target_name} → {source_name} ({})",
                                     swap.paint.description()
                                 ));
-                                ui.weak("Original → replacement");
+                                ui.weak(t("active-swaps-original-replacement"));
                             } else {
                                 ui.add(
                                     egui::Image::from_bytes(
@@ -1029,12 +1043,12 @@ impl SwapperState {
                                     .fit_to_exact_size(egui::vec2(120.0, 76.0)),
                                 );
                                 ui.strong(source_name);
-                                ui.weak(format!("Replaced {target_name}"));
+                                ui.weak(t_args("active-swaps-replaced-target-name", &[("target_name", target_name.to_string().into())]));
                             }
                             if ui
                                 .add_sized(
                                     [ui.available_width(), 24.0],
-                                    egui::Button::new("Restore"),
+                                    egui::Button::new(t("app-restore")),
                                 )
                                 .clicked()
                             {
@@ -1076,11 +1090,11 @@ impl SwapperState {
         ui.horizontal(|ui| {
             ui.heading(category.label());
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Reload Catalogs").clicked() {
+                if ui.button(t("app-reload-catalogs")).clicked() {
                     let _ = tx.send(AppMsg::ReloadCatalogs);
                     self.load_active(backups_dir);
                 }
-                if ui.button("Restore All").clicked() {
+                if ui.button(t("app-restore-all")).clicked() {
                     if crate::messages::block_item_action_if_game_running(tx) {
                         return;
                     }
@@ -1097,7 +1111,7 @@ impl SwapperState {
                     }
                 }
                 if ui
-                    .checkbox(&mut self.view_patched, "Show Applied")
+                    .checkbox(&mut self.view_patched, t("ball-show-applied"))
                     .changed()
                 {
                     self.page.insert(category, 0);
@@ -1106,33 +1120,33 @@ impl SwapperState {
         });
         ui.horizontal(|ui| {
             if ui
-                .checkbox(&mut self.owned_only, "Show only owned replacements")
+                .checkbox(&mut self.owned_only, t("tab-show-only-owned-replacements"))
                 .changed()
             {
                 owned_filter_requested = self.owned_only;
             }
             if self.owned_only {
                 if owned_ids.is_empty() {
-                    ui.weak("Waiting for Rocket League inventory...");
+                    ui.weak(t("tab-waiting-for-rocket-league-inventory"));
                 } else {
-                    ui.weak(format!("{} owned product IDs captured", owned_ids.len()));
+                    ui.weak(t_args("tab-owned-ids-owned-product-ids-captured", &[("owned_ids", (owned_ids.len()).to_string().into())]));
                 }
             }
         });
         ui.horizontal(|ui| {
-            ui.strong("Search:");
+            ui.strong(t("spoofer-search"));
             let input = self.search_input.entry(category).or_default();
             if ui
                 .add(
                     egui::TextEdit::singleline(input)
-                        .hint_text(format!("Search {}...", category.label().to_lowercase()))
+                        .hint_text(t_args("tab-search-category", &[("category", (category.label().to_lowercase()).to_string().into())]))
                         .desired_width(300.0),
                 )
                 .changed()
             {
                 self.page.insert(category, 0);
             }
-            if ui.button("Clear").clicked() {
+            if ui.button(t("spoofer-clear")).clicked() {
                 input.clear();
                 self.page.insert(category, 0);
             }
@@ -1184,7 +1198,7 @@ impl SwapperState {
                 .unwrap_or("Select car...");
             let previous_car = self.selected_car.clone();
             ui.horizontal(|ui| {
-                ui.strong("Car:");
+                ui.strong(t("tab-car"));
                 egui::ComboBox::from_id_salt("swapper_decal_car")
                     .width(280.0)
                     .height(320.0)
@@ -1193,13 +1207,13 @@ impl SwapperState {
                     .show_ui(ui, |ui| {
                         ui.set_min_height(300.0);
                         ui.horizontal(|ui| {
-                            ui.label("Filter:");
+                            ui.label(t("spoofer-filter"));
                             ui.add(
                                 egui::TextEdit::singleline(&mut self.car_search)
-                                    .hint_text("Search cars...")
+                                    .hint_text(t("tab-search-cars"))
                                     .desired_width(180.0),
                             );
-                            if ui.small_button("Clear").clicked() {
+                            if ui.small_button(t("spoofer-clear")).clicked() {
                                 self.car_search.clear();
                             }
                         });
@@ -1218,8 +1232,8 @@ impl SwapperState {
                         }
                     });
                 if ui
-                    .checkbox(&mut self.match_swapped_item, "Match Selected Car")
-                    .on_hover_text("Limit replacement decals to the selected car")
+                    .checkbox(&mut self.match_swapped_item, t("tab-match-selected-car"))
+                    .on_hover_text(t("tab-limit-replacement-decals-to-the-selected"))
                     .changed()
                 {
                     self.page.insert(category, 0);
@@ -1264,9 +1278,9 @@ impl SwapperState {
         if filtered.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.weak(if self.view_patched {
-                    "No applied items match the search."
+                    t("tab-no-applied-items-match-the-search")
                 } else {
-                    "No items match the search."
+                    t("tab-no-items-match-the-search")
                 })
             });
             return owned_filter_requested;
@@ -1277,20 +1291,15 @@ impl SwapperState {
         let page = self.page.entry(category).or_insert(0);
         *page = (*page).min(total_pages - 1);
         ui.horizontal(|ui| {
-            ui.label(format!(
-                "Page {} of {}  ({} items)",
-                *page + 1,
-                total_pages,
-                filtered.len()
-            ));
+            ui.label(t_args("tab-page-page-of-total-pages-filtered", &[("page", (*page + 1).to_string().into()), ("total_pages", total_pages.to_string().into()), ("filtered", (filtered.len()).to_string().into())]));
             if ui
-                .add_enabled(*page > 0, egui::Button::new("Previous"))
+                .add_enabled(*page > 0, egui::Button::new(t("ball-previous")))
                 .clicked()
             {
                 *page -= 1;
             }
             if ui
-                .add_enabled(*page + 1 < total_pages, egui::Button::new("Next"))
+                .add_enabled(*page + 1 < total_pages, egui::Button::new(t("ball-next")))
                 .clicked()
             {
                 *page += 1;
@@ -1307,7 +1316,7 @@ impl SwapperState {
                 self.queue_thumbnail(ui, category, &filename, cooked_pc);
             }
         }
-        let mut action: Option<(usize, usize, bool, SwapPaint)> = None;
+        let mut action: Option<(usize, usize, bool, SwapPaint, f32)> = None;
         egui::ScrollArea::vertical()
             .id_salt(("swapper_grid", category))
             .auto_shrink([false, false])
@@ -1391,9 +1400,9 @@ impl SwapperState {
                                         ui.label(
                                             egui::RichText::new(
                                                 if category == SwapCategory::Skins {
-                                                    "Replace with decal"
+                                                    t("tab-replace-with-decal")
                                                 } else {
-                                                    "Replace item"
+                                                    t("tab-replace-item")
                                                 },
                                             )
                                             .size(11.0)
@@ -1422,15 +1431,15 @@ impl SwapperState {
                                                         .entry(key.clone())
                                                         .or_default();
                                                     ui.horizontal(|ui| {
-                                                        ui.label("Filter:");
+                                                        ui.label(t("spoofer-filter"));
                                                         ui.add(
                                                             egui::TextEdit::singleline(
                                                                 target_filter,
                                                             )
-                                                            .hint_text("Search items...")
+                                                            .hint_text(t("tab-search-items"))
                                                             .desired_width(150.0),
                                                         );
-                                                        if ui.small_button("Clear").clicked() {
+                                                        if ui.small_button(t("spoofer-clear")).clicked() {
                                                             target_filter.clear();
                                                         }
                                                     });
@@ -1467,7 +1476,7 @@ impl SwapperState {
                                             );
                                         });
                                         if !has_target {
-                                            ui.weak("No owned replacement is available");
+                                            ui.weak(t("tab-no-owned-replacement-is-available"));
                                             return;
                                         }
                                         let selected_paint =
@@ -1478,6 +1487,15 @@ impl SwapperState {
                                             });
                                         }
                                         let paint = *selected_paint;
+                                        let mut speed = 1.0;
+                                        if self.speed_enabled {
+                                            let selected_speed =
+                                                self.swap_speed.entry(key.clone()).or_insert(1.0);
+                                            ui.push_id(("swap_speed", &key), |ui| {
+                                                crate::speed_patch::speed_slider(ui, selected_speed);
+                                            });
+                                            speed = *selected_speed;
+                                        }
                                         let active = self.active.iter().find(|swap| {
                                             swap.paint == paint
                                                 && swap.category == category.slug()
@@ -1487,15 +1505,15 @@ impl SwapperState {
                                                     .eq_ignore_ascii_case(&items[*target_index].upk)
                                         });
                                         if let Some(active) = active {
-                                            ui.weak(format!("Set as {}", active.target_name));
+                                            ui.weak(t_args("tab-set-as-active", &[("active", active.target_name.to_string().into())]));
                                         }
                                         if ui
                                             .add_sized(
                                                 [ui.available_width(), 24.0],
                                                 egui::Button::new(if active.is_some() {
-                                                    "Restore"
+                                                    t("app-restore")
                                                 } else {
-                                                    "Apply"
+                                                    t("ball-apply")
                                                 }),
                                             )
                                             .clicked()
@@ -1505,6 +1523,7 @@ impl SwapperState {
                                                 *target_index,
                                                 active.is_some(),
                                                 paint,
+                                                speed,
                                             ));
                                         }
                                     });
@@ -1515,7 +1534,7 @@ impl SwapperState {
                     ui.add_space(6.0);
                 }
             });
-        if let Some((source_index, target_index, restoring, paint)) = action {
+        if let Some((source_index, target_index, restoring, paint, speed)) = action {
             if crate::messages::block_item_action_if_game_running(tx) {
                 return owned_filter_requested;
             }
@@ -1524,7 +1543,7 @@ impl SwapperState {
             let result = if restoring {
                 self.restore_swap(&target.upk, cooked_pc, backups_dir)
             } else {
-                self.apply_swap(category, &source, &target, paint, cooked_pc, backups_dir)
+                self.apply_swap(category, &source, &target, paint, speed, cooked_pc, backups_dir)
             };
             match result {
                 Ok(()) => {
@@ -1559,25 +1578,25 @@ impl SwapperState {
         ui.horizontal(|ui| {
             ui.heading(category.label());
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("Reload Catalogs").clicked() {
+                if ui.button(t("app-reload-catalogs")).clicked() {
                     let _ = tx.send(AppMsg::ReloadCatalogs);
                 }
             });
         });
         ui.horizontal(|ui| {
-            ui.strong("Search:");
+            ui.strong(t("spoofer-search"));
             let search = self.spawn_search.entry(category).or_default();
             if ui
                 .add(
                     egui::TextEdit::singleline(search)
-                        .hint_text(format!("Search {}...", category.label().to_lowercase()))
+                        .hint_text(t_args("tab-search-category", &[("category", (category.label().to_lowercase()).to_string().into())]))
                         .desired_width(300.0),
                 )
                 .changed()
             {
                 self.spawn_page.insert(category, 0);
             }
-            if ui.button("Clear").clicked() {
+            if ui.button(t("spoofer-clear")).clicked() {
                 search.clear();
                 self.spawn_page.insert(category, 0);
             }
@@ -1586,7 +1605,7 @@ impl SwapperState {
         ui.add_space(10.0);
         self.thumbnail_status(ui, category);
         let Some(items) = self.catalogs.get(&category).cloned() else {
-            ui.weak("Catalog could not be loaded");
+            ui.weak(t("spawn-catalog-could-not-be-loaded"));
             return None;
         };
         let Some(resolved) = self.resolved_items(ui, category, cooked_pc, &items) else {
@@ -1616,7 +1635,7 @@ impl SwapperState {
             .map(|(index, _)| index)
             .collect();
         if filtered.is_empty() {
-            ui.vertical_centered(|ui| ui.weak("No spawnable items match the search."));
+            ui.vertical_centered(|ui| ui.weak(t("spawn-no-spawnable-items-match-the-search")));
             return None;
         }
         const PAGE_SIZE: usize = 16;
@@ -1624,20 +1643,15 @@ impl SwapperState {
         let page = self.spawn_page.entry(category).or_insert(0);
         *page = (*page).min(total_pages - 1);
         ui.horizontal(|ui| {
-            ui.label(format!(
-                "Page {} of {}  ({} items)",
-                *page + 1,
-                total_pages,
-                filtered.len()
-            ));
+            ui.label(t_args("tab-page-page-of-total-pages-filtered", &[("page", (*page + 1).to_string().into()), ("total_pages", total_pages.to_string().into()), ("filtered", (filtered.len()).to_string().into())]));
             if ui
-                .add_enabled(*page > 0, egui::Button::new("Previous"))
+                .add_enabled(*page > 0, egui::Button::new(t("ball-previous")))
                 .clicked()
             {
                 *page -= 1;
             }
             if ui
-                .add_enabled(*page + 1 < total_pages, egui::Button::new("Next"))
+                .add_enabled(*page + 1 < total_pages, egui::Button::new(t("ball-next")))
                 .clicked()
             {
                 *page += 1;
@@ -1695,14 +1709,11 @@ impl SwapperState {
                                         let label = item_label(category, item);
                                         ui.strong(shorten_for_card(&label))
                                             .on_hover_text(format!("{label}\n{}", item.upk));
-                                        ui.weak(format!(
-                                            "ID: {}",
-                                            item.product_id.unwrap_or_default()
-                                        ));
+                                        ui.weak(t_args("spawn-id-item", &[("item", (item.product_id.unwrap_or_default()).to_string().into())]));
                                         let mut paint = 0;
                                         if item.paintable {
                                             ui.add_space(6.0);
-                                            ui.label("Paint");
+                                            ui.label(t("spawn-paint"));
                                             let selected = self
                                                 .spawn_paint
                                                 .entry((
@@ -1735,7 +1746,7 @@ impl SwapperState {
                                         if ui
                                             .add_sized(
                                                 [ui.available_width(), 26.0],
-                                                egui::Button::new("Spawn"),
+                                                egui::Button::new(t("spawn-spawn")),
                                             )
                                             .clicked()
                                         {

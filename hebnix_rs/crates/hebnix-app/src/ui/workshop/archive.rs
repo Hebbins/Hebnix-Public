@@ -4,6 +4,7 @@
 //! is added within minutes. This lists the archive's maps.json and downloads
 //! and imports a map the same way a hand-picked file or zip is imported.
 
+use crate::i18n::{t, t_args};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::{
@@ -149,7 +150,7 @@ fn download_and_import(
     let mut banner = None;
     let mut published_file_id = parse_workshop_id(&map.steam_url).unwrap_or_default();
     let map_file = if is_zip(&download) {
-        log("Unpacking the zip...");
+        log(&t("download-and-import-unpacking-the-zip"));
         let contents = extract_map_zip(&download, &work_dir.join("zip"))?;
         if !contents.skipped.is_empty() {
             log(&format!("Skipped {} unrelated file(s) in the zip.", contents.skipped.len()));
@@ -179,7 +180,7 @@ fn download_and_import(
     }
 
     if !map.preview_url.is_empty() {
-        log("Downloading the preview image...");
+        log(&t("download-and-import-downloading-the-preview-image"));
         let preview = work_dir.join("preview");
         // an image that won't download or decode just means no banner
         if download_to(&map.preview_url, &preview, MAX_IMAGE_BYTES).is_ok() && usable_banner(&preview) {
@@ -187,7 +188,7 @@ fn download_and_import(
         }
     }
 
-    log("Saving the map...");
+    log(&t("download-and-import-saving-the-map"));
     let imported = import_map(cache_dir, runtime_dir, &map_file, &meta, banner.as_deref())?;
     if !published_file_id.is_empty() {
         let _ = write_item_vdf(cache_dir, &imported, &published_file_id);
@@ -272,14 +273,11 @@ impl ArchiveBrowser {
         let loading = self.loading.load(Ordering::Relaxed);
         let downloading = self.downloading.load(Ordering::Relaxed);
 
-        ui.heading("No API key? Use the RL Workshop Archive");
+        ui.heading(t("render-no-api-key-use-the-rl"));
         ui.label(
-            "If you can't get a Hubcap API key (or can't be bothered), request the map on the \
-             RL Workshop Archive instead. Paste its Steam Workshop link there and it's usually \
-             added within 5-10 minutes. Then download it below, or download the .zip from the \
-             site and import it with \"Choose map file...\" above.",
+            t("render-if-you-can-t-get-a"),
         );
-        ui.hyperlink_to("Open the RL Workshop Archive (request a map)", ARCHIVE_SITE);
+        ui.hyperlink_to(t("render-open-the-rl-workshop-archive-request"), ARCHIVE_SITE);
         ui.add_space(6.0);
 
         let mut download = None;
@@ -287,22 +285,22 @@ impl ArchiveBrowser {
         let loaded = self.shared.lock().is_ok_and(|s| s.index.is_some());
         ui.horizontal(|ui| {
             if !self.show_list {
-                if ui.add_enabled(!loading, egui::Button::new("Show archive maps")).clicked() {
+                if ui.add_enabled(!loading, egui::Button::new(t("render-show-archive-maps"))).clicked() {
                     self.show_list = true;
                     if !loaded {
                         self.load(ui.ctx());
                     }
                 }
             } else {
-                if ui.button("Hide list").clicked() {
+                if ui.button(t("render-hide-list")).clicked() {
                     self.show_list = false;
                 }
-                if ui.add_enabled(!loading, egui::Button::new("Refresh list")).clicked() {
+                if ui.add_enabled(!loading, egui::Button::new(t("render-refresh-list"))).clicked() {
                     self.load(ui.ctx());
                 }
                 ui.add(
                     egui::TextEdit::singleline(&mut self.search)
-                        .hint_text("Search name, author or tag...")
+                        .hint_text(t("render-search-name-author-or-tag"))
                         .desired_width(220.0),
                 );
             }
@@ -316,7 +314,7 @@ impl ArchiveBrowser {
                 Some(Ok(_)) if !self.show_list => {}
                 Some(Ok(maps)) => {
                     let shown: Vec<&ArchiveMap> = maps.iter().filter(|m| m.matches(&self.search)).collect();
-                    ui.small(format!("{} of {} maps", shown.len(), maps.len()));
+                    ui.small(t_args("render-shown-of-maps-maps", &[("shown", (shown.len()).to_string().into()), ("maps", (maps.len()).to_string().into())]));
                     egui::ScrollArea::vertical()
                         .id_salt("archive_maps")
                         .max_height(260.0)
@@ -324,14 +322,14 @@ impl ArchiveBrowser {
                             for map in shown {
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .add_enabled(!downloading, egui::Button::new("Download"))
+                                        .add_enabled(!downloading, egui::Button::new(t("render-download")))
                                         .clicked()
                                     {
                                         download = Some(map.clone());
                                     }
                                     ui.strong(&map.title);
                                     if !map.author.is_empty() {
-                                        ui.small(format!("by {}", map.author));
+                                        ui.small(t_args("render-by-map", &[("map", map.author.to_string().into())]));
                                     }
                                     let tags = map.categories();
                                     if !tags.is_empty() {
@@ -356,7 +354,7 @@ impl ArchiveBrowser {
                 Some(Ok(map)) => {
                     ui.colored_label(
                         egui::Color32::LIGHT_GREEN,
-                        format!("Imported {}. Find it under Browse Maps, in View Downloaded.", map.name),
+                        t_args("render-imported-map-find-it-under-browse", &[("map", map.name.to_string().into())]),
                     );
                     if !downloading && !shared.delivered {
                         imported = Some(map.clone());

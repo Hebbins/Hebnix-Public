@@ -1,4 +1,5 @@
 //! RLAPI request workbench. Credentials stay in the session transport.
+use crate::i18n::t;
 use eframe::egui;
 use serde_json::Value;
 
@@ -10,6 +11,15 @@ pub const ENDPOINTS: &[(&str, &str)] = &[
     ("Skills/GetPlayersSkills v1", "{\n  \"PlayerIDs\": []\n}"),
     ("Custom endpoint", "{}"),
 ];
+
+/// the last entry is the "custom endpoint" slot, its name is translated
+fn endpoint_label(index: usize) -> String {
+    if index == ENDPOINTS.len() - 1 {
+        t("rlapi-custom-endpoint")
+    } else {
+        ENDPOINTS[index].0.to_string()
+    }
+}
 
 pub enum Action {
     Enable,
@@ -80,12 +90,12 @@ impl RlApiPanel {
         status: &str,
     ) -> Option<Action> {
         let mut action = None;
-        ui.heading("RLAPI");
+        ui.heading(t("app-rlapi"));
         ui.horizontal(|ui| {
             if ui
                 .add_enabled(
                     !self.starting,
-                    egui::Button::new(if enabled { "Disable" } else { "Enable" }),
+                    egui::Button::new(if enabled { t("hebnix-install-disable") } else { t("hebnix-install-enable") }),
                 )
                 .clicked()
             {
@@ -97,18 +107,19 @@ impl RlApiPanel {
             }
             ui.label(status);
         });
-        ui.label("Enable before launching Rocket League to capture its session. Requests share the game's connection.");
-        ui.label("Disabling stops new requests. The relay stays running until Rocket League exits, even if you close this window.");
+        ui.label(t("rlapi-enable-before-launching-rocket-league-to"));
+        ui.label(t("rlapi-disabling-stops-new-requests-the-relay"));
         ui.add_space(10.0);
         let previous = self.selected;
         ui.horizontal(|ui| {
-            ui.label("Endpoint");
+            ui.label(t("rlapi-endpoint"));
             egui::ComboBox::from_id_salt("rlapi_endpoint")
-                .selected_text(ENDPOINTS[self.selected].0)
+                .selected_text(endpoint_label(self.selected))
                 .width(360.0)
                 .show_ui(ui, |ui| {
                     for (index, (endpoint, _)) in ENDPOINTS.iter().enumerate() {
-                        ui.selectable_value(&mut self.selected, index, *endpoint);
+                        let _ = endpoint;
+                        ui.selectable_value(&mut self.selected, index, endpoint_label(index));
                     }
                 });
         });
@@ -118,12 +129,12 @@ impl RlApiPanel {
         if self.selected == ENDPOINTS.len() - 1 {
             ui.add(
                 egui::TextEdit::singleline(&mut self.custom_endpoint)
-                    .hint_text("Namespace/Endpoint v1")
+                    .hint_text(t("rlapi-namespace-endpoint-v1"))
                     .desired_width(f32::INFINITY),
             );
         }
         ui.add_space(6.0);
-        ui.label("Payload (JSON)");
+        ui.label(t("rlapi-payload-json"));
         egui::ScrollArea::vertical()
             .id_salt("rlapi_payload_scroll")
             .max_height(170.0)
@@ -140,7 +151,7 @@ impl RlApiPanel {
             if ui
                 .add_enabled(
                     enabled && connected && !self.busy,
-                    egui::Button::new("Send request"),
+                    egui::Button::new(t("rlapi-send-request")),
                 )
                 .clicked()
             {
@@ -148,10 +159,10 @@ impl RlApiPanel {
             }
             if self.busy {
                 ui.spinner();
-                ui.label("Waiting for response…");
+                ui.label(t("rlapi-waiting-for-response"));
             }
             if ui
-                .add_enabled(!self.busy, egui::Button::new("Format JSON"))
+                .add_enabled(!self.busy, egui::Button::new(t("rlapi-format-json")))
                 .clicked()
             {
                 match serde_json::from_str::<Value>(&self.payload) {
@@ -162,7 +173,7 @@ impl RlApiPanel {
             if ui
                 .add_enabled(
                     !self.response.is_empty(),
-                    egui::Button::new("Copy response"),
+                    egui::Button::new(t("rlapi-copy-response")),
                 )
                 .clicked()
             {
@@ -170,7 +181,7 @@ impl RlApiPanel {
             }
         });
         ui.separator();
-        ui.label("Response");
+        ui.label(t("rlapi-response"));
         egui::ScrollArea::vertical()
             .id_salt("rlapi_response_scroll")
             .show(ui, |ui| {

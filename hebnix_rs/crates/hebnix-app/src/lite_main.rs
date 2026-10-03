@@ -7,6 +7,7 @@ mod discord_presence;
 mod dpi_fix;
 mod hotkey;
 mod hosts_file;
+mod i18n;
 mod lite_app;
 #[path = "lite_messages.rs"]
 mod messages;
@@ -127,6 +128,7 @@ fn main() -> eframe::Result {
     // after the instance guard, so only one copy prompts
     webview::runtime::ensure_present();
     let config = config::Config::load(&base_dir);
+    i18n::init(&config.settings.language, Some(base_dir.join("locales")));
     let mut viewport = eframe::egui::ViewportBuilder::default()
         .with_title("Hebnix Lite")
         .with_inner_size([

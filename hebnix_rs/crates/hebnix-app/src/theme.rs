@@ -124,6 +124,9 @@ pub fn apply_font(ctx: &egui::Context, fonts_dir: &Path, font_name: Option<&str>
         }
     }
 
+    // glyph fallbacks for the active language go last, behind the theme font
+    crate::i18n::fonts::add_fallbacks(&mut fonts);
+
     ctx.set_fonts(fonts);
 }
 

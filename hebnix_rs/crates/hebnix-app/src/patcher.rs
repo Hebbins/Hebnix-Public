@@ -19,21 +19,23 @@ pub mod heatseeker;
 pub mod painted_swap;
 pub mod patch_core;
 pub mod rl_font;
+pub mod speed_patch;
 pub mod swapper;
 pub mod upk_keys;
 pub mod upk_package;
 pub mod wheel_alignment;
 
+use crate::i18n::t;
 use crate::config::PatchSource;
 
 pub(crate) fn patch_source_selector(ui: &mut eframe::egui::Ui, source: &mut PatchSource) -> bool {
     ui.horizontal(|ui| {
         let mut changed = ui
-            .selectable_value(source, PatchSource::Catalog, "Catalog")
+            .selectable_value(source, PatchSource::Catalog, t("patch-source-selector-catalog"))
             .changed();
         ui.label("|");
         changed |= ui
-            .selectable_value(source, PatchSource::Custom, "Local")
+            .selectable_value(source, PatchSource::Custom, t("patch-source-selector-local"))
             .changed();
         changed
     })

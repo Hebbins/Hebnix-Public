@@ -5,6 +5,7 @@
 //! let it have the message for the scale factor, then put the geometry back.
 //! viewports open whenever a plugin asks, hence the sweep.
 
+use crate::i18n::t;
 use std::cell::Cell;
 
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM};

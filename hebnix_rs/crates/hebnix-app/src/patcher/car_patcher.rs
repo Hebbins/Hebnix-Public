@@ -1,3 +1,4 @@
+use crate::i18n::{t, t_args};
 use crate::config::{Config, PatchSource};
 use crate::messages::AppMsg;
 use crate::patcher::catalog::PatchCatalog;
@@ -439,7 +440,7 @@ impl CarPatcherState {
             let _ = fs::remove_dir_all(&destination);
             self.refresh_cars();
             return Err(
-                "No usable custom cars were found. The ZIP must contain a JSON manifest and its matching UPK file."
+                t("import-zip-no-usable-custom-cars-were-found")
                     .to_string(),
             );
         }
@@ -609,7 +610,7 @@ impl CarPatcherState {
         tx: &Sender<AppMsg>,
         config: &mut Config,
     ) {
-        ui.heading("Car Patcher");
+        ui.heading(t("app-car-patcher"));
         ui.add_space(10.0);
         if patch_source_selector(ui, &mut self.source) {
             config.patcher.car_source = self.source;
@@ -636,18 +637,18 @@ impl CarPatcherState {
         }
 
         ui.horizontal(|ui| {
-            if ui.button("Import ZIP").clicked() {
-                let dialog = rfd::FileDialog::new().add_filter("ZIP Archives", &["zip"]);
+            if ui.button(t("ball-import-zip")).clicked() {
+                let dialog = rfd::FileDialog::new().add_filter(t("ball-zip-archives"), &["zip"]);
                 if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
                     if let Err(error) = self.import_zip(&file, tx) {
                         let _ = tx.send(AppMsg::Log(format!("[Cars] Import failed: {error}")));
                     }
                 }
             }
-            if ui.button("Refresh").clicked() {
+            if ui.button(t("btn-refresh")).clicked() {
                 self.refresh_cars();
             }
-            ui.add(egui::TextEdit::singleline(&mut self.search).hint_text("Search local patches"));
+            ui.add(egui::TextEdit::singleline(&mut self.search).hint_text(t("tab-search-local-patches")));
         });
         ui.separator();
 
@@ -664,7 +665,7 @@ impl CarPatcherState {
         if visible.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.add_space(30.0);
-                ui.weak("No local car patches. Import a ZIP containing a JSON manifest and UPK.");
+                ui.weak(t("tab-no-local-car-patches-import-a"));
             });
             return;
         }
@@ -675,8 +676,8 @@ impl CarPatcherState {
                 let (supported, unsupported): (Vec<_>, Vec<_>) =
                     visible.into_iter().partition(|car| car.support.is_ok());
                 if !supported.is_empty() {
-                    ui.heading(format!("Supported patches ({})", supported.len()));
-                    ui.weak("These packages can safely replace their resolved stock body UPK.");
+                    ui.heading(t_args("tab-supported-patches-supported", &[("supported", (supported.len()).to_string().into())]));
+                    ui.weak(t("tab-these-packages-can-safely-replace-their"));
                     ui.add_space(6.0);
                 }
                 let supported_count = supported.len();
@@ -687,8 +688,8 @@ impl CarPatcherState {
                         if index > 0 {
                             ui.add_space(10.0);
                         }
-                        ui.heading("Not supported");
-                        ui.weak("Kept for reference; applying these profiles is disabled.");
+                        ui.heading(t("tab-not-supported"));
+                        ui.weak(t("tab-kept-for-reference-applying-these-profil"));
                         ui.add_space(6.0);
                     }
                     let resolved = self.resolve_body(car.body_id);
@@ -707,7 +708,7 @@ impl CarPatcherState {
                             );
                             ui.vertical(|ui| match (&car.support, &resolved) {
                                 (Ok(()), Ok(target)) => {
-                                    ui.strong(format!("Patching: {} to {}", target.name, car.name));
+                                    ui.strong(t_args("tab-patching-target-to-car", &[("target", target.name.to_string().into()), ("car", car.name.to_string().into())]));
                                 }
                                 (Err(error), _) | (_, Err(error)) => {
                                     ui.strong(&car.name);
@@ -719,7 +720,7 @@ impl CarPatcherState {
                                 |ui| {
                                     if let Ok(target) = &resolved {
                                         if self.active_cars.contains_key(&target.upk_path) {
-                                            if ui.button("Restore Original").clicked() {
+                                            if ui.button(t("ball-restore-original")).clicked() {
                                                 if let Err(error) = self.restore(
                                                     &target.upk_path,
                                                     cooked_pc,
@@ -736,9 +737,9 @@ impl CarPatcherState {
                                             .add_enabled(
                                                 car.support.is_ok(),
                                                 egui::Button::new(if car.support.is_ok() {
-                                                    "Apply"
+                                                    t("ball-apply")
                                                 } else {
-                                                    "Not supported"
+                                                    t("tab-not-supported")
                                                 }),
                                             )
                                             .clicked()
@@ -757,7 +758,7 @@ impl CarPatcherState {
                                             !resolved.as_ref().is_ok_and(|target| {
                                                 self.active_cars.contains_key(&target.upk_path)
                                             }),
-                                            egui::Button::new("Delete"),
+                                            egui::Button::new(t("presets-delete")),
                                         )
                                         .clicked()
                                     {

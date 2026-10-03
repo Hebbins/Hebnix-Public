@@ -6,6 +6,7 @@
 //! so the same file has the same id on every machine and a copy received
 //! from a peer can be checked against it.
 
+use crate::i18n::{t, t_args};
 use std::path::{Path, PathBuf};
 
 use eframe::egui;
@@ -609,7 +610,7 @@ impl ImportWizard {
 
     fn pick_map_file(&mut self) {
         let dialog =
-            rfd::FileDialog::new().add_filter("Rocket League map or map zip", &["upk", "udk", "zip"]);
+            rfd::FileDialog::new().add_filter(t("pick-map-file-rocket-league-map-or-map-zip"), &["upk", "udk", "zip"]);
         if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
             if file.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")) {
                 self.load_zip(&file);
@@ -636,7 +637,7 @@ impl ImportWizard {
     }
 
     fn import_vdf(&mut self) {
-        let dialog = rfd::FileDialog::new().add_filter("Steam workshop item", &["vdf", "txt"]);
+        let dialog = rfd::FileDialog::new().add_filter(t("import-vdf-steam-workshop-item"), &["vdf", "txt"]);
         let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() else {
             return;
         };
@@ -683,51 +684,50 @@ impl ImportWizard {
         runtime_dir: &Path,
     ) -> Option<LocalMap> {
         let mut imported = None;
-        ui.heading("Import a map");
+        ui.heading(t("render-import-a-map"));
         ui.label(
-            "Add a map that isn't on the Workshop. Players on your Workshop network \
-             can download it from you.",
+            t("render-add-a-map-that-isn-t"),
         );
         ui.add_space(8.0);
         match self.step {
             Step::File => {
-                ui.strong("Step 1: Choose the map file");
-                ui.small("A .upk or .udk file, or a .zip with the map inside (like the ones from the RL Workshop Archive).");
+                ui.strong(t("render-step-1-choose-the-map-file"));
+                ui.small(t("render-a-upk-or-udk-file-or"));
                 ui.add_space(6.0);
                 if let Some(name) = &self.done {
-                    ui.colored_label(egui::Color32::LIGHT_GREEN, format!("Imported {name}."));
-                    ui.small("Find it under Browse Maps, in View Downloaded.");
+                    ui.colored_label(egui::Color32::LIGHT_GREEN, t_args("render-imported-name", &[("name", name.to_string().into())]));
+                    ui.small(t("render-find-it-under-browse-maps-in"));
                     ui.add_space(6.0);
                 }
-                if ui.button("Choose map file...").clicked() {
+                if ui.button(t("render-choose-map-file")).clicked() {
                     self.pick_map_file();
                 }
             }
             Step::Details => {
-                ui.strong("Step 2: Details");
+                ui.strong(t("render-step-2-details"));
                 if let Some(file) = &self.map_file {
-                    ui.small(format!("File: {}", file.display()));
+                    ui.small(t_args("render-file-file", &[("file", (file.display()).to_string().into())]));
                 }
                 ui.add_space(6.0);
-                if ui.button("Import details from a VDF file...").clicked() {
+                if ui.button(t("render-import-details-from-a-vdf-file")).clicked() {
                     self.import_vdf();
                 }
                 ui.add_space(6.0);
                 egui::Grid::new("import_details").num_columns(2).show(ui, |ui| {
-                    ui.label("Name");
+                    ui.label(t("render-name"));
                     ui.text_edit_singleline(&mut self.meta.name);
                     ui.end_row();
-                    ui.label("Author");
+                    ui.label(t("render-author"));
                     ui.text_edit_singleline(&mut self.meta.author);
                     ui.end_row();
-                    ui.label("Description");
+                    ui.label(t("render-description"));
                     ui.text_edit_multiline(&mut self.meta.description);
                     ui.end_row();
                 });
                 ui.horizontal(|ui| {
-                    if ui.button("Choose image...").clicked() {
+                    if ui.button(t("render-choose-image")).clicked() {
                         let dialog = rfd::FileDialog::new()
-                            .add_filter("Image", &["png", "jpg", "jpeg", "webp", "bmp"]);
+                            .add_filter(t("render-image"), &["png", "jpg", "jpeg", "webp", "bmp"]);
                         if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
                             self.banner = Some(file);
                         }
@@ -735,22 +735,22 @@ impl ImportWizard {
                     match &self.banner {
                         Some(file) => {
                             ui.small(file.display().to_string());
-                            if ui.small_button("Clear").clicked() {
+                            if ui.small_button(t("spoofer-clear")).clicked() {
                                 self.banner = None;
                             }
                         }
                         None => {
-                            ui.small("Optional banner shown on the map card.");
+                            ui.small(t("render-optional-banner-shown-on-the-map"));
                         }
                     }
                 });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button("Back").clicked() {
+                    if ui.button(t("multiplayer-back")).clicked() {
                         self.reset();
                     }
                     let ready = self.map_file.is_some() && !self.meta.name.trim().is_empty();
-                    if ui.add_enabled(ready, egui::Button::new("Import map")).clicked() {
+                    if ui.add_enabled(ready, egui::Button::new(t("render-import-map-2"))).clicked() {
                         if let Some(file) = self.map_file.clone() {
                             match import_map(
                                 cache_dir,

@@ -407,7 +407,7 @@ impl D2dCanvas {
             None => ("Segoe UI", None),
         };
         let family: Vec<u16> = format!("{name}\0").encode_utf16().collect();
-        let locale: Vec<u16> = "en-us\0".encode_utf16().collect();
+        let locale: Vec<u16> = format!("{}\0", crate::i18n::current_bcp47()).encode_utf16().collect();
         unsafe {
             let weight = if bold {
                 DWRITE_FONT_WEIGHT_BOLD
@@ -548,7 +548,7 @@ pub fn measure_text(s: &str, size: f32, bold: bool) -> f32 {
         };
         unsafe {
             let family: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
-            let locale: Vec<u16> = "en-us\0".encode_utf16().collect();
+            let locale: Vec<u16> = format!("{}\0", crate::i18n::current_bcp47()).encode_utf16().collect();
             let weight = if bold {
                 DWRITE_FONT_WEIGHT_BOLD
             } else {

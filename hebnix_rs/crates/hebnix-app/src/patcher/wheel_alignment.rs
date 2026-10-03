@@ -1,4 +1,5 @@
 //! Offline, baseline-relative alignment. Never use the swapper's stock backup.
+use crate::i18n::{t, t_args};
 use super::upk_package::{UpkPackage, strip};
 use eframe::egui;
 use serde::{Deserialize, Serialize};
@@ -183,7 +184,7 @@ fn build(baseline: &Path, output: &Path, s: Settings) -> Result<(), String> {
     }
     if found.len() != 4 {
         return Err(
-            "This car's skeleton is unsupported: four standard wheel anchors are required".into(),
+            t("build-this-car-s-skeleton-is-unsupported").into(),
         );
     }
     if before
@@ -396,14 +397,14 @@ fn transaction(
                 "Alignment reverted and removed from the modified list. Old recovery files could not be deleted: {error}"
             ));
         }
-        Ok("Alignment reverted and removed from the modified list.".into())
+        Ok(t("drop-alignment-reverted-and-removed-from-the").into())
     } else if action == TransactionAction::Revert {
         Ok(
-            "Alignment reverted to captured baseline; prior swaps/custom placement retained."
+            t("drop-alignment-reverted-to-captured-baseline")
                 .into(),
         )
     } else {
-        Ok("Alignment applied and verified. Test steering and jumping in-game.".into())
+        Ok(t("drop-alignment-applied-and-verified-test-stee").into())
     }
 }
 
@@ -475,7 +476,7 @@ impl WheelAlignmentState {
                     self.edited_root = None;
                 }
                 Err(mpsc::TryRecvError::Disconnected) => {
-                    self.status = "Alignment worker stopped; inspect backup before retrying".into();
+                    self.status = t("render-alignment-worker-stopped-inspect-backup").into();
                     self.receiver = None;
                 }
                 _ => {
@@ -484,7 +485,7 @@ impl WheelAlignmentState {
                 }
             }
         }
-        ui.heading("Wheel Alignment");
+        ui.heading(t("app-wheel-alignment"));
         if self.edited_root.as_deref() != Some(cooked) {
             self.refresh_edited(cooked);
         }
@@ -501,7 +502,7 @@ impl WheelAlignmentState {
                         .unwrap_or("Load car catalog"),
                 )
                 .show_ui(ui, |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.search).hint_text("Filter cars…"));
+                    ui.add(egui::TextEdit::singleline(&mut self.search).hint_text(t("render-filter-cars")));
                     ui.separator();
                     for (i, (name, _)) in self.cars.iter().enumerate() {
                         if name.to_lowercase().contains(&self.search.to_lowercase())
@@ -512,7 +513,7 @@ impl WheelAlignmentState {
                     }
                 });
             let Some((_, file)) = self.cars.get(self.selected) else {
-                ui.label("Car catalog is not available yet.");
+                ui.label(t("render-car-catalog-is-not-available-yet"));
                 return;
             };
             let dir = record_dir(cooked, file);
@@ -527,36 +528,36 @@ impl WheelAlignmentState {
             ui.add(
                 egui::Slider::new(&mut self.settings.camber, -30.0..=30.0)
                     .step_by(0.5)
-                    .text("Camber degrees"),
+                    .text(t("render-camber-degrees")),
             );
-            ui.weak("Negative: tops inward. Positive: tops outward.");
+            ui.weak(t("render-negative-tops-inward-positive-tops-outwa"));
             ui.add(
                 egui::Slider::new(&mut self.settings.vertical, -15.0..=15.0)
                     .step_by(0.25)
-                    .text("Up / Down"),
+                    .text(t("render-up-down")),
             );
-            ui.weak("Positive: up. Negative: down. Values are model units.");
+            ui.weak(t("render-positive-up-negative-down-values-are"));
             ui.add(
                 egui::Slider::new(&mut self.settings.lateral, -15.0..=15.0)
                     .step_by(0.25)
-                    .text("Left / Right (track width)"),
+                    .text(t("render-left-right-track-width")),
             );
             ui.weak(
-                "Mirrored adjustment: positive moves both sides outward; negative moves inward.",
+                t("render-mirrored-adjustment-positive-moves-both"),
             );
             if ui
-                .add_enabled(!rl_open, egui::Button::new("Apply alignment"))
-                .on_disabled_hover_text("Close Rocket League before changing alignment.")
+                .add_enabled(!rl_open, egui::Button::new(t("render-apply-alignment")))
+                .on_disabled_hover_text(t("render-close-rocket-league-before-changing-alig"))
                 .clicked()
             {
                 action = Some((file.clone(), self.settings, TransactionAction::Apply));
             }
             ui.separator();
-            ui.heading("Revert settings");
-            if ui.button("Revert to 0").clicked() {
+            ui.heading(t("render-revert-settings"));
+            if ui.button(t("render-revert-to-0")).clicked() {
                 self.settings = Settings::default();
             }
-            ui.label(format!("Edited cars ({})", self.edited.len()));
+            ui.label(t_args("render-edited-cars-edited", &[("edited", (self.edited.len()).to_string().into())]));
             egui::ScrollArea::vertical()
                 .id_salt("alignment_edited_cars")
                 .max_height(200.0)
@@ -581,7 +582,7 @@ impl WheelAlignmentState {
                             if ui
                                 .add_enabled(!rl_open, egui::Button::new("X"))
                                 .on_disabled_hover_text(
-                                    "Close Rocket League before restoring alignment.",
+                                    t("render-close-rocket-league-before-restoring-ali"),
                                 )
                                 .clicked()
                             {
@@ -594,7 +595,7 @@ impl WheelAlignmentState {
                         });
                     }
                     if self.edited.is_empty() {
-                        ui.weak("No cars adjusted yet.");
+                        ui.weak(t("render-no-cars-adjusted-yet"));
                     }
                 });
         });
@@ -602,7 +603,7 @@ impl WheelAlignmentState {
             let cooked = cooked.to_path_buf();
             let (tx, rx) = mpsc::channel();
             self.receiver = Some(rx);
-            self.status = "Preparing alignment…".into();
+            self.status = t("render-preparing-alignment").into();
             let ctx = ui.ctx().clone();
             std::thread::spawn(move || {
                 let result = transaction(&cooked, &file, settings, action);
