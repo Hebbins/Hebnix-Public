@@ -1499,9 +1499,11 @@ impl HebnixApp {
                 self.topmost = true;
                 winutil::set_main_window_topmost(true);
             }
-            let game_fullscreen =
-                self.last_rl_open && self.window_mode == Some(WindowMode::Fullscreen);
-            if !game_fullscreen && !rocket_league_had_focus {
+            // Show/Hide is an explicit request to surface Hebnix.  In
+            // particular, don't leave it behind Rocket League just because
+            // the game was focused when the hotkey was pressed (including in
+            // exclusive fullscreen).
+            if rocket_league_had_focus || !winutil::foreground_window_is_ours() {
                 winutil::focus_main_window();
             }
         }

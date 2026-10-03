@@ -806,9 +806,10 @@ impl LiteApp {
                 self.topmost = true;
                 winutil::set_main_window_topmost(true);
             }
-            let game_fullscreen = self.last_rl_open
-                && self.window_mode == Some(hebnix_sdk::save_file::WindowMode::Fullscreen);
-            if !game_fullscreen && !rocket_league_had_focus {
+            // Show/Hide is an explicit request to surface Hebnix.  Do not
+            // leave it behind Rocket League when the hotkey came from the
+            // game, even if the game is fullscreen.
+            if rocket_league_had_focus || !winutil::foreground_window_is_ours() {
                 winutil::focus_main_window();
             }
         }
