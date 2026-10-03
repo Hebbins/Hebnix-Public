@@ -1,5 +1,4 @@
 // crates/hebnix-app/src/decal_patcher.rs
-use crate::i18n::{t, t_args};
 use aes::Aes256;
 use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray};
 use crossbeam_channel::Sender;
@@ -13,8 +12,8 @@ use std::sync::Arc;
 
 use crate::config::{Config, PatchSource};
 use crate::messages::AppMsg;
-use crate::patcher::{catalog::PatchCatalog, patch_source_selector};
 use crate::patch_core::upk;
+use crate::patcher::{catalog::PatchCatalog, patch_source_selector};
 
 // UPK magic constant
 const UPK_MAGIC: u32 = 0x9E2A83C1;
@@ -1758,7 +1757,6 @@ pub struct DecalPatcherState {
     pub selected_skin_id: Option<String>,
     pub selected_decal_name: Option<String>,
     target_by_decal: HashMap<String, String>,
-    speed_by_decal: HashMap<String, f32>,
     pub catalog_error: Option<String>,
     catalog: PatchCatalog,
     bodies_catalog: Option<Value>,
@@ -1836,7 +1834,7 @@ fn prepare_specific_decal_carrier(
         return Ok(false);
     }
 
-    progress(0.12, &t("prepare-specific-decal-carrier-preparing-a-full-colour-decal-carrier"));
+    progress(0.12, "Preparing a full-colour decal carrier...");
     let target_backup = backup_dir.join(format!("{target_upk}.bak"));
     if !target_backup.is_file() {
         fs::copy(&target_live, &target_backup)
@@ -1891,7 +1889,7 @@ fn patch_decal_on_skin(
     progress: &dyn Fn(f32, &str),
 ) -> Result<(String, Vec<String>), String> {
     load_upk_keys(base_dir)?;
-    progress(0.08, &t("patch-decal-on-skin-loading-upk-keys"));
+    progress(0.08, "Loading UPK keys...");
     fs::create_dir_all(backup_dir)
         .map_err(|e| format!("Failed to create backup directory: {e}"))?;
 
@@ -1993,7 +1991,7 @@ fn patch_decal_on_skin(
             .map_err(|e| format!("Failed to backup {}: {}", target_upk, e))?;
     }
     progress(0.42, &format!("Using {target_upk}..."));
-    progress(0.42, &t("patch-decal-on-skin-finding-decal-textures"));
+    progress(0.42, "Finding decal textures...");
 
     let mut patched_fields = Vec::new();
     let mut patched_exports = HashSet::new();
@@ -2179,7 +2177,7 @@ fn patch_decal_on_skin(
                 })
                 .or_else(|| blanks.first().copied());
             if let Some(blank) = blank {
-                progress(0.82, &t("patch-decal-on-skin-patching-blankskin"));
+                progress(0.82, "Patching BlankSkin...");
                 let tfc_name = blank.tfc_name.as_ref().ok_or_else(|| {
                     format!("BlankSkin export '{}' has no TFC name", blank.export_name)
                 })?;
@@ -2241,9 +2239,9 @@ fn patch_decal_on_skin(
     } else {
         repack_package(&package)?
     };
-    progress(0.9, &t("patch-decal-on-skin-encrypting-patched-upk"));
+    progress(0.9, "Encrypting patched UPK...");
     fs::write(&upk_path, &final_out).map_err(|e| format!("Failed to write patched UPK: {}", e))?;
-    progress(1.0, &t("patch-decal-on-skin-decal-patch-complete"));
+    progress(1.0, "Decal patch complete");
     Ok((target_upk, patched_fields))
 }
 
@@ -2411,7 +2409,6 @@ impl DecalPatcherState {
             selected_skin_id: None,
             selected_decal_name: None,
             target_by_decal: HashMap::new(),
-            speed_by_decal: HashMap::new(),
             catalog_error: None,
             catalog: PatchCatalog::new(base_dir, "decal"),
             bodies_catalog: None,
@@ -2487,7 +2484,7 @@ impl DecalPatcherState {
 
         let Some(json) = self.skins_catalog.as_ref() else {
             self.car_skins.clear();
-            self.catalog_error = Some(t("load-car-skins-the-skins-catalog-has-not-been").to_string());
+            self.catalog_error = Some("The skins catalog has not been downloaded".to_string());
             return;
         };
 
@@ -2495,7 +2492,7 @@ impl DecalPatcherState {
             Some(c) => c,
             None => {
                 self.car_skins.clear();
-                self.catalog_error = Some(t("load-car-skins-no-cars-object-found-in-skins").to_string());
+                self.catalog_error = Some("No 'cars' object found in skins.json".to_string());
                 return;
             }
         };
@@ -2713,7 +2710,6 @@ impl DecalPatcherState {
         decal_name: &str,
         car_key: &str,
         skin_id: &str,
-        speed: f32,
         cooked_pc: &Path,
         backups_dir: &Path,
         tx: &Sender<AppMsg>,
@@ -2740,7 +2736,7 @@ impl DecalPatcherState {
             })
         {
             return Err(
-                t("apply-decal-to-skin-this-decal-target-already-has-an").to_string(),
+                "This decal target already has an applied decal; restore it first".to_string(),
             );
         }
 
@@ -2888,19 +2884,6 @@ impl DecalPatcherState {
 
             match result {
                 Ok((target_upk, _patched_fields)) => {
-                    if crate::speed_patch::is_active(speed) {
-                        match crate::speed_patch::apply(
-                            &cooked_clone.join(&target_upk),
-                            Some(&backups_clone.join(format!("{target_upk}.bak"))),
-                            speed,
-                        ) {
-                            Ok(0) => {}
-                            Ok(count) => {
-                                tracing::info!("[Speed] {target_upk}: scaled {count} animation values")
-                            }
-                            Err(error) => tracing::warn!("[Speed] {target_upk}: {error}"),
-                        }
-                    }
                     let _ = local_tx.send(DecalOp::Applied {
                         name: decal_name_clone,
                         active_key: format!("{}|{}", car_key_clone, skin_id_clone),
@@ -2942,7 +2925,7 @@ impl DecalPatcherState {
 
         self.processing_target = Some(format!("Restoring {}", decal_name));
         self.progress = Some(0.05);
-        self.progress_label = t("restore-decal-from-skin-restoring-original-files").to_string();
+        self.progress_label = "Restoring original files...".to_string();
         let target_candidates_clone = target_candidates.clone();
         let cooked_clone = cooked_pc.to_path_buf();
         let backups_clone = backups_dir.to_path_buf();
@@ -3020,7 +3003,7 @@ impl DecalPatcherState {
 
         self.processing_target = Some("Global_Restore".to_string());
         self.progress = Some(0.05);
-        self.progress_label = t("restore-decal-from-skin-restoring-original-files").to_string();
+        self.progress_label = "Restoring original files...".to_string();
         let cooked_clone = cooked_pc.to_path_buf();
         let backups_clone = backups_dir.to_path_buf();
         let target_candidates: Vec<String> = target_candidates.into_iter().collect();
@@ -3172,25 +3155,25 @@ impl DecalPatcherState {
         let busy = self.processing_target.is_some();
         let key_ok = self.validate_key_file().is_ok();
 
-        ui.heading(t("app-decal-patcher"));
+        ui.heading("Decal Patcher");
         ui.add_space(8.0);
 
         ui.horizontal(|ui| {
-            ui.strong(t("spoofer-search"));
+            ui.strong("Search:");
             let response = ui.add(
                 egui::TextEdit::singleline(&mut self.search_input)
-                    .hint_text(t("ball-name-or-author"))
+                    .hint_text("Name or author...")
                     .desired_width(180.0),
             );
             let submitted =
                 response.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
-            if ui.button(t("ball-search")).clicked() || submitted {
+            if ui.button("Search").clicked() || submitted {
                 self.search_filter = self.search_input.clone();
                 self.page = 0;
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button(t("btn-refresh")).clicked() {
+                if ui.button("Refresh").clicked() {
                     if self.source == PatchSource::Catalog {
                         self.catalog.refresh(ctx);
                     } else {
@@ -3201,19 +3184,19 @@ impl DecalPatcherState {
                 if ui
                     .add_enabled(
                         !self.active_decals.is_empty() && !busy && key_ok,
-                        egui::Button::new(t("ball-restore-original"))
+                        egui::Button::new("Restore Original")
                             .fill(egui::Color32::from_rgb(180, 50, 50)),
                     )
-                    .on_hover_text(t("tab-restore-every-patched-decal"))
+                    .on_hover_text("Restore every patched decal")
                     .clicked()
                 {
                     self.restore_all_confirmed = true;
                 }
                 if ui
-                    .add_enabled(!busy, egui::Button::new(t("ball-import-zip")))
+                    .add_enabled(!busy, egui::Button::new("Import ZIP"))
                     .clicked()
                 {
-                    let dialog = rfd::FileDialog::new().add_filter(t("ball-zip-archives"), &["zip"]);
+                    let dialog = rfd::FileDialog::new().add_filter("ZIP Archives", &["zip"]);
                     if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
                         match self.import_zip(&file, tx) {
                             Ok(()) => {
@@ -3222,14 +3205,16 @@ impl DecalPatcherState {
                                 let _ = config.save(&self.base_dir);
                             }
                             Err(error) => {
-                                let _ = tx.send(AppMsg::Log(format!(
-                                    "[Decals] Import failed: {error}"
-                                )));
+                                let _ = tx
+                                    .send(AppMsg::Log(format!("[Decals] Import failed: {error}")));
                             }
                         }
                     }
                 }
-                if ui.checkbox(&mut self.show_applied, t("ball-show-applied")).changed() {
+                if ui
+                    .checkbox(&mut self.show_applied, "Show Applied")
+                    .changed()
+                {
                     self.page = 0;
                 }
             });
@@ -3265,7 +3250,7 @@ impl DecalPatcherState {
 
         if let Some(error) = self.catalog_error.as_ref() {
             ui.colored_label(egui::Color32::from_rgb(231, 76, 60), error);
-            if ui.button(t("tab-retry-loading-catalog")).clicked() {
+            if ui.button("Retry Loading Catalog").clicked() {
                 let _ = tx.send(AppMsg::ReloadCatalogs);
             }
             return;
@@ -3273,7 +3258,7 @@ impl DecalPatcherState {
 
         if self.restore_all_confirmed {
             let mut close = false;
-            egui::Window::new(t("tab-confirm-restore-all-decals")).id(egui::Id::new("tab-confirm-restore-all-decals"))
+            egui::Window::new("Confirm Restore All Decals")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -3283,17 +3268,16 @@ impl DecalPatcherState {
                         self.active_decals.len()
                     ));
                     ui.horizontal(|ui| {
-                        if ui.button(t("app-restore-all")).clicked() {
+                        if ui.button("Restore All").clicked() {
                             if let Err(error) =
                                 self.restore_all_decals(cooked_pc, backups_dir, tx, ctx)
                             {
-                                let _ = tx.send(AppMsg::Log(format!(
-                                    "[Decals] Restore failed: {error}"
-                                )));
+                                let _ = tx
+                                    .send(AppMsg::Log(format!("[Decals] Restore failed: {error}")));
                             }
                             close = true;
                         }
-                        if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
+                        if ui.button("Cancel").clicked() {
                             close = true;
                         }
                     });
@@ -3304,7 +3288,7 @@ impl DecalPatcherState {
         }
 
         if !self.active_decals.is_empty() {
-            ui.strong(t("tab-active-decal-patches"));
+            ui.strong("Active decal patches");
             ui.add_space(4.0);
             let active: Vec<_> = self
                 .active_decals
@@ -3321,18 +3305,20 @@ impl DecalPatcherState {
                                 ui.horizontal(|ui| {
                                     ui.vertical(|ui| {
                                         ui.strong(replacement);
-                                        ui.weak(t_args("tab-patched-into-target-display-name", &[("target_display_name", (self.target_display_name(target)).to_string().into())]));
+                                        ui.weak(format!(
+                                            "patched into {}",
+                                            self.target_display_name(target)
+                                        ));
                                     });
                                     ui.with_layout(
                                         egui::Layout::right_to_left(egui::Align::Center),
                                         |ui| {
                                             if ui
-                                                .add_enabled(!busy, egui::Button::new(t("app-restore")))
+                                                .add_enabled(!busy, egui::Button::new("Restore"))
                                                 .clicked()
                                             {
-                                                restore = target
-                                                    .split_once('|')
-                                                    .map(|(car, skin)| {
+                                                restore =
+                                                    target.split_once('|').map(|(car, skin)| {
                                                         (car.to_string(), skin.to_string())
                                                     });
                                             }
@@ -3346,17 +3332,10 @@ impl DecalPatcherState {
                 ui.add_space(4.0);
             }
             if let Some((car, skin)) = restore {
-                if let Err(error) = self.restore_decal_from_skin(
-                    &car,
-                    &skin,
-                    cooked_pc,
-                    backups_dir,
-                    tx,
-                    ctx,
-                ) {
-                    let _ = tx.send(AppMsg::Log(format!(
-                        "[Decals] Restore failed: {error}"
-                    )));
+                if let Err(error) =
+                    self.restore_decal_from_skin(&car, &skin, cooked_pc, backups_dir, tx, ctx)
+                {
+                    let _ = tx.send(AppMsg::Log(format!("[Decals] Restore failed: {error}")));
                 }
             }
             ui.add_space(8.0);
@@ -3365,7 +3344,7 @@ impl DecalPatcherState {
         }
 
         ui.weak(
-            t("tab-each-item-lists-api-decals-for"),
+            "Each item lists API decals for its matching car. Patched targets stay locked until restored.",
         );
         ui.add_space(8.0);
 
@@ -3385,15 +3364,15 @@ impl DecalPatcherState {
         let pages = filtered.len().div_ceil(PAGE_SIZE).max(1);
         self.page = self.page.min(pages - 1);
         ui.horizontal(|ui| {
-            ui.label(t_args("ball-page-page-of-pages", &[("page", (self.page + 1).to_string().into()), ("pages", pages.to_string().into())]));
+            ui.label(format!("Page {} of {pages}", self.page + 1));
             if ui
-                .add_enabled(self.page > 0, egui::Button::new(t("ball-previous")))
+                .add_enabled(self.page > 0, egui::Button::new("Previous"))
                 .clicked()
             {
                 self.page -= 1;
             }
             if ui
-                .add_enabled(self.page + 1 < pages, egui::Button::new(t("ball-next")))
+                .add_enabled(self.page + 1 < pages, egui::Button::new("Next"))
                 .clicked()
             {
                 self.page += 1;
@@ -3415,9 +3394,9 @@ impl DecalPatcherState {
                     ui.add_space(20.0);
                     ui.vertical_centered(|ui| {
                         ui.weak(if self.decals.is_empty() {
-                            t("tab-no-decals-found-in-the-decals")
+                            "No decals found in the /decals/ directory."
                         } else {
-                            t("tab-no-decals-match-your-search")
+                            "No decals match your search."
                         });
                     });
                     return;
@@ -3448,7 +3427,7 @@ impl DecalPatcherState {
                                                 .fit_to_exact_size(size),
                                             );
                                         } else {
-                                            ui.add_sized(size, egui::Label::new(t("ball-no-image")));
+                                            ui.add_sized(size, egui::Label::new("No Image"));
                                         }
                                         ui.strong(&decal.name);
                                         ui.weak(self.lookup_body_name(decal.body_id));
@@ -3458,7 +3437,7 @@ impl DecalPatcherState {
                                             .get(&decal.name)
                                             .cloned();
                                         let selected_text = if compatible_car.is_none() {
-                                            t("tab-no-api-decals-for-this-car").to_string()
+                                            "No API decals for this car".to_string()
                                         } else {
                                             selected_target
                                                 .as_deref()
@@ -3476,7 +3455,7 @@ impl DecalPatcherState {
                                                 })
                                                 .map(|skin| skin.name.clone())
                                                 .unwrap_or_else(|| {
-                                                    t("tab-decal-to-patch").to_string()
+                                                    "Decal to patch...".to_string()
                                                 })
                                         };
                                         let mut next_target = None;
@@ -3544,15 +3523,6 @@ impl DecalPatcherState {
                                                 !self.target_is_patched(car_key, &skin)
                                             });
                                         let can_apply = target_available && !busy && key_ok;
-                                        if config.speed_patch.items_page {
-                                            let speed = self
-                                                .speed_by_decal
-                                                .entry(decal.name.clone())
-                                                .or_insert(1.0);
-                                            ui.push_id(("decal_speed", &decal.name), |ui| {
-                                                crate::speed_patch::speed_slider(ui, speed);
-                                            });
-                                        }
                                         if self.processing_target.as_deref()
                                             == Some(decal.name.as_str())
                                         {
@@ -3560,7 +3530,7 @@ impl DecalPatcherState {
                                         } else if ui
                                             .add_enabled(
                                                 can_apply,
-                                                egui::Button::new(t("ball-apply")).min_size(egui::vec2(
+                                                egui::Button::new("Apply").min_size(egui::vec2(
                                                     ui.available_width(),
                                                     24.0,
                                                 )),
@@ -3586,10 +3556,10 @@ impl DecalPatcherState {
                                         if ui
                                             .add_enabled(
                                                 !busy && !in_use,
-                                                egui::Button::new(t("presets-delete")).small(),
+                                                egui::Button::new("Delete").small(),
                                             )
                                             .on_disabled_hover_text(
-                                                t("tab-restore-every-patch-using-this-decal"),
+                                                "Restore every patch using this decal before deleting it",
                                             )
                                             .clicked()
                                         {
@@ -3605,21 +3575,9 @@ impl DecalPatcherState {
             });
 
         if let Some((decal, car, skin)) = apply {
-            let speed = if config.speed_patch.items_page {
-                self.speed_by_decal.get(&decal).copied().unwrap_or(1.0)
-            } else {
-                1.0
-            };
-            if let Err(error) = self.apply_decal_to_skin(
-                &decal,
-                &car,
-                &skin,
-                speed,
-                cooked_pc,
-                backups_dir,
-                tx,
-                ctx,
-            ) {
+            if let Err(error) =
+                self.apply_decal_to_skin(&decal, &car, &skin, cooked_pc, backups_dir, tx, ctx)
+            {
                 let _ = tx.send(AppMsg::Log(format!("[Decals] Apply failed: {error}")));
             }
         }
@@ -3629,22 +3587,21 @@ impl DecalPatcherState {
 
         if let Some(decal) = self.confirm_delete.clone() {
             let mut close = false;
-            egui::Window::new(t("render-confirm-deletion")).id(egui::Id::new("render-confirm-deletion"))
+            egui::Window::new("Confirm Deletion")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label(t_args("tab-delete-decal-from-local-decals", &[("decal", decal.name.to_string().into())]));
+                    ui.label(format!("Delete '{}' from local decals?", decal.name));
                     ui.horizontal(|ui| {
-                        if ui.button(t("presets-delete")).clicked() {
+                        if ui.button("Delete").clicked() {
                             if let Err(error) = self.delete_decal(&decal.name, tx, config) {
-                                let _ = tx.send(AppMsg::Log(format!(
-                                    "[Decals] Delete failed: {error}"
-                                )));
+                                let _ = tx
+                                    .send(AppMsg::Log(format!("[Decals] Delete failed: {error}")));
                             }
                             close = true;
                         }
-                        if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
+                        if ui.button("Cancel").clicked() {
                             close = true;
                         }
                     });
@@ -3669,9 +3626,9 @@ impl DecalPatcherState {
                 tab_rect.center(),
                 egui::Align2::CENTER_CENTER,
                 if self.progress_label.is_empty() {
-                    t("tab-working")
+                    "Working..."
                 } else {
-                    self.progress_label.clone()
+                    &self.progress_label
                 },
                 egui::FontId::proportional(16.0),
                 egui::Color32::WHITE,
@@ -3696,7 +3653,7 @@ impl DecalPatcherState {
         // show the desktop through the entire app while a decal was running.
         let decal_tab_rect = ui.available_rect_before_wrap();
 
-        ui.heading(t("app-decal-patcher"));
+        ui.heading("Decal Patcher");
         ui.add_space(4.0);
 
         let key_ok = self.validate_key_file().is_ok();
@@ -3707,7 +3664,7 @@ impl DecalPatcherState {
                 format!("⚠ {}", error),
             );
             ui.add_space(8.0);
-            if ui.button(t("tab-retry-loading-catalog")).clicked() {
+            if ui.button("Retry Loading Catalog").clicked() {
                 let _ = tx.send(AppMsg::ReloadCatalogs);
             }
             ui.add_space(8.0);
@@ -3718,7 +3675,7 @@ impl DecalPatcherState {
                 if ui
                     .add_enabled(
                         self.processing_target.is_none(),
-                        egui::Button::new(t("btn-refresh")),
+                        egui::Button::new("Refresh"),
                     )
                     .clicked()
                 {
@@ -3730,7 +3687,7 @@ impl DecalPatcherState {
                 if ui
                     .add_enabled(
                         has_active && !is_processing && key_ok,
-                        egui::Button::new(t("ball-restore-original"))
+                        egui::Button::new("Restore Original")
                             .fill(egui::Color32::from_rgb(180, 50, 50)),
                     )
                     .clicked()
@@ -3739,10 +3696,10 @@ impl DecalPatcherState {
                 }
 
                 if ui
-                    .add_enabled(!is_processing, egui::Button::new(t("ball-import-zip")))
+                    .add_enabled(!is_processing, egui::Button::new("Import ZIP"))
                     .clicked()
                 {
-                    let dialog = rfd::FileDialog::new().add_filter(t("ball-zip-archives"), &["zip"]);
+                    let dialog = rfd::FileDialog::new().add_filter("ZIP Archives", &["zip"]);
                     if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
                         if let Err(e) = self.import_zip(&file, tx) {
                             let _ = tx.send(AppMsg::Log(format!("[Decals] Import failed: {}", e)));
@@ -3750,7 +3707,7 @@ impl DecalPatcherState {
                     }
                 }
                 if ui
-                    .checkbox(&mut self.show_applied, t("ball-show-applied"))
+                    .checkbox(&mut self.show_applied, "Show Applied")
                     .changed()
                 {
                     self.page = 0;
@@ -3765,19 +3722,19 @@ impl DecalPatcherState {
         // Restore All confirmation
         if self.restore_all_confirmed {
             let mut close = false;
-            egui::Window::new(t("tab-legacy-confirm-restore-all")).id(egui::Id::new("tab-legacy-confirm-restore-all"))
+            egui::Window::new("Confirm Restore All")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label(t("tab-legacy-this-will-restore-all-decals-to"));
+                    ui.label("This will restore ALL decals to their original state.");
                     ui.label(format!(
                         "{} decal(s) will be reverted.",
                         self.active_decals.len()
                     ));
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        if ui.button(t("app-restore-all")).clicked() {
+                        if ui.button("Restore All").clicked() {
                             if let Err(e) = self.restore_all_decals(cooked_pc, backups_dir, tx, ctx)
                             {
                                 let _ =
@@ -3785,7 +3742,7 @@ impl DecalPatcherState {
                             }
                             close = true;
                         }
-                        if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
+                        if ui.button("Cancel").clicked() {
                             close = true;
                         }
                     });
@@ -3805,14 +3762,14 @@ impl DecalPatcherState {
                 egui::vec2(left_width, 440.0),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
-                    ui.label(egui::RichText::new(t("tab-legacy-available-decals")).strong());
+                    ui.label(egui::RichText::new("Available Decals").strong());
                     ui.add_space(4.0);
 
                     ui.horizontal(|ui| {
-                        ui.strong(t("spoofer-search"));
+                        ui.strong("Search:");
                         let search_resp = ui.add(
                             egui::TextEdit::singleline(&mut self.search_input)
-                                .hint_text(t("tab-legacy-search-decals"))
+                                .hint_text("Search decals...")
                                 .desired_width(150.0),
                         );
                         let submitted = search_resp.lost_focus()
@@ -3821,7 +3778,7 @@ impl DecalPatcherState {
                             self.search_filter = self.search_input.clone();
                             self.page = 0;
                         }
-                        if ui.button(t("spoofer-clear")).clicked() {
+                        if ui.button("Clear").clicked() {
                             self.search_input.clear();
                             self.search_filter.clear();
                             self.page = 0;
@@ -3852,15 +3809,15 @@ impl DecalPatcherState {
                     let total_pages = filtered.len().div_ceil(PAGE_SIZE).max(1);
                     self.page = self.page.min(total_pages - 1);
                     ui.horizontal(|ui| {
-                        ui.label(t_args("tab-legacy-page-page-of-total-pages", &[("page", (self.page + 1).to_string().into()), ("total_pages", total_pages.to_string().into())]));
+                        ui.label(format!("Page {} of {}", self.page + 1, total_pages));
                         if ui
-                            .add_enabled(self.page > 0, egui::Button::new(t("ball-previous")))
+                            .add_enabled(self.page > 0, egui::Button::new("Previous"))
                             .clicked()
                         {
                             self.page -= 1;
                         }
                         if ui
-                            .add_enabled(self.page + 1 < total_pages, egui::Button::new(t("ball-next")))
+                            .add_enabled(self.page + 1 < total_pages, egui::Button::new("Next"))
                             .clicked()
                         {
                             self.page += 1;
@@ -3876,7 +3833,7 @@ impl DecalPatcherState {
                         .show(ui, |ui| {
                             if filtered.is_empty() {
                                 ui.label(
-                                    egui::RichText::new(t("tab-legacy-no-decals-found"))
+                                    egui::RichText::new("No decals found")
                                         .color(egui::Color32::GRAY),
                                 );
                                 return;
@@ -3907,7 +3864,7 @@ impl DecalPatcherState {
                                                     } else {
                                                         ui.add_sized(
                                                             size,
-                                                            egui::Label::new(t("ball-no-image")),
+                                                            egui::Label::new("No Image"),
                                                         );
                                                     }
                                                     if ui
@@ -3937,7 +3894,7 @@ impl DecalPatcherState {
                                                     if ui
                                                         .add_enabled(
                                                             self.processing_target.is_none(),
-                                                            egui::Button::new(t("presets-delete"))
+                                                            egui::Button::new("Delete")
                                                                 .fill(egui::Color32::from_rgb(
                                                                     180, 50, 50,
                                                                 ))
@@ -3967,22 +3924,22 @@ impl DecalPatcherState {
                 egui::vec2(right_width, 440.0),
                 egui::Layout::top_down(egui::Align::Min),
                 |ui| {
-                    ui.label(egui::RichText::new(t("tab-legacy-target-skin")).strong());
+                    ui.label(egui::RichText::new("Target Skin").strong());
                     ui.add_space(4.0);
 
                     let selected_car_clone = self.selected_car.clone();
                     let selected_skin_id_clone = self.selected_skin_id.clone();
                     let selected_decal_name_clone = self.selected_decal_name.clone();
                     if let Some(car) = self.selected_decal_car() {
-                        ui.label(egui::RichText::new(t_args("tab-legacy-car-car", &[("car", car.car_name.to_string().into())])).strong());
+                        ui.label(egui::RichText::new(format!("Car: {}", car.car_name)).strong());
                     } else if selected_decal_name_clone.is_some() {
                         ui.colored_label(
                             egui::Color32::from_rgb(230, 160, 60),
-                            t("tab-legacy-this-decal-s-bodyid-does-not"),
+                            "This decal's BodyID does not match a car in the catalogs",
                         );
                     } else {
                         ui.label(
-                            egui::RichText::new(t("tab-legacy-select-an-imported-decal-first"))
+                            egui::RichText::new("Select an imported decal first")
                                 .color(egui::Color32::GRAY),
                         );
                     }
@@ -3990,7 +3947,7 @@ impl DecalPatcherState {
                     ui.add_enabled_ui(self.processing_target.is_none(), |ui| {
                         // SKIN DROPDOWN
                         ui.horizontal(|ui| {
-                            ui.label(t("tab-legacy-decal-to-replace"));
+                            ui.label("Decal to replace:");
 
                             let car_info = selected_car_clone
                                 .as_ref()
@@ -4020,13 +3977,13 @@ impl DecalPatcherState {
                                     )
                                     .show_ui(ui, |ui| {
                                         ui.horizontal(|ui| {
-                                            ui.label(t("spoofer-filter"));
+                                            ui.label("Filter:");
                                             ui.add_sized(
                                                 [185.0, 20.0],
                                                 egui::TextEdit::singleline(
                                                     &mut self.skin_dropdown_filter,
                                                 )
-                                                .hint_text(t("tab-legacy-search-decals")),
+                                                .hint_text("Search decals..."),
                                             );
                                             if ui.small_button("×").clicked() {
                                                 self.skin_dropdown_filter.clear();
@@ -4049,7 +4006,7 @@ impl DecalPatcherState {
 
                                         if sorted_skins.is_empty() {
                                             ui.label(
-                                                egui::RichText::new(t("tab-legacy-no-decals-match-the-filter"))
+                                                egui::RichText::new("No decals match the filter")
                                                     .color(egui::Color32::GRAY),
                                             );
                                         } else {
@@ -4085,9 +4042,9 @@ impl DecalPatcherState {
                                     }
                                 }
                             } else if self.car_skins.is_empty() {
-                                ui.label(t("tab-legacy-no-decals-available-check-skins-json"));
+                                ui.label("No decals available - check skins.json");
                             } else {
-                                ui.label(t("tab-legacy-select-an-imported-decal-first"));
+                                ui.label("Select an imported decal first");
                             }
                         });
                     });
@@ -4114,10 +4071,10 @@ impl DecalPatcherState {
                                 .unwrap_or(skin_id);
                             ui.colored_label(
                                 egui::Color32::from_rgb(46, 204, 113),
-                                t_args("tab-legacy-set-to-car-name-skin-name", &[("car_name", car_name.to_string().into()), ("skin_name", skin_name.to_string().into()), ("applied", applied.to_string().into())]),
+                                format!("Set to {car_name}\n{skin_name}\nApplied decal: {applied}"),
                             );
                         } else {
-                            ui.colored_label(egui::Color32::GRAY, t("tab-legacy-no-decal-applied-to-this-skin"));
+                            ui.colored_label(egui::Color32::GRAY, "No decal applied to this skin");
                         }
                     }
 
@@ -4143,7 +4100,7 @@ impl DecalPatcherState {
                             if ui
                                 .add_enabled(
                                     key_ok && self.processing_target.is_none(),
-                                    egui::Button::new(t("app-restore"))
+                                    egui::Button::new("Restore")
                                         .fill(egui::Color32::from_rgb(200, 100, 50)),
                                 )
                                 .clicked()
@@ -4173,7 +4130,7 @@ impl DecalPatcherState {
                             if ui
                                 .add_enabled(
                                     can_apply,
-                                    egui::Button::new(t("tab-legacy-apply-decal"))
+                                    egui::Button::new("Apply Decal")
                                         .fill(egui::Color32::from_rgb(46, 204, 113)),
                                 )
                                 .clicked()
@@ -4187,7 +4144,6 @@ impl DecalPatcherState {
                                         decal_name,
                                         car_key,
                                         skin_id,
-                                        1.0,
                                         cooked_pc,
                                         backups_dir,
                                         tx,
@@ -4208,7 +4164,7 @@ impl DecalPatcherState {
 
                     if self.selected_decal_name.is_none() && !self.decals.is_empty() {
                         ui.label(
-                            egui::RichText::new(t("tab-legacy-select-a-decal-from-the-left"))
+                            egui::RichText::new("Select a decal from the left panel")
                                 .color(egui::Color32::GRAY)
                                 .size(11.0),
                         );
@@ -4220,22 +4176,25 @@ impl DecalPatcherState {
         // Delete confirmation
         if let Some(decal_to_delete) = self.confirm_delete.clone() {
             let mut close = false;
-            egui::Window::new(t("render-confirm-deletion")).id(egui::Id::new("render-confirm-deletion"))
+            egui::Window::new("Confirm Deletion")
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label(t_args("tab-legacy-are-you-sure-you-want-to", &[("decal_to_delete", decal_to_delete.name.to_string().into())]));
+                    ui.label(format!(
+                        "Are you sure you want to delete '{}'?",
+                        decal_to_delete.name
+                    ));
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        if ui.button(t("plugin-delete-prompt-yes")).clicked() {
+                        if ui.button("Yes").clicked() {
                             if let Err(e) = self.delete_decal(&decal_to_delete.name, tx, config) {
                                 let _ =
                                     tx.send(AppMsg::Log(format!("[Decals] Delete failed: {}", e)));
                             }
                             close = true;
                         }
-                        if ui.button(t("plugin-delete-prompt-no")).clicked() {
+                        if ui.button("No").clicked() {
                             close = true;
                         }
                     });
@@ -4260,9 +4219,9 @@ impl DecalPatcherState {
                 decal_tab_rect.center(),
                 egui::Align2::CENTER_CENTER,
                 if self.progress_label.is_empty() {
-                    t("tab-working")
+                    "Working..."
                 } else {
-                    self.progress_label.clone()
+                    self.progress_label.as_str()
                 },
                 egui::FontId::proportional(16.0),
                 egui::Color32::WHITE,

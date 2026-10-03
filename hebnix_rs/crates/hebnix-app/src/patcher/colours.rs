@@ -1,4 +1,3 @@
-use crate::i18n::{t, t_args};
 use aes::Aes256;
 use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray};
 use crossbeam_channel::Receiver;
@@ -169,7 +168,6 @@ pub struct ColoursState {
     loaded_backups_dir: Option<PathBuf>,
     ball_source: usize,
     ball_donor: usize,
-    ball_colours: bool,
     ball_swaps: Vec<super::ball_visual::SavedSwap>,
     ball_state_error: Option<String>,
 }
@@ -179,13 +177,13 @@ impl ColoursState {
         Self {
             settings: ColourSettings::default(),
             busy: false,
-            status: t("colours-status-choose"),
+            status: "Choose the stadium, HUD and garage palette colours, then apply them together."
+                .into(),
             error: false,
             result_rx: None,
             loaded_backups_dir: None,
             ball_source: 0,
             ball_donor: 1,
-            ball_colours: true,
             ball_swaps: Vec::new(),
             ball_state_error: None,
         }
@@ -227,23 +225,23 @@ impl ColoursState {
             .id_salt("colours_page")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                ui.heading(t("tab-colours"));
-                ui.label(t("render-stadium-hud-and-garage-palette-colours"));
+                ui.heading("Colours");
+                ui.label("Stadium, HUD and garage palette colours on one page.");
                 ui.add_space(12.0);
 
                 ui.vertical(|ui| {
-                    ui.heading(t("render-stadium-colours"));
-                    ui.checkbox(&mut self.settings.stadium_colours, t("render-apply-stadium-colours"));
-                    ui.weak(t("render-banners-flags-and-field-lines"));
+                    ui.heading("Stadium colours");
+                    ui.checkbox(&mut self.settings.stadium_colours, "Apply stadium colours");
+                    ui.weak("Banners, flags and field lines.");
                     ui.add_enabled_ui(self.settings.stadium_colours, |ui| {
-                    colour_row(ui, &t("colours-blue-team"), &mut self.settings.stadium_blue);
-                    colour_row(ui, &t("colours-orange-team"), &mut self.settings.stadium_orange);
+                    colour_row(ui, "Blue team", &mut self.settings.stadium_blue);
+                    colour_row(ui, "Orange team", &mut self.settings.stadium_orange);
                     ui.horizontal(|ui| {
-                        if ui.button(t("render-defaults")).clicked() {
+                        if ui.button("Defaults").clicked() {
                             self.settings.stadium_blue = [25, 115, 255];
                             self.settings.stadium_orange = [195, 100, 25];
                         }
-                        if ui.button(t("render-swap-teams")).clicked() {
+                        if ui.button("Swap teams").clicked() {
                             std::mem::swap(
                                 &mut self.settings.stadium_blue,
                                 &mut self.settings.stadium_orange,
@@ -255,22 +253,22 @@ impl ColoursState {
 
                 ui.add_space(10.0);
                 ui.vertical(|ui| {
-                    ui.heading(t("render-hud-colours"));
-                    ui.checkbox(&mut self.settings.hud_colours, t("render-apply-hud-colours"));
-                    ui.weak(t("render-boost-meter-and-scoreboard"));
+                    ui.heading("HUD colours");
+                    ui.checkbox(&mut self.settings.hud_colours, "Apply HUD colours");
+                    ui.weak("Boost meter and scoreboard.");
                     ui.add_enabled_ui(self.settings.hud_colours, |ui| {
-                    colour_row(ui, &t("colours-blue-team"), &mut self.settings.hud_blue);
-                    colour_row(ui, &t("colours-orange-team"), &mut self.settings.hud_orange);
+                    colour_row(ui, "Blue team", &mut self.settings.hud_blue);
+                    colour_row(ui, "Orange team", &mut self.settings.hud_orange);
                     ui.horizontal(|ui| {
-                        if ui.button(t("render-match-stadium")).clicked() {
+                        if ui.button("Match stadium").clicked() {
                             self.settings.hud_blue = self.settings.stadium_blue;
                             self.settings.hud_orange = self.settings.stadium_orange;
                         }
-                        if ui.button(t("render-defaults")).clicked() {
+                        if ui.button("Defaults").clicked() {
                             self.settings.hud_blue = [0, 46, 191];
                             self.settings.hud_orange = [179, 61, 0];
                         }
-                        if ui.button(t("render-swap-teams")).clicked() {
+                        if ui.button("Swap teams").clicked() {
                             std::mem::swap(
                                 &mut self.settings.hud_blue,
                                 &mut self.settings.hud_orange,
@@ -282,33 +280,33 @@ impl ColoursState {
 
                 ui.add_space(10.0);
                 ui.vertical(|ui| {
-                    ui.heading(t("render-extended-colour-palette"));
+                    ui.heading("Extended colour palette");
                     ui.checkbox(
                         &mut self.settings.extended_palette,
-                        t("render-add-pure-white-to-pure-black"),
+                        "Add pure white to pure black to the darkest garage row",
                     );
                     ui.weak(
-                        t("render-only-you-see-these-colours-disable"),
+                        "Only you see these colours. Disable this and apply again to put the original palette row back.",
                     );
                 });
 
                 ui.add_space(10.0);
                 ui.vertical(|ui| {
-                    ui.heading(t("render-heatseeker-ball-glow"));
+                    ui.heading("Heatseeker ball glow");
                     ui.checkbox(
                         &mut self.settings.heatseeker_glow,
-                        t("render-override-the-maximum-speed-glow-locally"),
+                        "Override the maximum-speed glow locally",
                     );
-                    ui.weak(t("render-changes-the-high-speed-bloom-and"));
+                    ui.weak("Changes the high-speed bloom and trail only; team colouring is left untouched.");
                     ui.add_enabled_ui(self.settings.heatseeker_glow, |ui| {
-                        colour_row(ui, &t("colours-max-speed"), &mut self.settings.heatseeker_max_speed);
+                        colour_row(ui, "Max speed", &mut self.settings.heatseeker_max_speed);
                     });
                 });
 
                 ui.add_space(14.0);
                 ui.horizontal(|ui| {
                     if ui
-                        .add_enabled(!self.busy, egui::Button::new(t("render-apply-colours")))
+                        .add_enabled(!self.busy, egui::Button::new("Apply Colours"))
                         .clicked()
                     {
                         requested = Some(ColourAction::Apply);
@@ -316,7 +314,7 @@ impl ColoursState {
                     if ui
                         .add_enabled(
                             !self.busy && (self.settings.applied || restore_available),
-                            egui::Button::new(t("ball-restore-original")),
+                            egui::Button::new("Restore Original"),
                         )
                         .clicked()
                     {
@@ -332,7 +330,7 @@ impl ColoursState {
                     ui.visuals().text_color()
                 };
                 ui.colored_label(colour, &self.status);
-                ui.weak(t_args("render-pristine-backup-backup-name", &[("backup", BACKUP_NAME.to_string().into())]));
+                ui.weak(format!("Pristine backup: {BACKUP_NAME}"));
             });
         requested
     }
@@ -348,15 +346,15 @@ impl ColoursState {
             .id_salt("ball_appearance_page")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                ui.heading(t("app-ball-appearance"));
+                ui.heading("Ball Appearance");
                 ui.label(
-                    t("ball-appearance-change-the-ball-s-shape-locally"),
+                    "Change the ball's shape locally while keeping its original physics and hitbox.",
                 );
-                ui.weak(t("ball-appearance-experimental-visual-swap-collision-and-p"));
+                ui.weak("Experimental visual swap. Collision and physics are preserved.");
                 ui.add_space(12.0);
                 ui.add_enabled_ui(!self.busy, |ui| {
                     ui.horizontal(|ui| {
-                        ui.label(t("ball-appearance-original-ball"));
+                        ui.label("Original ball");
                         egui::ComboBox::from_id_salt("ball_visual_source")
                             .selected_text(super::ball_visual::BALLS[self.ball_source].0)
                             .show_ui(ui, |ui| {
@@ -366,7 +364,7 @@ impl ColoursState {
                                     ui.selectable_value(&mut self.ball_source, index, *label);
                                 }
                             });
-                        ui.label(t("ball-appearance-replace-appearance-with"));
+                        ui.label("Replace appearance with");
                         egui::ComboBox::from_id_salt("ball_visual_donor")
                             .selected_text(super::ball_visual::BALLS[self.ball_donor].0)
                             .show_ui(ui, |ui| {
@@ -379,31 +377,20 @@ impl ColoursState {
                                 }
                             });
                     });
-                    let colour_support =
-                        super::ball_visual::colour_texture(self.ball_source, self.ball_donor)
-                            .is_some();
-                    ui.add_enabled_ui(colour_support, |ui| {
-                        ui.checkbox(
-                            &mut self.ball_colours,
-                            t("ball-appearance-include-replacement-colours-experimental"),
-                        );
-                    });
-                    if colour_support {
-                        ui.weak(
-                            t("ball-appearance-copies-the-colour-texture-special-shader"),
-                        );
-                    } else {
-                        ui.weak(
-                            t("ball-appearance-colours-are-available-for-normal-selecte"),
-                        );
-                    }
+                    ui.weak(
+                        "Uses the selected ball's material and skin. Physics and hitbox stay original.",
+                    );
                     let active = self
                         .ball_swaps
                         .iter()
                         .find(|swap| swap.source == self.ball_source);
                     if let Some(swap) = active {
-                        ui.label(t_args("ball-appearance-applied-super-super2", &[("original", (super::ball_visual::BALLS[swap.source].0).to_string().into()), ("replacement", (super::ball_visual::BALLS[swap.donor].0).to_string().into())]));
-                        ui.weak(t("ball-appearance-restore-this-ball-before-choosing-anothe"));
+                        ui.label(format!(
+                            "Applied: {} › {}",
+                            super::ball_visual::BALLS[swap.source].0,
+                            super::ball_visual::BALLS[swap.donor].0
+                        ));
+                        ui.weak("Restore this ball before choosing another appearance.");
                     }
                     if let Some(error) = &self.ball_state_error {
                         ui.colored_label(egui::Color32::RED, error);
@@ -414,20 +401,20 @@ impl ColoursState {
                                 active.is_none()
                                     && self.ball_source != self.ball_donor
                                     && self.ball_state_error.is_none(),
-                                egui::Button::new(t("ball-appearance-apply-ball-appearance")),
+                                egui::Button::new("Apply Ball Appearance"),
                             )
                             .clicked()
                         {
                             requested = Some(ColourAction::ApplyBall {
                                 source: self.ball_source,
                                 donor: self.ball_donor,
-                                colours: self.ball_colours && colour_support,
+                                colours: false,
                             });
                         }
                         if ui
                             .add_enabled(
                                 active.is_some() && self.ball_state_error.is_none(),
-                                egui::Button::new(t("ball-appearance-restore-ball-appearance")),
+                                egui::Button::new("Restore Ball Appearance"),
                             )
                             .clicked()
                         {
@@ -469,11 +456,12 @@ impl ColoursState {
         self.busy = true;
         self.error = false;
         self.status = match action {
-            ColourAction::Apply => t("colours-status-applying"),
-            ColourAction::Restore => t("colours-status-restoring"),
-            ColourAction::ApplyBall { .. } => t("colours-status-preparing-ball"),
-            ColourAction::RestoreBall { .. } => t("colours-status-restoring-ball"),
-        };
+            ColourAction::Apply => "Applying stadium, HUD and garage palette colours…",
+            ColourAction::Restore => "Restoring original colours…",
+            ColourAction::ApplyBall { .. } => "Preparing and validating visual ball swaps…",
+            ColourAction::RestoreBall { .. } => "Restoring original ball geometry…",
+        }
+        .into();
         let cooked_pc = cooked_pc.to_path_buf();
         let backups_dir = backups_dir.to_path_buf();
         let settings = self.settings.clone();
@@ -531,20 +519,20 @@ impl ColoursState {
         match result {
             Ok(ColourAction::Apply) => {
                 self.settings.applied = true;
-                self.status = t("colours-status-applied");
+                self.status = "Colours applied. Start Rocket League to see them.".into();
                 self.error = false;
             }
             Ok(ColourAction::Restore) => {
                 self.settings = ColourSettings::default();
-                self.status = t("colours-status-restored");
+                self.status = "Original stadium, HUD and garage palette colours restored.".into();
                 self.error = false;
             }
             Ok(ColourAction::ApplyBall { .. }) => {
-                self.status = t("colours-status-ball-applied");
+                self.status = "Ball shape applied. Restart Rocket League to test it.".into();
                 self.error = false;
             }
             Ok(ColourAction::RestoreBall { .. }) => {
-                self.status = t("colours-status-ball-restored");
+                self.status = "Original ball shape restored.".into();
                 self.error = false;
             }
             Err(error) => {
@@ -561,9 +549,8 @@ impl ColoursState {
 
 fn colour_row(ui: &mut egui::Ui, label: &str, colour: &mut [u8; 3]) {
     ui.horizontal(|ui| {
-        let label_w = crate::i18n::layout::label_column_width(ui, &[label.to_string()], 110.0);
         ui.add_sized(
-            [label_w, 20.0],
+            [110.0, 20.0],
             egui::Label::new(label).halign(egui::Align::Min),
         );
         ui.color_edit_button_srgb(colour);
