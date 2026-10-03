@@ -2312,7 +2312,8 @@ impl LiteApp {
 
         egui::Panel::left("lite_plugin_settings_list")
             .resizable(false)
-            .exact_size(200.0)
+            .default_size(200.0)
+            .size_range(200.0..=320.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("lite_plugin_settings_names")

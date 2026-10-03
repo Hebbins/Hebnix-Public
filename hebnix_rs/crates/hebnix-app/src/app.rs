@@ -2777,7 +2777,8 @@ impl HebnixApp {
 
         egui::Panel::left("spoofer_settings_list")
             .resizable(false)
-            .exact_size(150.0)
+            .default_size(200.0)
+            .size_range(200.0..=320.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("spoofer_settings_names")
@@ -4768,7 +4769,8 @@ impl HebnixApp {
 
         egui::Panel::left("plugin_settings_list")
             .resizable(false)
-            .exact_size(200.0)
+            .default_size(200.0)
+            .size_range(200.0..=320.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("plugin_settings_names")
@@ -6460,7 +6462,10 @@ impl eframe::App for HebnixApp {
                             let cooked_pc = std::path::Path::new(&self.config.settings.rl_path)
                                 .join("TAGame").join("CookedPCConsole");
                             egui::Panel::left("spawner_categories")
-                                .resizable(false).exact_size(150.0).show(ui, |ui| {
+                                .resizable(false)
+                                .default_size(200.0)
+                                .size_range(200.0..=320.0)
+                                .show(ui, |ui| {
                                     egui::ScrollArea::vertical().id_salt("spawner_subtabs").show(ui, |ui| {
                                         ui.selectable_value(&mut self.spawner_subtab, SpawnerSubTab::Tutorial, t("app-tutorial"));
                                         ui.separator();
@@ -6531,7 +6536,8 @@ impl eframe::App for HebnixApp {
 
                         egui::Panel::left("patcher_settings_list")
                             .resizable(false)
-                            .exact_size(150.0)
+                            .default_size(200.0)
+                            .size_range(200.0..=320.0)
                             .show(ui, |ui| {
                                 egui::ScrollArea::vertical()
                                     .id_salt("patcher_subtabs")
@@ -6943,7 +6949,8 @@ impl eframe::App for HebnixApp {
 
                         egui::Panel::left("experimental_list")
                             .resizable(false)
-                            .exact_size(150.0)
+                            .default_size(200.0)
+                            .size_range(200.0..=320.0)
                             .show(ui, |ui| {
                                 egui::ScrollArea::vertical()
                                     .id_salt("experimental_subtabs")
