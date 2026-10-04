@@ -36,10 +36,27 @@ fn rgb(c: Rgba) -> COLORREF {
     COLORREF((c.2 as u32) << 16 | (c.1 as u32) << 8 | c.0 as u32)
 }
 
-struct GdiImage {
+struct GdiFrame {
     bmp: HBITMAP,
     w: i32,
     h: i32,
+}
+
+/// gifs hold one bitmap per frame and pick the frame from the wall clock
+struct GdiImage {
+    frames: Vec<GdiFrame>,
+    delays_ms: Vec<u32>,
+    total_ms: u64,
+}
+
+impl GdiImage {
+    fn current(&self) -> &GdiFrame {
+        if self.frames.len() == 1 {
+            return &self.frames[0];
+        }
+        let i = super::gif::index_at(&self.delays_ms, self.total_ms, super::gif::clock_ms());
+        &self.frames[i.min(self.frames.len() - 1)]
+    }
 }
 
 thread_local! {
@@ -111,7 +128,20 @@ fn cached_font(size: i32, bold: bool) -> HFONT {
 }
 
 fn load_gdi_bitmap(path: &str) -> Option<GdiImage> {
-    let img = image::open(path).ok()?.into_rgba8();
+    let frames = super::gif::load(path)?;
+    let bitmaps = frames
+        .images
+        .iter()
+        .map(load_gdi_frame)
+        .collect::<Option<Vec<_>>>()?;
+    Some(GdiImage {
+        frames: bitmaps,
+        delays_ms: frames.delays_ms,
+        total_ms: frames.total_ms,
+    })
+}
+
+fn load_gdi_frame(img: &image::RgbaImage) -> Option<GdiFrame> {
     let (width, height) = img.dimensions();
     let bmi = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
@@ -154,7 +184,7 @@ fn load_gdi_bitmap(path: &str) -> Option<GdiImage> {
             slice[i * 4 + 3] = a;
         }
 
-        Some(GdiImage {
+        Some(GdiFrame {
             bmp: hbm,
             w: width as i32,
             h: height as i32,
@@ -269,6 +299,7 @@ pub fn image(hdc: HDC, path: &str, x: i32, y: i32, w: i32, h: i32, opacity: f32)
             }
         }
         if let Some(img) = m.get(path) {
+            let img = img.current();
             unsafe {
                 let dc = CreateCompatibleDC(Some(hdc));
                 let old = SelectObject(dc, HGDIOBJ(img.bmp.0));
