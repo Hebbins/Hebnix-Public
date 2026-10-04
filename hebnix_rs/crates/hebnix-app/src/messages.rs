@@ -18,6 +18,8 @@ pub enum AppMsg {
     RlApiCaptureReady(Result<(), String>),
     RlApiResponse(Result<Value, String>),
     GameEvent(StatsEvent),
+    /// text chat read off the LAN match traffic (see multiplayer_lan::chat_capture)
+    ChatMessage(crate::multiplayer_lan::ChatMessage),
     // periodic RL monitor result. root_dir is the game install folder resolved
     // from the running process, used to auto-fill the configured paths.
     RlStatus {

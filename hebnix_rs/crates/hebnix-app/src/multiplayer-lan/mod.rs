@@ -1,4 +1,5 @@
 mod beacon;
+mod chat_capture;
 mod direct_udp;
 mod dns_cleanup;
 mod firewall;
@@ -19,6 +20,7 @@ pub use firewall::{
 // "host" and "join" only mean something inside Rocket League's own UI now -
 // every peer runs the same relay (see hosting.rs), so there's just the one
 // session type
+pub use chat_capture::{ChatCapture, ChatMessage};
 pub use hosting::HostSession;
 pub use map_sync::{
     LocalInfo, MAP_SYNC_PORT, MAX_MAP_BYTES, MapFileProvider, MapProvider, PeerOffer, SlotMap,

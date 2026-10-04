@@ -41,8 +41,8 @@ use windows::Win32::Foundation::HANDLE;
 use windows::core::BOOL;
 
 const WINDIVERT_LAYER_NETWORK: u32 = 0;
-const WINDIVERT_FLAG_SNIFF: u64 = 0x0001;
-const WINDIVERT_FLAG_RECV_ONLY: u64 = 0x0004;
+pub(super) const WINDIVERT_FLAG_SNIFF: u64 = 0x0001;
+pub(super) const WINDIVERT_FLAG_RECV_ONLY: u64 = 0x0004;
 const WINDIVERT_SHUTDOWN_BOTH: u32 = 3;
 
 pub struct BeaconRelay {
@@ -82,7 +82,7 @@ pub struct BeaconRelay {
 /// a genuinely corrupted state (disabled, marked for deletion, stuck
 /// stop-pending) after repeated start/stop cycles. The service itself is
 /// now never touched at shutdown at all.
-struct RawCapture {
+pub(super) struct RawCapture {
     handle: HANDLE,
     // Keep the DLL mapped for every call and until after WinDivertClose().
     _library: Library,
@@ -101,7 +101,7 @@ impl RawCapture {
     /// Loads WinDivert only once Hebnix is elevated and the runtime bundle has
     /// been extracted to its AppData folder. This avoids an eager process-load
     /// dependency on a DLL/driver that may not exist yet.
-    fn open(filter: &str, flags: u64) -> Result<Self, String> {
+    pub(super) fn open(filter: &str, flags: u64) -> Result<Self, String> {
         if !crate::spoofer::is_admin() {
             return Err("WinDivert capture requires Hebnix to run as administrator".to_string());
         }
@@ -150,7 +150,7 @@ impl RawCapture {
         })
     }
 
-    fn recv(&self, buffer: &mut [u8]) -> std::io::Result<usize> {
+    pub(super) fn recv(&self, buffer: &mut [u8]) -> std::io::Result<usize> {
         let mut recv_len: u32 = 0;
         let ok = unsafe {
             (self.recv)(
@@ -170,7 +170,7 @@ impl RawCapture {
 
     /// unblocks a `recv()` call in progress on another thread - see the
     /// struct doc comment for why this is safe to call concurrently
-    fn shutdown(&self) {
+    pub(super) fn shutdown(&self) {
         unsafe {
             let _ = (self.shutdown)(self.handle, WINDIVERT_SHUTDOWN_BOTH);
         }
@@ -299,7 +299,7 @@ fn spawn_capture_thread(tx: Sender<(Vec<u8>, SocketAddr, u16)>) -> Result<Arc<Ra
 /// IP packet - WinDivert's network layer hands us the packet starting at
 /// the IP header (no Ethernet header, it's already above that), so this is
 /// the same job a normal socket's recv_from would otherwise do
-fn parse_udp_payload(ip: &[u8]) -> Option<(Vec<u8>, SocketAddr, u16)> {
+pub(super) fn parse_udp_payload(ip: &[u8]) -> Option<(Vec<u8>, SocketAddr, u16)> {
     const UDP_PROTOCOL: u8 = 17;
 
     if ip.len() < 20 {

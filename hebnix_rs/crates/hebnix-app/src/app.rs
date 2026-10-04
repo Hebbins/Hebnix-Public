@@ -460,6 +460,8 @@ pub struct HebnixApp {
     stats_tx: crossbeam_channel::Sender<hebnix_sdk::stats::StatsEvent>,
     monitor: Monitor,
     discord_presence: crate::discord_presence::DiscordPresence,
+    chat_capture: Option<crate::multiplayer_lan::ChatCapture>,
+    egui_ctx: egui::Context,
     plugin_mgr: PluginManager,
     tray: Option<Tray>,
     hotkey: Option<ToggleHotkey>,
@@ -968,6 +970,8 @@ impl HebnixApp {
             stats_tx,
             monitor,
             discord_presence,
+            chat_capture: None,
+            egui_ctx: cc.egui_ctx.clone(),
             plugin_mgr,
             tray,
             hotkey,
@@ -1087,6 +1091,7 @@ impl HebnixApp {
         app.plugin_mgr.shared.borrow_mut().is_gui_open = !hidden;
         app.refresh_stats_api_viewer();
         app.check_web_port();
+        app.sync_chat_capture();
 
         app.save_friends_internal();
         app.save_ranks_internal();
@@ -1097,6 +1102,59 @@ impl HebnixApp {
         fetch_catalogs(app.tx.clone(), cc.egui_ctx.clone());
 
         app
+    }
+
+    /// starts or stops the LAN chat capture to match the `chat_export` setting
+    fn sync_chat_capture(&mut self) {
+        if !self.config.settings.chat_export {
+            self.stop_chat_capture();
+            return;
+        }
+        if self.chat_capture.is_some() {
+            return;
+        }
+        let tx = self.tx.clone();
+        let ctx = self.egui_ctx.clone();
+        match crate::multiplayer_lan::ChatCapture::start(move |message| {
+            let _ = tx.send(AppMsg::ChatMessage(message));
+            ctx.request_repaint();
+        }) {
+            Ok(capture) => self.chat_capture = Some(capture),
+            Err(error) => self.console.write(format!("[Chat] {error}")),
+        }
+    }
+
+    fn stop_chat_capture(&mut self) {
+        if let Some(capture) = self.chat_capture.take() {
+            capture.stop();
+        }
+    }
+
+    /// appends the message to chat_log.jsonl and hands it to the plugins
+    fn handle_chat_message(&mut self, message: &crate::multiplayer_lan::ChatMessage) {
+        use std::io::Write;
+        let line = match serde_json::to_string(message) {
+            Ok(line) => line,
+            Err(_) => return,
+        };
+        let logged = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.base_dir.join("chat_log.jsonl"))
+            .and_then(|mut file| writeln!(file, "{line}"));
+        if let Err(error) = logged {
+            self.console
+                .write(format!("[Chat] could not write chat_log.jsonl: {error}"));
+        }
+        self.plugin_mgr.dispatch_simple(
+            "ChatMessage",
+            serde_json::json!({
+                "sender": message.sender,
+                "text": message.text,
+                "time": message.time,
+                "counter": message.counter,
+            }),
+        );
     }
 
     fn save_config(&mut self) {
@@ -1568,6 +1626,7 @@ impl HebnixApp {
             self.ws_stats.stop();
             self.monitor.stop();
             self.discord_presence.stop();
+            self.stop_chat_capture();
             self.tray = None;
             // Keep the proxy alive without leaving a transparent viewport on screen.
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
@@ -1584,6 +1643,7 @@ impl HebnixApp {
         self.ws_stats.stop();
         self.monitor.stop();
         self.discord_presence.stop();
+        self.stop_chat_capture();
         self.tray = None;
         // std::process::exit() terminates immediately without running Rust
         // destructors, so `impl Drop for HebnixApp` (which would otherwise
@@ -2071,6 +2131,10 @@ impl HebnixApp {
                 } => {
                     self.plugin_mgr
                         .on_http_result(&slug, &req_id, status, &body, &headers);
+                    ctx.request_repaint();
+                }
+                AppMsg::ChatMessage(message) => {
+                    self.handle_chat_message(&message);
                     ctx.request_repaint();
                 }
                 AppMsg::PluginWsOpen { slug, id } => {
@@ -4598,6 +4662,19 @@ impl HebnixApp {
                                 }
                             });
                             ui.horizontal(|ui| {
+                                ui.add_sized([label_w, 20.0], egui::Label::new("Export LAN Chat:"));
+                                let response = ui.checkbox(&mut self.config.settings.chat_export, "")
+                                    .on_hover_text(
+                                        "Reads text chat out of LAN match traffic (port 7777), writes it to \
+                                         chat_log.jsonl and sends plugins a ChatMessage event. Needs Hebnix \
+                                         to run as administrator (WinDivert). Quick chats are not included.",
+                                    );
+                                if response.changed() {
+                                    self.sync_chat_capture();
+                                    self.save_config();
+                                }
+                            });
+                            ui.horizontal(|ui| {
                                 ui.add_sized([label_w, 20.0], egui::Label::new(t("system-p2p")));
                                 if ui.checkbox(&mut self.config.settings.p2p_file_sharing, "").changed() {
                                     self.workshop
@@ -6339,6 +6416,7 @@ impl Drop for HebnixApp {
         }
         self.workshop.suspend_multiplayer();
         self.discord_presence.stop();
+        self.stop_chat_capture();
     }
 }
 
