@@ -4003,6 +4003,69 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
         })?,
     )?;
 
+    // ui.columns(left_fn, right_fn [, right_width]) -- two blocks side by side.
+    // the right one is right_width points wide (default 280), the left takes
+    // the rest. each callback gets the ui table.
+    ui.set(
+        "columns",
+        lua.create_function(
+            |lua, (left, right, right_width): (mlua::Function, mlua::Function, Option<f32>)| {
+                let ui_tbl: Table = ui_table(lua)?;
+                with_current_ui(|outer| {
+                    let spacing = outer.spacing().item_spacing.x;
+                    let total = outer.available_width();
+                    let right_width = right_width
+                        .unwrap_or(280.0)
+                        .clamp(120.0, (total * 0.6).max(120.0));
+                    let left_width = (total - right_width - spacing * 2.0 - 2.0).max(80.0);
+                    outer.horizontal_top(|row| {
+                        let column = |row: &mut egui::Ui, width: f32, f: &mlua::Function| {
+                            row.allocate_ui_with_layout(
+                                egui::vec2(width, 0.0),
+                                egui::Layout::top_down(egui::Align::LEFT),
+                                |inner| {
+                                    inner.set_width(width);
+                                    with_ui_scope(inner, || {
+                                        if let Err(e) = f.call::<()>(ui_tbl.clone()) {
+                                            tracing::warn!("plugin ui.columns callback error: {e}");
+                                        }
+                                    });
+                                },
+                            );
+                        };
+                        column(row, left_width, &left);
+                        row.separator();
+                        column(row, right_width, &right);
+                    });
+                });
+                Ok(())
+            },
+        )?,
+    )?;
+
+    // ui.scroll_area(max_height, function(ui) ... end) -- vertical scroll
+    // area that follows its newest line until the user scrolls up
+    ui.set(
+        "scroll_area",
+        lua.create_function(|lua, (max_height, f): (f32, mlua::Function)| {
+            let ui_tbl: Table = ui_table(lua)?;
+            with_current_ui(|outer| {
+                egui::ScrollArea::vertical()
+                    .max_height(max_height.max(20.0))
+                    .auto_shrink([false, true])
+                    .stick_to_bottom(true)
+                    .show(outer, |inner| {
+                        with_ui_scope(inner, || {
+                            if let Err(e) = f.call::<()>(ui_tbl.clone()) {
+                                tracing::warn!("plugin ui.scroll_area callback error: {e}");
+                            }
+                        });
+                    });
+            });
+            Ok(())
+        })?,
+    )?;
+
     Ok(ui)
 }
 
