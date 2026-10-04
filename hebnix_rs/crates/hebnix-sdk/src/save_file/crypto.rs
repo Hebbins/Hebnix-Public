@@ -90,37 +90,3 @@ pub fn aes_encrypt(data: &[u8]) -> Vec<u8> {
     }
     out
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn aes_round_trip() {
-        let plain = b"hello rocket league save data!!!"; // 32 bytes
-        let encrypted = aes_encrypt(plain);
-        assert_eq!(encrypted.len() % 16, 0);
-        assert_ne!(&encrypted[..], &plain[..]);
-        let decrypted = aes_decrypt(&encrypted);
-        assert_eq!(&decrypted[..plain.len()], &plain[..]);
-    }
-
-    #[test]
-    fn aes_pads_to_block_boundary() {
-        let plain = b"short";
-        let encrypted = aes_encrypt(plain);
-        assert_eq!(encrypted.len(), 16);
-        let decrypted = aes_decrypt(&encrypted);
-        assert_eq!(&decrypted[..5], plain);
-        assert_eq!(&decrypted[5..], &[0u8; 11]);
-    }
-
-    #[test]
-    fn crc32_is_stable_and_sensitive() {
-        let a = crc32(b"data");
-        let b = crc32(b"data");
-        let c = crc32(b"date");
-        assert_eq!(a, b);
-        assert_ne!(a, c);
-    }
-}

@@ -7,8 +7,6 @@ pub mod backup_guard;
 pub mod ball;
 pub mod ball_visual;
 pub mod boost_patcher;
-#[path = "../examples/support/car_geometry.rs"]
-pub mod car_geometry;
 pub mod car_patcher;
 pub mod catalog;
 pub mod colours;

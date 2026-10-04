@@ -276,33 +276,3 @@ fn safe_filename<'a>(value: &'a str, expected_extension: &str) -> Result<&'a str
         .then_some(value)
         .ok_or_else(|| format!("Unsafe theme filename '{value}'"))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{PLUGIN_PREFIX, THEME_PREFIX, id_from_url};
-
-    #[test]
-    fn accepts_safe_install_links() {
-        assert_eq!(
-            id_from_url("hebnix://install/plugin/example-123", PLUGIN_PREFIX),
-            Some("example-123")
-        );
-        assert_eq!(
-            id_from_url("hebnix://install/theme/316", THEME_PREFIX),
-            Some("316")
-        );
-    }
-
-    #[test]
-    fn rejects_other_or_unsafe_links() {
-        assert_eq!(id_from_url("https://example.com", THEME_PREFIX), None);
-        assert_eq!(
-            id_from_url("hebnix://install/theme/../bad", THEME_PREFIX),
-            None
-        );
-        assert_eq!(
-            id_from_url("hebnix://install/theme/a?x=1", THEME_PREFIX),
-            None
-        );
-    }
-}

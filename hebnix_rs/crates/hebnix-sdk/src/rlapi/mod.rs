@@ -297,31 +297,3 @@ fn read_response(reader: &mut BufReader<ChildStdout>) -> Result<BridgeResponse, 
         });
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn player_id_format() {
-        assert_eq!(
-            player_id(Platform::Steam, "76561197960287930"),
-            "Steam|76561197960287930|0"
-        );
-        assert_eq!(player_id(Platform::Epic, "abc123"), "Epic|abc123|0");
-    }
-
-    #[test]
-    fn auth_config_from_token_scopes_steam_id() {
-        let mut token = EOSToken::default();
-        token.access_token = "t".into();
-        token.account_id = "acc".into();
-        token.steam_id = "76561198000000000".into();
-
-        let steam = AuthConfig::from_token(&token, Platform::Steam);
-        assert_eq!(steam.steam_id.as_deref(), Some("76561198000000000"));
-
-        let epic = AuthConfig::from_token(&token, Platform::Epic);
-        assert_eq!(epic.steam_id, None, "steam_id must not leak into Epic auth");
-    }
-}

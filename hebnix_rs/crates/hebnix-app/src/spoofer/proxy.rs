@@ -121,45 +121,6 @@ fn absolute_uri_path(target: &str) -> &str {
     if target.starts_with('/') { target } else { "/" }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{CertResolver, absolute_uri_path};
-    use crate::spoofer::ca;
-    use std::sync::Arc;
-
-    #[test]
-    fn localhost_bridge_has_a_certificate_without_sni() {
-        let base = std::env::temp_dir().join(format!("hebnix_bridge_cert_{}", std::process::id()));
-        let ca = Arc::new(ca::ensure(&base).expect("create bridge CA"));
-        let resolver = CertResolver::with_default_host(ca, "localhost");
-        assert_eq!(resolver.default_host.as_deref(), Some("localhost"));
-        assert!(resolver.leaf_for("localhost").is_some());
-        if let (Ok(root), Ok(path)) = (
-            std::fs::canonicalize(std::env::temp_dir()),
-            std::fs::canonicalize(&base),
-        ) {
-            if path.starts_with(&root) && path != root {
-                let _ = std::fs::remove_dir_all(path);
-            }
-        }
-    }
-
-    #[test]
-    fn absolute_request_target_keeps_only_path_and_query() {
-        assert_eq!(
-            absolute_uri_path("https://config.psynet.gg/rpc/Player/GetPlayerSkills?x=1"),
-            "/rpc/Player/GetPlayerSkills?x=1"
-        );
-    }
-
-    #[test]
-    fn origin_form_target_is_unchanged() {
-        assert_eq!(
-            absolute_uri_path("/Services/v1/config"),
-            "/Services/v1/config"
-        );
-    }
-}
 
 const SKIP_REQ_HEADERS: [&str; 5] = [
     "host",

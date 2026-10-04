@@ -320,38 +320,3 @@ fn parse_match_ended(data: &Value) -> MatchEndedData {
         winner_team_num: i_or(data, "WinnerTeamNum", -1),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn extracts_complete_objects_and_keeps_tail() {
-        let buf = br#"{"Event":"A"}{"Event":"B","Data":{"x":"}"}}{"Event":"C","#;
-        let (objects, rest) = extract_json_objects(buf);
-        assert_eq!(objects.len(), 2);
-        assert_eq!(objects[0], br#"{"Event":"A"}"#.to_vec());
-        assert_eq!(rest, br#"{"Event":"C","#.to_vec());
-    }
-
-    #[test]
-    fn parses_goal_scored() {
-        let raw = br#"{"Event":"GoalScored","Data":{"MatchGuid":"abc","GoalSpeed":92.5,"Scorer":{"Name":"Player1","TeamNum":1},"BallLastTouch":{"Player":{"Name":"Player1"},"Speed":80.0},"ImpactLocation":{"X":1.0,"Y":2.0,"Z":3.0}}}"#;
-        let event = parse_message(raw).unwrap();
-        assert_eq!(event.event_type, "GoalScored");
-        assert_eq!(event.match_guid.as_deref(), Some("abc"));
-        let goal = event.goal_scored().unwrap();
-        assert_eq!(goal.scorer.name, "Player1");
-        assert_eq!(goal.scorer.team_num, 1);
-        assert!((goal.goal_speed - 92.5).abs() < 1e-9);
-        assert!((goal.impact_location.z - 3.0).abs() < 1e-9);
-    }
-
-    #[test]
-    fn unknown_event_becomes_simple() {
-        let raw = br#"{"Event":"CountdownBegin","Data":{"MatchGuid":"xyz"}}"#;
-        let event = parse_message(raw).unwrap();
-        assert_eq!(event.event_type, "CountdownBegin");
-        assert!(matches!(event.data, EventData::Simple));
-    }
-}

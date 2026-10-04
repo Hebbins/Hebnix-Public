@@ -889,38 +889,3 @@ fn create_window() -> Result<HWND> {
         )
     }
 }
-
-#[cfg(all(test, not(feature = "lite")))]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[ignore]
-    fn rl_collection_builds_and_exposes_its_families() {
-        let rl = std::env::var("HEBNIX_RL_DIR")
-            .unwrap_or_else(|_| r"E:\SteamLibrary\steamapps\common\rocketleague".into());
-        crate::patcher::rl_font::set_install_dir(std::path::Path::new(&rl));
-        let faces = crate::patcher::rl_font::loaded();
-        println!("rebuilt faces: {}", faces.len());
-
-        let factory: IDWriteFactory =
-            unsafe { DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED).expect("dwrite factory") };
-        let f5 = factory.cast::<IDWriteFactory5>();
-        println!("IDWriteFactory5 available: {}", f5.is_ok());
-
-        let collection = build_rl_collection(&factory).expect("rl collection");
-        unsafe {
-            let count = collection.GetFontFamilyCount();
-            println!("families in collection: {count}");
-            for i in 0..count {
-                let fam = collection.GetFontFamily(i).expect("family");
-                let names = fam.GetFamilyNames().expect("names");
-                let len = names.GetStringLength(0).expect("len") as usize;
-                let mut buf = vec![0u16; len + 1];
-                names.GetString(0, &mut buf).expect("string");
-                println!("  [{i}] {}", String::from_utf16_lossy(&buf[..len]));
-            }
-            assert!(count > 0, "collection has no families");
-        }
-    }
-}

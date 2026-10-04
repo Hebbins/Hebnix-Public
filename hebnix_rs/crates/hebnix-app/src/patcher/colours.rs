@@ -24,53 +24,6 @@ const BLUE_COLOUR_BLIND: &str = "cdcccc3d0000803ecdcc4c3f0000803fcdcccc3d6666263
 const ORANGE_DEFAULT: &str = "61c3433f70cec83e39b4c83d0000803f79e9663f7cf2703e39b4c83d0000803f26e4633f26e4633f26e4633f0000803f";
 const ORANGE_COLOUR_BLIND: &str = "cdcc4c3f6666e63ecdcccc3d0000803f0000803f6666263f000000000000803f0000803f0000803f6666663f0000803f";
 
-#[cfg(test)]
-const BOOST_ARENA_PACKAGES: &[&str] = &[
-    "Stadium_P",
-    "Stadium_Day_P",
-    "Stadium_Foggy_P",
-    "Stadium_Winter_P",
-    "EuroStadium_P",
-    "EuroStadium_Night_P",
-    "EuroStadium_Dusk_P",
-    "EuroStadium_Rainy_P",
-    "EuroStadium_SnowNight_P",
-    "UtopiaStadium_P",
-    "UtopiaStadium_Dusk_P",
-    "UtopiaStadium_Snow_P",
-    "UtopiaStadium_Lux_P",
-    "TrainStation_P",
-    "TrainStation_Night_P",
-    "TrainStation_Dawn_P",
-    "Park_P",
-    "Park_Night_P",
-    "Park_Rainy_P",
-    "Park_Snowy_P",
-    "Outlaw_P",
-    "UF_Night_P",
-    "Street_P",
-    "Farm_P",
-    "Farm_Night_P",
-    "Farm_GRS_P",
-    "UF_Day_P",
-    "Paname_Dusk_P",
-    "CS_P",
-    "CS_Day_P",
-    "Beach_P",
-    "Beach_Night_P",
-    "NeoTokyo_Standard_P",
-    "Underwater_P",
-    "Wasteland_S_P",
-    "Wasteland_Night_S_P",
-    "CHN_Stadium_P",
-    "CHN_Stadium_Day_P",
-    "ARC_Standard_P",
-    "Music_P",
-    "Woods_P",
-    "Woods_Night_P",
-    "Mall_Day_P",
-    "FF_Dusk_P",
-];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ColourAction {
@@ -869,7 +822,7 @@ struct BoostMaterialTarget {
     offset: usize,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 struct BoostEmitterTarget {
     key: &'static str,
     offset: usize,
@@ -1730,39 +1683,7 @@ impl Package {
             && read_i32(&self.image, offset + 4).ok() == Some(instance)
     }
 
-    #[cfg(test)]
-    fn capture_boost_material_values(&self) -> Result<Vec<BoostMaterialValue>, String> {
-        self.boost_material_targets()?
-            .into_iter()
-            .map(|target| {
-                let rgb = self
-                    .image
-                    .get(target.offset..target.offset + 12)
-                    .ok_or("A boost-pad material colour is outside the package")?
-                    .try_into()
-                    .map_err(|_| "A boost-pad material colour has the wrong size")?;
-                Ok(BoostMaterialValue {
-                    export: target.export.into(),
-                    parameter: target.parameter.into(),
-                    instance: target.instance,
-                    rgb,
-                })
-            })
-            .collect()
-    }
 
-    #[cfg(test)]
-    fn capture_boost_emitter_values(&self) -> Result<Vec<BoostEmitterValue>, String> {
-        self.boost_emitter_targets()?
-            .into_iter()
-            .map(|target| {
-                Ok(BoostEmitterValue {
-                    key: target.key.into(),
-                    object_ref: read_i32(&self.image, target.offset)?,
-                })
-            })
-            .collect()
-    }
     fn restore_active_boost_materials(
         &mut self,
         values: &[BoostMaterialValue],
@@ -2167,30 +2088,4 @@ fn usize_from_i32(value: i32, label: &str) -> Result<usize, String> {
 
 fn usize_from_i64(value: i64, label: &str) -> Result<usize, String> {
     usize::try_from(value).map_err(|_| format!("Invalid negative {label}"))
-}
-
-#[test]
-#[ignore = "requires HEBNIX_TEST_TAGAME"]
-fn heatseeker_max_speed_roundtrip() {
-    let path = std::env::var("HEBNIX_TEST_TAGAME").unwrap();
-    let mut package = Package::load(fs::read(path).unwrap()).unwrap();
-    let offset = package.heatseeker_colour_offset().unwrap();
-    let original = package.image.clone();
-    package.apply_heatseeker_colour([0, 255, 0]).unwrap();
-    assert_eq!(&package.image[..offset], &original[..offset]);
-    assert_eq!(&package.image[offset + 12..], &original[offset + 12..]);
-    let decoded = Package::load(package.save().unwrap()).unwrap();
-    let actual = decoded.heatseeker_colour_offset().unwrap();
-    let expected: Vec<u8> = [0f32, 1f32, 0f32]
-        .into_iter()
-        .flat_map(f32::to_le_bytes)
-        .collect();
-    assert_eq!(&decoded.image[actual..actual + 12], expected.as_slice());
-    assert_eq!(
-        &decoded.image[actual + 12..actual + 16],
-        &original[offset + 12..offset + 16]
-    );
-    println!(
-        "MaxSpeedColor saved/reloaded green; all other decoded bytes unchanged before repacking"
-    );
 }

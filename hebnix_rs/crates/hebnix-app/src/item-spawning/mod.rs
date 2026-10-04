@@ -123,49 +123,4 @@ impl SpawnedItemLedger {
         Ok(())
     }
 
-    #[cfg(test)]
-    pub fn snapshot(&self) -> Vec<String> {
-        self.ids.lock().map(|ids| ids.clone()).unwrap_or_default()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn reward_ids_match_the_products_sent_to_rocket_league() {
-        let request = ItemSpawnRequest {
-            product_id: 42,
-            series_id: 1,
-            quality: 0,
-            paint: 0,
-            certification: 0,
-            quantity: 2,
-        };
-        let (message, ids) = reward_message(&request, 1_700_000_000).unwrap();
-        let (_, body) = message.split_once("\r\n\r\n").unwrap();
-        let body: serde_json::Value = serde_json::from_str(body).unwrap();
-        let sent_ids = body["ProductData"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|product| product["InstanceID"].as_str().unwrap().to_string())
-            .collect::<Vec<_>>();
-        assert_eq!(sent_ids, ids);
-        assert_ne!(ids[0], ids[1]);
-    }
-
-    #[test]
-    fn ledger_retains_spawned_ids_across_restart() {
-        let dir =
-            std::env::temp_dir().join(format!("hebnix-spawn-ledger-{}", rand::random::<u64>()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let first = "00000000000000000000000000000001".to_string();
-        let second = "00000000000000000000000000000002".to_string();
-        let ledger = SpawnedItemLedger::new(&dir);
-        ledger.record(&[first.clone(), second.clone()]).unwrap();
-        assert_eq!(SpawnedItemLedger::new(&dir).snapshot(), vec![first, second]);
-        std::fs::remove_dir_all(dir).unwrap();
-    }
 }

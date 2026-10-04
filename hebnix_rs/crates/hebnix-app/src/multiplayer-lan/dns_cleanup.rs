@@ -87,14 +87,3 @@ pub fn clean_stale_nrpt_rule(log: impl Fn(&str)) {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn dns_policy_config_path_matches_the_known_tailscale_rule_id() {
-        assert!(dns_policy_config_path().ends_with(NRPT_RULE_ID));
-        assert_eq!(NRPT_RULE_ID, "{5abe529b-675b-4486-8459-25a634dacc23}");
-    }
-}

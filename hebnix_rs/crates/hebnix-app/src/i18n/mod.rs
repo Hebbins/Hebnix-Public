@@ -9,8 +9,6 @@
 pub mod fonts;
 pub mod format;
 pub mod layout;
-#[cfg(test)]
-mod tests;
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};

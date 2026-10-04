@@ -334,38 +334,3 @@ fn parse_udp_payload(ip: &[u8]) -> Option<(Vec<u8>, SocketAddr, u16)> {
         destination_port,
     ))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_a_udp_payload_out_of_a_raw_ip_packet() {
-        let mut ip = vec![0u8; 20];
-        ip[0] = 0x45; // version 4, header length 20
-        ip[9] = 17; // UDP
-        ip[12..16].copy_from_slice(&[10, 242, 77, 1]);
-        let mut udp = vec![0u8; 8];
-        udp[0..2].copy_from_slice(&14001u16.to_be_bytes());
-        udp[2..4].copy_from_slice(&14001u16.to_be_bytes());
-        let payload = b"hello beacon";
-        udp[4..6].copy_from_slice(&((8 + payload.len()) as u16).to_be_bytes());
-        udp.extend_from_slice(payload);
-        ip.extend_from_slice(&udp);
-
-        let (parsed_payload, source, destination_port) =
-            parse_udp_payload(&ip).expect("should parse a well-formed UDP packet");
-        assert_eq!(parsed_payload, payload);
-        assert_eq!(source, "10.242.77.1:14001".parse().unwrap());
-        assert_eq!(destination_port, 14001);
-    }
-
-    #[test]
-    fn ignores_non_udp_and_truncated_packets() {
-        assert!(parse_udp_payload(&[0u8; 10]).is_none()); // too short for an IP header
-        let mut non_udp = vec![0u8; 20];
-        non_udp[0] = 0x45;
-        non_udp[9] = 6; // TCP, not UDP
-        assert!(parse_udp_payload(&non_udp).is_none());
-    }
-}

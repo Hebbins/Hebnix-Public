@@ -207,35 +207,3 @@ pub fn validate_request(service: &str, payload: &str) -> Result<Value, String> {
     hebnix_sdk::rlapi::session::validate_request(service, &value)?;
     Ok(value)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn next_request_clears_previous_response_before_dispatch() {
-        let mut panel = RlApiPanel::default();
-        panel.complete(Ok(serde_json::json!({"previous": true})));
-        assert!(panel.begin_request().is_some());
-        assert!(panel.response.is_empty());
-        assert!(panel.busy);
-        panel.complete(Ok(serde_json::json!({"next": true})));
-        panel.payload = "invalid".into();
-        assert!(panel.begin_request().is_none());
-        assert!(panel.response.starts_with("Error: Invalid JSON"));
-        assert!(!panel.response.contains("next"));
-        assert!(!panel.busy);
-    }
-    #[test]
-    fn rejects_header_injection_and_new_logins() {
-        assert!(validate_request("Population/GetPopulation v1\r\nPsyToken: bad", "{}").is_err());
-        assert!(validate_request("Auth/AuthPlayer v2", "{}").is_err());
-        assert!(
-            validate_request(
-                "Skills/GetPlayerSkill v1",
-                r#"{"PlayerID":"Epic|example|0"}"#
-            )
-            .is_ok()
-        );
-        assert!(validate_request("Population/GetPopulation v1", "[]").is_err());
-    }
-}

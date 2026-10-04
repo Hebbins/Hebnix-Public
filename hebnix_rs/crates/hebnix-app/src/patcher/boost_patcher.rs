@@ -2,10 +2,6 @@ use crate::i18n::{t, t_args};
 use aes::Aes256;
 use aes::cipher::generic_array::GenericArray;
 use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
-#[cfg(test)]
-use base64::Engine;
-#[cfg(test)]
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use crossbeam_channel::{Receiver, Sender};
 use eframe::egui;
 use image::imageops::FilterType;

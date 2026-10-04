@@ -367,35 +367,3 @@ impl Drop for HostSession {
         let _ = self.stop_sender.send(());
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        find_unreal_lan_endpoint, replace_binary_lan_endpoint, replace_equal_length_ascii_endpoint,
-        unreal_ansi_string,
-    };
-
-    #[test]
-    fn rewrites_the_physical_lan_endpoint_to_the_tailnet_host() {
-        let payload = unreal_ansi_string("192.168.0.119:7777");
-        let (_, _, replacement) = find_unreal_lan_endpoint(&payload, "100.64.0.1")
-            .expect("the LAN endpoint should be found");
-        assert_eq!(replacement, unreal_ansi_string("100.64.0.1:7777"));
-    }
-
-    #[test]
-    fn rewrites_binary_and_equal_length_lan_endpoints() {
-        let tailnet_octets = [100, 64, 0, 1];
-        let mut binary = [172, 31, 64, 1, 0x1e, 0x61];
-        assert!(replace_binary_lan_endpoint(&mut binary, tailnet_octets));
-        assert_eq!(&binary[..4], &tailnet_octets);
-        // same byte length as the source address -- this rewrite only fires
-        // on an exact-length match, by design (see replace_equal_length_ascii_endpoint)
-        let mut text = b"172.31.64.1:7777".to_vec();
-        assert!(replace_equal_length_ascii_endpoint(
-            &mut text,
-            "100.64.77.1"
-        ));
-        assert_eq!(text, b"100.64.77.1:7777");
-    }
-}

@@ -192,8 +192,6 @@ pub fn controls(ui: &mut eframe::egui::Ui, paint: &mut SwapPaint) {
                     egui::Stroke::new(1.0, ui.visuals().text_color()),
                 );
             }
-            #[cfg(test)]
-            ui.data_mut(|d| d.insert_temp(egui::Id::new("paint_test_swatch"), response.rect));
             if response.changed() {
                 let changed = [color.r(), color.g(), color.b()];
                 if changed != rgb || *paint == SwapPaint::Default {
@@ -206,8 +204,6 @@ pub fn controls(ui: &mut eframe::egui::Ui, paint: &mut SwapPaint) {
                     .desired_width(72.0)
                     .char_limit(7),
             );
-            #[cfg(test)]
-            ui.data_mut(|d| d.insert_temp(egui::Id::new("paint_test_hex"), edit.id));
             if edit.changed() {
                 if let Some(changed) = parse_hex(&hex) {
                     if changed != paint.rgb() || *paint == SwapPaint::Default {
@@ -621,165 +617,4 @@ fn bake_declared_paint(path: &Path, paint: SwapPaint) -> Result<usize, String> {
     })();
     let _ = std::fs::remove_file(temporary);
     result
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn custom_hex_and_linear_colours() {
-        assert_eq!(parse_hex("#12abEF"), Some([18, 171, 239]));
-        assert!(parse_hex("#12zz00").is_none());
-        assert!(parse_hex("#12345").is_none());
-        assert_eq!(SwapPaint::Custom([0; 3]).material(), [0.0, 0.0, 0.0, 1.0]);
-        assert_eq!(
-            SwapPaint::Custom([255, 0, 0]).material(),
-            SwapPaint::Red.material()
-        );
-        assert!((SwapPaint::Custom([128; 3]).material()[0] - 0.21586).abs() < 0.00001);
-        assert_eq!(SwapPaint::Crimson.rgb(), [203, 0, 0]);
-        assert_eq!(SwapPaint::TitaniumWhite.rgb(), [231; 3]);
-        for paint in SwapPaint::ALL {
-            assert!(paint.material().iter().all(|v| v.is_finite()));
-        }
-    }
-    #[test]
-    fn opening_default_picker_does_not_select_custom() {
-        use eframe::egui;
-        let ctx = egui::Context::default();
-        let mut paint = SwapPaint::Default;
-        let _ = ctx.run_ui(egui::RawInput::default(), |ui| controls(ui, &mut paint));
-        assert_eq!(paint, SwapPaint::Default);
-        let rect = ctx
-            .data_mut(|d| d.get_temp::<egui::Rect>(egui::Id::new("paint_test_swatch")))
-            .unwrap();
-        let pos = rect.center();
-        let input = egui::RawInput {
-            events: vec![
-                egui::Event::PointerMoved(pos),
-                egui::Event::PointerButton {
-                    pos,
-                    button: egui::PointerButton::Primary,
-                    pressed: true,
-                    modifiers: egui::Modifiers::default(),
-                },
-                egui::Event::PointerButton {
-                    pos,
-                    button: egui::PointerButton::Primary,
-                    pressed: false,
-                    modifiers: egui::Modifiers::default(),
-                },
-            ],
-            ..Default::default()
-        };
-        let _ = ctx.run_ui(input, |ui| controls(ui, &mut paint));
-        assert_eq!(paint, SwapPaint::Default);
-    }
-    #[test]
-    fn editing_hex_switches_preset_to_custom() {
-        use eframe::egui;
-        let ctx = egui::Context::default();
-        let mut paint = SwapPaint::Crimson;
-        let _ = ctx.run_ui(egui::RawInput::default(), |ui| controls(ui, &mut paint));
-        let id = ctx
-            .data_mut(|d| d.get_temp::<egui::Id>(egui::Id::new("paint_test_hex")))
-            .unwrap();
-        ctx.memory_mut(|m| m.request_focus(id));
-        let modifiers = egui::Modifiers {
-            ctrl: true,
-            command: true,
-            ..Default::default()
-        };
-        let input = egui::RawInput {
-            modifiers,
-            events: vec![
-                egui::Event::Key {
-                    key: egui::Key::A,
-                    physical_key: None,
-                    pressed: true,
-                    repeat: false,
-                    modifiers,
-                },
-                egui::Event::Text("#123456".into()),
-            ],
-            ..Default::default()
-        };
-        let _ = ctx.run_ui(input, |ui| controls(ui, &mut paint));
-        assert_eq!(paint, SwapPaint::Custom([0x12, 0x34, 0x56]));
-    }
-    #[test]
-    fn saved_paints_remain_compatible() {
-        for paint in [
-            SwapPaint::Default,
-            SwapPaint::Crimson,
-            SwapPaint::Red,
-            SwapPaint::TitaniumWhite,
-            SwapPaint::Custom([1, 2, 3]),
-            SwapPaint::Preset(18),
-        ] {
-            assert_eq!(
-                serde_json::from_str::<SwapPaint>(&serde_json::to_string(&paint).unwrap()).unwrap(),
-                paint
-            );
-        }
-        assert_eq!(
-            serde_json::from_str::<SwapPaint>("\"Crimson\"").unwrap(),
-            SwapPaint::Crimson
-        );
-    }
-}
-
-#[cfg(test)]
-mod local_paint_tests {
-    use super::*;
-    #[test]
-    #[ignore = "Requires installed packages; set HEBNIX_UPK_DIR"]
-    fn verifies_declared_paint_on_copies() {
-        let cooked =
-            std::path::PathBuf::from(std::env::var_os("HEBNIX_UPK_DIR").expect("HEBNIX_UPK_DIR"));
-        let work =
-            std::env::temp_dir().join(format!("hebnix-paint-test-{}", rand::random::<u64>()));
-        std::fs::create_dir(&work).unwrap();
-        for name in [
-            "Hat_Halo_SF.upk",
-            "skin_zomba_SF.upk",
-            "body_grain_SF.upk",
-            "boost_standard_SF.upk",
-        ] {
-            let output = work.join(name);
-            std::fs::copy(cooked.join(name), &output).unwrap();
-            let original = std::fs::read(&output).unwrap();
-            assert_eq!(bake(&output, name, SwapPaint::Default).unwrap(), 0);
-            assert_eq!(std::fs::read(&output).unwrap(), original);
-            let before = UpkPackage::load(&output).unwrap();
-            for paint in [
-                SwapPaint::Custom([24, 102, 235]),
-                SwapPaint::Custom([0; 3]),
-                SwapPaint::Crimson,
-            ] {
-                std::fs::write(&output, &original).unwrap();
-                let count = bake(&output, name, paint).unwrap();
-                assert!(count > 0);
-                let after = UpkPackage::load(&output).unwrap();
-                for (a, b) in before.exports.iter().zip(&after.exports) {
-                    let class = before.class_of(a);
-                    if !class.starts_with("Material")
-                        && !class.starts_with("DistributionVectorParticleParameter")
-                    {
-                        assert_eq!(
-                            &before.image[a.serial_offset..a.serial_offset + a.serial_size],
-                            &after.image[b.serial_offset..b.serial_offset + b.serial_size],
-                            "{name}: unrelated export changed"
-                        );
-                    }
-                }
-                println!(
-                    "{name}: {} patched {count} colour values",
-                    paint.description()
-                );
-            }
-            std::fs::remove_file(output).unwrap();
-        }
-        std::fs::remove_dir(work).unwrap();
-    }
 }

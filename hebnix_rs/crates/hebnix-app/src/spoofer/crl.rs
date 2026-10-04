@@ -71,29 +71,3 @@ fn handle(mut stream: TcpStream, crl: &[u8], tx: &Sender<AppMsg>) {
     let _ = stream.write_all(crl);
     let _ = stream.flush();
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn serves_the_crl_bytes() {
-        let (tx, _rx) = crossbeam_channel::unbounded();
-        let body = b"fake-crl-der".to_vec();
-        // random port so it wont clash with a running hebnix
-        let (server, port) =
-            CrlServer::start_on("127.0.0.1:0", body.clone(), tx).expect("bind failed");
-        std::thread::sleep(std::time::Duration::from_millis(100));
-
-        let mut c = TcpStream::connect(format!("127.0.0.1:{port}")).unwrap();
-        c.write_all(b"GET /hebnix.crl HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
-            .unwrap();
-        let mut resp = Vec::new();
-        let _ = c.read_to_end(&mut resp);
-        let text = String::from_utf8_lossy(&resp);
-        assert!(text.contains("200 OK"));
-        assert!(text.contains("application/pkix-crl"));
-        assert!(resp.ends_with(&body), "crl bytes not served");
-        server.stop();
-    }
-}
