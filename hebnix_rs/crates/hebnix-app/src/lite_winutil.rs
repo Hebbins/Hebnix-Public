@@ -87,6 +87,12 @@ pub fn parent_file_dialog(dialog: rfd::FileDialog) -> rfd::FileDialog {
         .unwrap_or(dialog)
 }
 
+pub fn parent_message_dialog(dialog: rfd::MessageDialog) -> rfd::MessageDialog {
+    main_window()
+        .map(|hwnd| dialog.clone().set_parent(&DialogParent(hwnd)))
+        .unwrap_or(dialog)
+}
+
 /// note which program we came from. ours doesnt count, the monitor calls this
 /// on its tick so it tracks whatever you were last actually in.
 pub fn note_foreground() {

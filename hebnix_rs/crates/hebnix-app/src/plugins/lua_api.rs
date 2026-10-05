@@ -17,6 +17,7 @@ use hebnix_sdk::tracker::TrackerClient;
 
 use crate::messages::AppMsg;
 use crate::plugins::store::PluginStore;
+use crate::plugins::window_capture::WindowCaptureRegistry;
 
 use rodio::{Decoder, OutputStream, Sink};
 
@@ -178,6 +179,9 @@ pub struct HostCtx {
     pub dir: std::path::PathBuf,
     /// asset bytes by relative path. None means it failed and was already logged, the ui callbacks run every frame so it can only be said once.
     pub assets: RefCell<std::collections::HashMap<String, Option<std::sync::Arc<[u8]>>>>,
+    /// Native window captures owned by this plugin. Dropping the host stops
+    /// and joins every capture worker.
+    pub captures: WindowCaptureRegistry,
     /// canonicalized directory roots this plugin may read via read_file,
     /// expanded from [permissions] read_roots in its plugin.toml
     pub read_roots: Vec<std::path::PathBuf>,
@@ -3260,6 +3264,56 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         hebnix.set("overlay", overlay)?;
     }
 
+    // hebnix.capture: enumerate visible top-level windows and manage opaque,
+    // plugin-scoped capture handles. Capture workers never execute Lua.
+    let capture = lua.create_table()?;
+    let capture_host = Rc::clone(&host);
+    capture.set(
+        "windows",
+        lua.create_function(move |lua, ()| {
+            let result = lua.create_table()?;
+            for (index, window) in capture_host.captures.windows().into_iter().enumerate() {
+                let item = lua.create_table()?;
+                item.set("id", window.id)?;
+                item.set("title", window.title)?;
+                item.set("process", window.process)?;
+                result.set(index + 1, item)?;
+            }
+            Ok(result)
+        })?,
+    )?;
+    let capture_host = Rc::clone(&host);
+    capture.set(
+        "window_capture_start",
+        lua.create_function(move |_, (window_id, opts): (String, Option<Table>)| {
+            let fps = opts
+                .as_ref()
+                .and_then(|table| table.get::<u32>("fps").ok())
+                .unwrap_or(30);
+            let cursor = opts
+                .as_ref()
+                .and_then(|table| table.get::<bool>("cursor").ok())
+                .unwrap_or(false);
+            let plugin_name = capture_host.display_name.borrow().clone();
+            Ok(capture_host
+                .captures
+                .start(&window_id, fps, cursor, &plugin_name))
+        })?,
+    )?;
+    let capture_host = Rc::clone(&host);
+    capture.set(
+        "window_capture_frame",
+        lua.create_function(move |_, handle: u64| {
+            Ok(capture_host.captures.frame(handle).map(|_| handle))
+        })?,
+    )?;
+    let capture_host = Rc::clone(&host);
+    capture.set(
+        "window_capture_stop",
+        lua.create_function(move |_, handle: u64| Ok(capture_host.captures.stop(handle)))?,
+    )?;
+    hebnix.set("capture", capture)?;
+
     lua.globals().set("hebnix", hebnix)?;
 
     // Build the ui bridge table and stash it in the registry.
@@ -3470,6 +3524,28 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                     opt_f32(&opts, "opacity", 1.0),
                     opt_f32(&opts, "radius", 0.0),
                 );
+                Ok(())
+            },
+        )?,
+    )?;
+
+    // draw.capture_image(frame, x, y, width, height, {opacity=1.0})
+    let capture_host = Rc::clone(&host);
+    draw.set(
+        "capture_image",
+        lua.create_function(
+            move |_, (handle, x, y, w, h, opts): (u64, f32, f32, f32, f32, Option<Table>)| {
+                if let Some(frame) = capture_host.captures.frame(handle) {
+                    overlay::capture_image(
+                        handle,
+                        &frame,
+                        x,
+                        y,
+                        w,
+                        h,
+                        opt_f32(&opts, "opacity", 1.0),
+                    );
+                }
                 Ok(())
             },
         )?,

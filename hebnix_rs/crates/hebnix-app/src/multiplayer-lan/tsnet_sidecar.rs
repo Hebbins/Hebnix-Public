@@ -408,8 +408,9 @@ fn spawn_peer_poller(cli: PathBuf, tx: Sender<AppMsg>, stop: Arc<AtomicBool>) {
 /// -- kept entirely separate from any real Tailscale install so the two
 /// can't collide.
 fn ensure_service(tailscaled_exe: &Path, state_dir: &Path, relay_only: bool) -> Result<(), String> {
-    std::fs::create_dir_all(state_dir)
-        .map_err(|error| format!("could not create the multiplayer network's state directory: {error}"))?;
+    std::fs::create_dir_all(state_dir).map_err(|error| {
+        format!("could not create the multiplayer network's state directory: {error}")
+    })?;
 
     let bin_path = format!(
         "\"{}\" --statedir=\"{}\" --socket={SERVICE_PIPE} --port=0",
@@ -542,7 +543,8 @@ fn set_relay_only(relay_only: bool) -> Result<bool, String> {
         return Ok(false);
     }
     if wanted.is_empty() {
-        key.delete_value("Environment").map_err(|error| error.to_string())?;
+        key.delete_value("Environment")
+            .map_err(|error| error.to_string())?;
     } else {
         key.set_value("Environment", &wanted)
             .map_err(|error| error.to_string())?;

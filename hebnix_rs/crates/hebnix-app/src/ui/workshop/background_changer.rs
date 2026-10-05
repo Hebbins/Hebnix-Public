@@ -100,9 +100,7 @@ impl Default for BackgroundChangerState {
             active: HashMap::new(),
             last_rl_path: String::new(),
             busy: false,
-            status:
-                t("default-choose-the-arena-you-want-to")
-                    .to_string(),
+            status: t("default-choose-the-arena-you-want-to").to_string(),
         }
     }
 }
@@ -273,13 +271,14 @@ impl BackgroundChangerState {
         ui.label(t("render-keep-an-arena-s-gameplay-and"));
         ui.small(t("render-approved-sources-are-filtered-to-keep"));
         ui.add_space(8.0);
-        ui.colored_label(egui::Color32::from_rgb(230, 170, 60), t("render-close-rocket-league-before-applying-or"));
+        ui.colored_label(
+            egui::Color32::from_rgb(230, 170, 60),
+            t("render-close-rocket-league-before-applying-or"),
+        );
         ui.add_space(12.0);
 
         if self.installed_hosts.is_empty() {
-            ui.label(
-                t("render-no-supported-arena-packages-were-found"),
-            );
+            ui.label(t("render-no-supported-arena-packages-were-found"));
             if ui.button(t("render-scan-again")).clicked() {
                 self.refresh(rl_path);
             }

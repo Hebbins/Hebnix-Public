@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SwapCategory {
@@ -201,6 +202,13 @@ fn normalized_label(text: &str) -> String {
         .collect()
 }
 
+fn is_universal_car(name: &str) -> bool {
+    matches!(
+        normalized_label(name).as_str(),
+        "universal" | "universalcar"
+    )
+}
+
 fn item_label(category: SwapCategory, item: &SwapItem) -> String {
     if category != SwapCategory::Skins {
         return item.name.clone();
@@ -218,6 +226,70 @@ fn item_label(category: SwapCategory, item: &SwapItem) -> String {
     }
 }
 
+fn walkthrough_item_tile(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    category: SwapCategory,
+    index: usize,
+    thumbnail: Option<Arc<[u8]>>,
+    fallback: &Arc<[u8]>,
+    label: &str,
+    upk: &str,
+    selected: bool,
+) -> egui::Response {
+    let card = egui::Frame::group(ui.style()).show(ui, |ui| {
+        ui.set_min_height(178.0);
+        ui.vertical_centered(|ui| {
+            let image = thumbnail.unwrap_or_else(|| fallback.clone());
+            let preview_size = egui::vec2((ui.available_width() - 12.0).clamp(120.0, 220.0), 126.0);
+            ui.add(
+                egui::Image::from_bytes(
+                    format!(
+                        "bytes://swapper-walkthrough/{}/{index}/{:08x}",
+                        category.slug(),
+                        crc32fast::hash(&image)
+                    ),
+                    image,
+                )
+                .fit_to_exact_size(preview_size),
+            );
+            ui.strong(shorten_for_card(label))
+                .on_hover_text(format!("{label}\n{upk}"));
+            if category == SwapCategory::Skins {
+                ui.weak(shorten_for_card(upk)).on_hover_text(upk);
+            }
+            ui.add_space(4.0);
+            if selected {
+                ui.strong(t_args(
+                    "tab-walkthrough-selected",
+                    &[("item", label.to_string().into())],
+                ));
+            } else {
+                ui.weak(" ");
+            }
+        });
+    });
+    let response = ui
+        .interact(card.response.rect, id, egui::Sense::click())
+        .on_hover_cursor(egui::CursorIcon::PointingHand);
+    if selected || response.hovered() {
+        ui.painter().rect_stroke(
+            card.response.rect,
+            4.0,
+            egui::Stroke::new(
+                if selected { 2.0 } else { 1.0 },
+                if selected {
+                    ui.visuals().selection.stroke.color
+                } else {
+                    ui.visuals().widgets.hovered.fg_stroke.color
+                },
+            ),
+            egui::StrokeKind::Inside,
+        );
+    }
+    response
+}
+
 #[derive(Clone)]
 struct ResolvedItem {
     available: bool,
@@ -229,6 +301,12 @@ struct Resolution {
     generation: u64,
     items: Option<Arc<Vec<ResolvedItem>>>,
     cars: Option<Arc<Vec<(String, String, Option<i64>)>>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WalkthroughStep {
+    SelectSource,
+    SelectTarget,
 }
 
 pub struct SwapperState {
@@ -244,6 +322,15 @@ pub struct SwapperState {
     page: HashMap<SwapCategory, usize>,
     active: Vec<ActiveSwap>,
     view_patched: bool,
+    walkthrough_mode: bool,
+    walkthrough_step: WalkthroughStep,
+    walkthrough_category: Option<SwapCategory>,
+    walkthrough_source: Option<usize>,
+    walkthrough_source_car: Option<String>,
+    walkthrough_target: Option<usize>,
+    walkthrough_search: HashMap<SwapCategory, String>,
+    walkthrough_page: HashMap<SwapCategory, usize>,
+    walkthrough_applied_at: Option<Instant>,
     owned_only: bool,
     thumbnails: HashMap<String, Option<Arc<[u8]>>>,
     failed_thumbnails: HashMap<String, String>,
@@ -308,8 +395,8 @@ impl SwapperState {
                     Vec::new()
                 };
                 cars.sort_by(|left, right| {
-                    let left_universal = left.1.eq_ignore_ascii_case("Universal Car");
-                    let right_universal = right.1.eq_ignore_ascii_case("Universal Car");
+                    let left_universal = is_universal_car(&left.1);
+                    let right_universal = is_universal_car(&right.1);
                     right_universal.cmp(&left_universal).then_with(|| {
                         left.1
                             .to_ascii_lowercase()
@@ -339,6 +426,15 @@ impl SwapperState {
             page: HashMap::new(),
             active: Vec::new(),
             view_patched: false,
+            walkthrough_mode: true,
+            walkthrough_step: WalkthroughStep::SelectSource,
+            walkthrough_category: None,
+            walkthrough_source: None,
+            walkthrough_source_car: None,
+            walkthrough_target: None,
+            walkthrough_search: HashMap::new(),
+            walkthrough_page: HashMap::new(),
+            walkthrough_applied_at: None,
             owned_only: false,
             thumbnails: HashMap::new(),
             failed_thumbnails: HashMap::new(),
@@ -383,9 +479,18 @@ impl SwapperState {
             return;
         }
         ui.horizontal(|ui| {
-            ui.weak(t_args("thumbnail-status-failures-previews-unavailable-items-rema", &[("failures", (failures.len()).to_string().into())]));
-            if ui.small_button(t("thumbnail-status-retry-previews")).clicked() {
-                for key in failures { self.failed_thumbnails.remove(&key); self.thumbnails.remove(&key); }
+            ui.weak(t_args(
+                "thumbnail-status-failures-previews-unavailable-items-rema",
+                &[("failures", (failures.len()).to_string().into())],
+            ));
+            if ui
+                .small_button(t("thumbnail-status-retry-previews"))
+                .clicked()
+            {
+                for key in failures {
+                    self.failed_thumbnails.remove(&key);
+                    self.thumbnails.remove(&key);
+                }
             }
         });
     }
@@ -677,7 +782,9 @@ impl SwapperState {
         if crate::speed_patch::is_active(speed) {
             match crate::speed_patch::apply(&target_live, Some(&target_backup), speed) {
                 Ok(0) => {}
-                Ok(count) => tracing::info!("[Speed] {}: scaled {count} animation values", target.upk),
+                Ok(count) => {
+                    tracing::info!("[Speed] {}: scaled {count} animation values", target.upk)
+                }
                 Err(error) => tracing::warn!("[Speed] {}: {error}", target.upk),
             }
         }
@@ -968,31 +1075,25 @@ impl SwapperState {
                                 .find(|item| item.upk.eq_ignore_ascii_case(&swap.target_upk))
                         })
                     });
-                    // Prefer the live target thumbnail package: item swapping patches it
-                    // to contain the thumbnail of the item that was swapped in. Fall back
-                    // to the donor's inferred thumbnail for older swap manifests.
-                    let source_path = swap
-                        .target_thumbnail
-                        .as_deref()
-                        .map(|filename| cooked_pc.join(filename))
-                        .filter(|path| path.is_file())
+                    // Active cards represent the desired item, so prefer its pristine
+                    // catalog thumbnail. A patched target thumbnail can be unreadable by
+                    // the preview extractor even though Rocket League accepts the package.
+                    let source_path = source_item
+                        .and_then(|item| inferred_thumbnail(category?, item, cooked_pc))
+                        .map(|filename| {
+                            let backup = backups_dir.join(format!("{filename}.bak"));
+                            if backup.is_file() {
+                                backup
+                            } else {
+                                cooked_pc.join(filename)
+                            }
+                        })
                         .or_else(|| {
-                            source_item.and_then(|item| {
-                                inferred_thumbnail(category?, item, cooked_pc)
-                                    .map(|filename| cooked_pc.join(filename))
-                            })
+                            swap.target_thumbnail
+                                .as_deref()
+                                .map(|filename| cooked_pc.join(filename))
+                                .filter(|path| path.is_file())
                         });
-                    let target_path =
-                        target_item
-                            .and_then(|item| item.thumbnail.as_deref())
-                            .map(|filename| {
-                                let backup = backups_dir.join(format!("{filename}.bak"));
-                                if backup.is_file() {
-                                    backup
-                                } else {
-                                    cooked_pc.join(filename)
-                                }
-                            });
                     let mut image_for = |path: Option<PathBuf>, role: &str| {
                         let Some(path) = path else {
                             return Some(fallback.clone());
@@ -1007,14 +1108,16 @@ impl SwapperState {
                                 columns[column].ctx().clone(),
                             ));
                         }
-                        self.thumbnails.get(&key).and_then(Clone::clone).or_else(|| {
-                            self.failed_thumbnails
-                                .contains_key(&key)
-                                .then(|| fallback.clone())
-                        })
+                        self.thumbnails
+                            .get(&key)
+                            .and_then(Clone::clone)
+                            .or_else(|| {
+                                self.failed_thumbnails
+                                    .contains_key(&key)
+                                    .then(|| fallback.clone())
+                            })
                     };
                     let image = image_for(source_path, "source");
-                    let target_image = image_for(target_path, "target");
                     let source_name = source_item
                         .map(|item| item.name.as_str())
                         .unwrap_or(&swap.source_name);
@@ -1023,47 +1126,31 @@ impl SwapperState {
                         .unwrap_or(&swap.target_name);
                     egui::Frame::group(columns[column].style()).show(&mut columns[column], |ui| {
                         ui.vertical_centered(|ui| {
-                            let thumbnail = |ui: &mut egui::Ui,
-                                             uri: String,
-                                             bytes: Option<Arc<[u8]>>,
-                                             size: egui::Vec2| {
-                                if let Some(bytes) = bytes {
-                                    ui.add(egui::Image::from_bytes(uri, bytes).fit_to_exact_size(size));
-                                } else {
-                                    ui.add_sized(size, egui::Spinner::new());
-                                }
-                            };
-                            if category == Some(SwapCategory::Skins) {
-                                ui.horizontal(|ui| {
-                                    thumbnail(
-                                        ui,
-                                        format!("bytes://active/target/{}", swap.target_upk),
-                                        target_image,
-                                        egui::vec2(48.0, 48.0),
-                                    );
-                                    ui.label("›");
-                                    thumbnail(
-                                        ui,
-                                        format!("bytes://active/source/{}", swap.target_upk),
-                                        image,
-                                        egui::vec2(48.0, 48.0),
-                                    );
-                                });
-                                ui.strong(format!(
-                                    "{target_name} › {source_name} ({})",
-                                    swap.paint.description()
-                                ));
-                                ui.weak(t("active-swaps-original-replacement"));
-                            } else {
-                                thumbnail(
-                                    ui,
-                                    format!("bytes://active/{}", swap.target_upk),
-                                    image,
-                                    egui::vec2(120.0, 76.0),
-                                );
-                                ui.strong(source_name);
-                                ui.weak(t_args("active-swaps-replaced-target-name", &[("target_name", target_name.to_string().into())]));
-                            }
+                            let thumbnail =
+                                |ui: &mut egui::Ui,
+                                 uri: String,
+                                 bytes: Option<Arc<[u8]>>,
+                                 size: egui::Vec2| {
+                                    if let Some(bytes) = bytes {
+                                        ui.add(
+                                            egui::Image::from_bytes(uri, bytes)
+                                                .fit_to_exact_size(size),
+                                        );
+                                    } else {
+                                        ui.add_sized(size, egui::Spinner::new());
+                                    }
+                                };
+                            thumbnail(
+                                ui,
+                                format!("bytes://active/{}", swap.target_upk),
+                                image,
+                                egui::vec2(120.0, 76.0),
+                            );
+                            ui.strong(source_name);
+                            ui.weak(t_args(
+                                "active-swaps-replaced-target-name",
+                                &[("target_name", target_name.to_string().into())],
+                            ));
                             if ui
                                 .add_sized(
                                     [ui.available_width(), 24.0],
@@ -1094,6 +1181,243 @@ impl SwapperState {
         }
     }
 
+    fn render_walkthrough_target(
+        &mut self,
+        ui: &mut egui::Ui,
+        category: SwapCategory,
+        items: &Arc<Vec<SwapItem>>,
+        resolved: &Arc<Vec<ResolvedItem>>,
+        cooked_pc: &Path,
+        backups_dir: &Path,
+        tx: &Sender<AppMsg>,
+        owned_ids: &HashSet<i64>,
+    ) {
+        let Some(source_index) = self.walkthrough_source.filter(|index| *index < items.len())
+        else {
+            self.walkthrough_step = WalkthroughStep::SelectSource;
+            self.walkthrough_target = None;
+            return;
+        };
+        let source = &items[source_index];
+        let selected_car = self.selected_car.clone();
+        let owned_only = self.owned_only;
+        let target_allowed = |index: usize, target: &SwapItem| {
+            index != source_index
+                && resolved[index].available
+                && swap_compatible(category, source, target)
+                && (category != SwapCategory::Skins
+                    || selected_car
+                        .as_ref()
+                        .is_some_and(|car| target.car_key.as_ref() == Some(car)))
+                && (!owned_only || target.product_id.is_some_and(|id| owned_ids.contains(&id)))
+        };
+        let query = self
+            .walkthrough_search
+            .get(&category)
+            .map(String::as_str)
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let filtered: Vec<usize> = items
+            .iter()
+            .enumerate()
+            .filter(|(index, item)| {
+                target_allowed(*index, item)
+                    && (query.is_empty()
+                        || item_label(category, item)
+                            .to_ascii_lowercase()
+                            .contains(&query)
+                        || item.upk.to_ascii_lowercase().contains(&query))
+            })
+            .map(|(index, _)| index)
+            .collect();
+
+        if self
+            .walkthrough_target
+            .is_some_and(|index| !filtered.contains(&index))
+        {
+            self.walkthrough_target = None;
+        }
+
+        let mut apply = false;
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .add_sized(
+                    [110.0, 28.0],
+                    egui::Button::new(t("tab-walkthrough-back"))
+                        .fill(egui::Color32::from_rgb(0xd3, 0x54, 0x00)),
+                )
+                .clicked()
+            {
+                self.walkthrough_step = WalkthroughStep::SelectSource;
+                self.walkthrough_target = None;
+            }
+            ui.separator();
+            ui.strong(t_args(
+                "tab-walkthrough-selected",
+                &[("item", item_label(category, source).into())],
+            ));
+            if let Some(target_index) = self.walkthrough_target {
+                let key = format!("{}|{}", category.slug(), source.upk.to_ascii_lowercase());
+                let selected_paint = self.swap_paint.entry(key.clone()).or_default();
+                if source.paintable || painted_swap::supports(&source.upk) {
+                    ui.push_id(("walkthrough_paint", &key), |ui| {
+                        painted_swap::controls(ui, selected_paint);
+                    });
+                }
+                if self.speed_enabled {
+                    let selected_speed = self.swap_speed.entry(key).or_insert(1.0);
+                    ui.push_id("walkthrough_speed", |ui| {
+                        crate::speed_patch::speed_slider(ui, selected_speed);
+                    });
+                }
+                apply = ui
+                    .add_sized(
+                        [110.0, 28.0],
+                        egui::Button::new(t("ball-apply")).fill(ui.visuals().selection.bg_fill),
+                    )
+                    .on_hover_text(item_label(category, &items[target_index]))
+                    .clicked();
+            }
+        });
+        ui.add_space(8.0);
+
+        if self.walkthrough_step == WalkthroughStep::SelectSource {
+            return;
+        }
+        if filtered.is_empty() {
+            ui.vertical_centered(|ui| ui.weak(t("tab-walkthrough-no-replacements")));
+            return;
+        }
+
+        const PAGE_SIZE: usize = 16;
+        let total_pages = filtered.len().div_ceil(PAGE_SIZE);
+        let page = self.walkthrough_page.entry(category).or_insert(0);
+        *page = (*page).min(total_pages - 1);
+        ui.horizontal(|ui| {
+            ui.label(t_args(
+                "tab-page-page-of-total-pages-filtered",
+                &[
+                    ("page", (*page + 1).to_string().into()),
+                    ("total_pages", total_pages.to_string().into()),
+                    ("filtered", filtered.len().to_string().into()),
+                ],
+            ));
+            if ui
+                .add_enabled(*page > 0, egui::Button::new(t("ball-previous")))
+                .clicked()
+            {
+                *page -= 1;
+            }
+            if ui
+                .add_enabled(*page + 1 < total_pages, egui::Button::new(t("ball-next")))
+                .clicked()
+            {
+                *page += 1;
+            }
+        });
+        ui.add_space(6.0);
+        let visible = &filtered[*page * PAGE_SIZE..((*page + 1) * PAGE_SIZE).min(filtered.len())];
+        let fallback: Arc<[u8]> = fs::read(self.base_dir.join("assets").join("hebnix.png"))
+            .unwrap_or_else(|_| include_bytes!("../../assets/hebnix.png").to_vec())
+            .into();
+        for &target_index in visible {
+            if let Some(filename) = resolved[target_index].thumbnail.as_deref() {
+                self.queue_thumbnail(ui, category, filename, cooked_pc);
+            }
+        }
+        egui::ScrollArea::vertical()
+            .id_salt(("swapper_walkthrough_targets", category))
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for row in visible.chunks(4) {
+                    ui.columns(4, |columns| {
+                        for (column, &target_index) in row.iter().enumerate() {
+                            let target = &items[target_index];
+                            let thumbnail =
+                                resolved[target_index]
+                                    .thumbnail
+                                    .as_deref()
+                                    .and_then(|filename| {
+                                        self.thumbnails
+                                            .get(&format!(
+                                                "{}|{}",
+                                                category.slug(),
+                                                filename.to_ascii_lowercase()
+                                            ))
+                                            .and_then(Clone::clone)
+                                    });
+                            let label = item_label(category, target);
+                            let tile_id = columns[column].id().with((
+                                "walkthrough_target",
+                                category,
+                                target_index,
+                            ));
+                            if walkthrough_item_tile(
+                                &mut columns[column],
+                                tile_id,
+                                category,
+                                target_index,
+                                thumbnail,
+                                &fallback,
+                                &label,
+                                &target.upk,
+                                self.walkthrough_target == Some(target_index),
+                            )
+                            .clicked()
+                            {
+                                self.walkthrough_target = Some(target_index);
+                            }
+                        }
+                    });
+                    ui.add_space(6.0);
+                }
+            });
+
+        if apply {
+            let Some(target_index) = self.walkthrough_target else {
+                return;
+            };
+            if crate::messages::block_item_action_if_game_running(tx) {
+                return;
+            }
+            let source = items[source_index].clone();
+            let target = items[target_index].clone();
+            let key = format!("{}|{}", category.slug(), source.upk.to_ascii_lowercase());
+            let paint = *self.swap_paint.entry(key.clone()).or_default();
+            let speed = *self.swap_speed.entry(key).or_insert(1.0);
+            match self.apply_swap(
+                category,
+                &source,
+                &target,
+                paint,
+                speed,
+                cooked_pc,
+                backups_dir,
+            ) {
+                Ok(()) => {
+                    let _ = tx.send(AppMsg::Log(format!(
+                        "[Swapper] {} -> {} (replaced {})",
+                        source.name, target.name, target.upk
+                    )));
+                    if category == SwapCategory::Skins {
+                        self.selected_car = self.walkthrough_source_car.clone();
+                        self.page.insert(category, 0);
+                    }
+                    self.walkthrough_step = WalkthroughStep::SelectSource;
+                    self.walkthrough_source = None;
+                    self.walkthrough_source_car = None;
+                    self.walkthrough_target = None;
+                    self.walkthrough_search.entry(category).or_default().clear();
+                    self.walkthrough_page.insert(category, 0);
+                    self.walkthrough_applied_at = Some(Instant::now());
+                }
+                Err(error) => {
+                    let _ = tx.send(AppMsg::Log(format!("[Swapper] Error: {error}")));
+                }
+            }
+        }
+    }
+
     pub fn render_tab(
         &mut self,
         ui: &mut egui::Ui,
@@ -1106,6 +1430,13 @@ impl SwapperState {
         let mut owned_filter_requested = false;
         self.load_active(backups_dir);
         self.collect_thumbnails();
+        if self.walkthrough_mode && self.walkthrough_category != Some(category) {
+            self.walkthrough_category = Some(category);
+            self.walkthrough_step = WalkthroughStep::SelectSource;
+            self.walkthrough_source = None;
+            self.walkthrough_source_car = None;
+            self.walkthrough_target = None;
+        }
         ui.horizontal(|ui| {
             ui.heading(category.label());
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -1135,6 +1466,22 @@ impl SwapperState {
                 {
                     self.page.insert(category, 0);
                 }
+                let previous_mode = self.walkthrough_mode;
+                ui.horizontal(|ui| {
+                    ui.selectable_value(&mut self.walkthrough_mode, false, t("tab-manual-mode"));
+                    ui.selectable_value(
+                        &mut self.walkthrough_mode,
+                        true,
+                        t("tab-walkthrough-mode"),
+                    );
+                });
+                if self.walkthrough_mode != previous_mode {
+                    self.walkthrough_category = Some(category);
+                    self.walkthrough_step = WalkthroughStep::SelectSource;
+                    self.walkthrough_source = None;
+                    self.walkthrough_source_car = None;
+                    self.walkthrough_target = None;
+                }
             });
         });
         ui.horizontal(|ui| {
@@ -1148,30 +1495,90 @@ impl SwapperState {
                 if owned_ids.is_empty() {
                     ui.weak(t("tab-waiting-for-rocket-league-inventory"));
                 } else {
-                    ui.weak(t_args("tab-owned-ids-owned-product-ids-captured", &[("owned_ids", (owned_ids.len()).to_string().into())]));
+                    ui.weak(t_args(
+                        "tab-owned-ids-owned-product-ids-captured",
+                        &[("owned_ids", (owned_ids.len()).to_string().into())],
+                    ));
                 }
             }
         });
         ui.horizontal(|ui| {
             ui.strong(t("spoofer-search"));
-            let input = self.search_input.entry(category).or_default();
+            let selecting_target =
+                self.walkthrough_mode && self.walkthrough_step == WalkthroughStep::SelectTarget;
+            let input = if selecting_target {
+                self.walkthrough_search.entry(category).or_default()
+            } else {
+                self.search_input.entry(category).or_default()
+            };
             if ui
                 .add(
                     egui::TextEdit::singleline(input)
-                        .hint_text(t_args("tab-search-category", &[("category", (category.label().to_lowercase()).to_string().into())]))
+                        .hint_text(t_args(
+                            "tab-search-category",
+                            &[(
+                                "category",
+                                (category.label().to_lowercase()).to_string().into(),
+                            )],
+                        ))
                         .desired_width(300.0),
                 )
                 .changed()
             {
-                self.page.insert(category, 0);
+                if selecting_target {
+                    self.walkthrough_page.insert(category, 0);
+                } else {
+                    self.page.insert(category, 0);
+                }
             }
             if ui.button(t("spoofer-clear")).clicked() {
                 input.clear();
-                self.page.insert(category, 0);
+                if selecting_target {
+                    self.walkthrough_page.insert(category, 0);
+                } else {
+                    self.page.insert(category, 0);
+                }
             }
         });
         ui.separator();
         ui.add_space(10.0);
+
+        if self.walkthrough_mode {
+            let applied_duration = Duration::from_secs(1);
+            if let Some(applied_at) = self.walkthrough_applied_at {
+                let elapsed = applied_at.elapsed();
+                if elapsed < applied_duration {
+                    ui.ctx().request_repaint_after(applied_duration - elapsed);
+                    egui::Frame::new()
+                        .fill(egui::Color32::from_rgb(0x2e, 0xcc, 0x71))
+                        .corner_radius(6.0)
+                        .inner_margin(egui::Margin::symmetric(12, 8))
+                        .show(ui, |ui| {
+                            ui.strong(
+                                egui::RichText::new(t("tab-walkthrough-applied-swap"))
+                                    .color(egui::Color32::WHITE),
+                            );
+                        });
+                    ui.add_space(8.0);
+                } else {
+                    self.walkthrough_applied_at = None;
+                }
+            }
+            egui::Frame::new()
+                .fill(ui.visuals().faint_bg_color)
+                .corner_radius(6.0)
+                .inner_margin(egui::Margin::symmetric(12, 8))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.strong(if self.walkthrough_step == WalkthroughStep::SelectSource {
+                            t("tab-walkthrough-find-item")
+                        } else {
+                            t("tab-walkthrough-select-owned")
+                        });
+                    });
+                });
+            ui.add_space(10.0);
+        }
 
         self.thumbnail_status(ui, category);
         let Some(items) = self.catalogs.get(&category).cloned() else {
@@ -1206,7 +1613,8 @@ impl SwapperState {
             if self.selected_car.is_none() {
                 self.selected_car = cars
                     .iter()
-                    .find(|car| car_allowed(car))
+                    .find(|car| car_allowed(car) && is_universal_car(&car.1))
+                    .or_else(|| cars.iter().find(|car| car_allowed(car)))
                     .map(|car| car.0.clone());
             }
             let selected_text = self
@@ -1250,7 +1658,14 @@ impl SwapperState {
                             }
                         }
                     });
-                if ui
+                if self.walkthrough_mode {
+                    let mut enabled = true;
+                    ui.add_enabled(
+                        false,
+                        egui::Checkbox::new(&mut enabled, t("tab-match-selected-car")),
+                    )
+                    .on_hover_text(t("tab-limit-replacement-decals-to-the-selected"));
+                } else if ui
                     .checkbox(&mut self.match_swapped_item, t("tab-match-selected-car"))
                     .on_hover_text(t("tab-limit-replacement-decals-to-the-selected"))
                     .changed()
@@ -1260,8 +1675,23 @@ impl SwapperState {
             });
             if self.selected_car != previous_car {
                 self.page.insert(category, 0);
+                self.walkthrough_page.insert(category, 0);
+                self.walkthrough_target = None;
             }
             ui.add_space(6.0);
+        }
+        if self.walkthrough_mode && self.walkthrough_step == WalkthroughStep::SelectTarget {
+            self.render_walkthrough_target(
+                ui,
+                category,
+                &items,
+                &resolved,
+                cooked_pc,
+                backups_dir,
+                tx,
+                owned_ids,
+            );
+            return owned_filter_requested;
         }
         let query = self
             .search_input
@@ -1294,6 +1724,13 @@ impl SwapperState {
             })
             .map(|(index, _)| index)
             .collect();
+        if self.walkthrough_mode
+            && self
+                .walkthrough_source
+                .is_some_and(|index| !filtered.contains(&index))
+        {
+            self.walkthrough_source = None;
+        }
         if filtered.is_empty() {
             ui.vertical_centered(|ui| {
                 ui.weak(if self.view_patched {
@@ -1310,7 +1747,14 @@ impl SwapperState {
         let page = self.page.entry(category).or_insert(0);
         *page = (*page).min(total_pages - 1);
         ui.horizontal(|ui| {
-            ui.label(t_args("tab-page-page-of-total-pages-filtered", &[("page", (*page + 1).to_string().into()), ("total_pages", total_pages.to_string().into()), ("filtered", (filtered.len()).to_string().into())]));
+            ui.label(t_args(
+                "tab-page-page-of-total-pages-filtered",
+                &[
+                    ("page", (*page + 1).to_string().into()),
+                    ("total_pages", total_pages.to_string().into()),
+                    ("filtered", (filtered.len()).to_string().into()),
+                ],
+            ));
             if ui
                 .add_enabled(*page > 0, egui::Button::new(t("ball-previous")))
                 .clicked()
@@ -1334,6 +1778,80 @@ impl SwapperState {
             if let Some(filename) = resolved[source_index].thumbnail.as_deref() {
                 self.queue_thumbnail(ui, category, &filename, cooked_pc);
             }
+        }
+        if self.walkthrough_mode {
+            if let Some(source_index) = self.walkthrough_source {
+                ui.horizontal(|ui| {
+                    ui.strong(t_args(
+                        "tab-walkthrough-selected",
+                        &[("item", item_label(category, &items[source_index]).into())],
+                    ));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .add_sized(
+                                [110.0, 28.0],
+                                egui::Button::new(t("ball-next"))
+                                    .fill(ui.visuals().selection.bg_fill),
+                            )
+                            .clicked()
+                        {
+                            self.walkthrough_step = WalkthroughStep::SelectTarget;
+                            self.walkthrough_target = None;
+                            self.walkthrough_page.insert(category, 0);
+                        }
+                    });
+                });
+                ui.add_space(8.0);
+            }
+            egui::ScrollArea::vertical()
+                .id_salt(("swapper_walkthrough_sources", category))
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    for row in visible.chunks(4) {
+                        ui.columns(4, |columns| {
+                            for (column, &source_index) in row.iter().enumerate() {
+                                let source = &items[source_index];
+                                let thumbnail = resolved[source_index]
+                                    .thumbnail
+                                    .as_deref()
+                                    .and_then(|filename| {
+                                        self.thumbnails
+                                            .get(&format!(
+                                                "{}|{}",
+                                                category.slug(),
+                                                filename.to_ascii_lowercase()
+                                            ))
+                                            .and_then(Clone::clone)
+                                    });
+                                let label = item_label(category, source);
+                                let tile_id = columns[column].id().with((
+                                    "walkthrough_source",
+                                    category,
+                                    source_index,
+                                ));
+                                if walkthrough_item_tile(
+                                    &mut columns[column],
+                                    tile_id,
+                                    category,
+                                    source_index,
+                                    thumbnail,
+                                    &fallback_thumbnail,
+                                    &label,
+                                    &source.upk,
+                                    self.walkthrough_source == Some(source_index),
+                                )
+                                .clicked()
+                                {
+                                    self.walkthrough_source = Some(source_index);
+                                    self.walkthrough_source_car = self.selected_car.clone();
+                                    self.walkthrough_target = None;
+                                }
+                            }
+                        });
+                        ui.add_space(6.0);
+                    }
+                });
+            return owned_filter_requested;
         }
         let mut action: Option<(usize, usize, bool, SwapPaint, f32)> = None;
         egui::ScrollArea::vertical()
@@ -1363,7 +1881,8 @@ impl SwapperState {
                             let selected_car = self.selected_car.clone();
                             let match_swapped_item = self.match_swapped_item;
                             let target_allowed = |index: usize, target: &SwapItem| {
-                                resolved[index].available
+                                index != source_index
+                                    && resolved[index].available
                                     && swap_compatible(category, source, target)
                                     && (category != SwapCategory::Skins
                                         || !match_swapped_item
@@ -1458,7 +1977,10 @@ impl SwapperState {
                                                             .hint_text(t("tab-search-items"))
                                                             .desired_width(150.0),
                                                         );
-                                                        if ui.small_button(t("spoofer-clear")).clicked() {
+                                                        if ui
+                                                            .small_button(t("spoofer-clear"))
+                                                            .clicked()
+                                                        {
                                                             target_filter.clear();
                                                         }
                                                     });
@@ -1511,7 +2033,10 @@ impl SwapperState {
                                             let selected_speed =
                                                 self.swap_speed.entry(key.clone()).or_insert(1.0);
                                             ui.push_id(("swap_speed", &key), |ui| {
-                                                crate::speed_patch::speed_slider(ui, selected_speed);
+                                                crate::speed_patch::speed_slider(
+                                                    ui,
+                                                    selected_speed,
+                                                );
                                             });
                                             speed = *selected_speed;
                                         }
@@ -1524,7 +2049,13 @@ impl SwapperState {
                                                     .eq_ignore_ascii_case(&items[*target_index].upk)
                                         });
                                         if let Some(active) = active {
-                                            ui.weak(t_args("tab-set-as-active", &[("active", active.target_name.to_string().into())]));
+                                            ui.weak(t_args(
+                                                "tab-set-as-active",
+                                                &[(
+                                                    "active",
+                                                    active.target_name.to_string().into(),
+                                                )],
+                                            ));
                                         }
                                         if ui
                                             .add_sized(
@@ -1562,7 +2093,15 @@ impl SwapperState {
             let result = if restoring {
                 self.restore_swap(&target.upk, cooked_pc, backups_dir)
             } else {
-                self.apply_swap(category, &source, &target, paint, speed, cooked_pc, backups_dir)
+                self.apply_swap(
+                    category,
+                    &source,
+                    &target,
+                    paint,
+                    speed,
+                    cooked_pc,
+                    backups_dir,
+                )
             };
             match result {
                 Ok(()) => {
@@ -1608,7 +2147,13 @@ impl SwapperState {
             if ui
                 .add(
                     egui::TextEdit::singleline(search)
-                        .hint_text(t_args("tab-search-category", &[("category", (category.label().to_lowercase()).to_string().into())]))
+                        .hint_text(t_args(
+                            "tab-search-category",
+                            &[(
+                                "category",
+                                (category.label().to_lowercase()).to_string().into(),
+                            )],
+                        ))
                         .desired_width(300.0),
                 )
                 .changed()
@@ -1662,7 +2207,14 @@ impl SwapperState {
         let page = self.spawn_page.entry(category).or_insert(0);
         *page = (*page).min(total_pages - 1);
         ui.horizontal(|ui| {
-            ui.label(t_args("tab-page-page-of-total-pages-filtered", &[("page", (*page + 1).to_string().into()), ("total_pages", total_pages.to_string().into()), ("filtered", (filtered.len()).to_string().into())]));
+            ui.label(t_args(
+                "tab-page-page-of-total-pages-filtered",
+                &[
+                    ("page", (*page + 1).to_string().into()),
+                    ("total_pages", total_pages.to_string().into()),
+                    ("filtered", (filtered.len()).to_string().into()),
+                ],
+            ));
             if ui
                 .add_enabled(*page > 0, egui::Button::new(t("ball-previous")))
                 .clicked()
@@ -1728,7 +2280,15 @@ impl SwapperState {
                                         let label = item_label(category, item);
                                         ui.strong(shorten_for_card(&label))
                                             .on_hover_text(format!("{label}\n{}", item.upk));
-                                        ui.weak(t_args("spawn-id-item", &[("item", (item.product_id.unwrap_or_default()).to_string().into())]));
+                                        ui.weak(t_args(
+                                            "spawn-id-item",
+                                            &[(
+                                                "item",
+                                                (item.product_id.unwrap_or_default())
+                                                    .to_string()
+                                                    .into(),
+                                            )],
+                                        ));
                                         let mut paint = 0;
                                         if item.paintable {
                                             ui.add_space(6.0);

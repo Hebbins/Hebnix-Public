@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
+mod auto_upload_replays;
 mod patcher;
 mod ball {
     pub use crate::patcher::ball::*;
@@ -32,9 +33,9 @@ mod i18n;
 mod item_spawning;
 mod messages;
 mod monitor;
+mod multiplayer_assets;
 #[path = "multiplayer-lan/mod.rs"]
 mod multiplayer_lan;
-mod multiplayer_assets;
 mod overlay;
 mod veryimportantfile;
 mod patch_core {

@@ -377,6 +377,7 @@ impl PluginManager {
             text_bufs: RefCell::new(Default::default()),
             dir: self.plugin_dir.join(&disc.slug),
             assets: RefCell::new(Default::default()),
+            captures: Default::default(),
             read_roots,
         });
 

@@ -45,14 +45,13 @@ impl RepairState {
             self.result = Some(result);
         }
         if self.confirm {
-            egui::Window::new(t("action-fix-epic-connection")).id(egui::Id::new("action-fix-epic-connection"))
+            egui::Window::new(t("action-fix-epic-connection"))
+                .id(egui::Id::new("action-fix-epic-connection"))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label(
-                        t("epic-connection-rocket-league-must-close-to-repair"),
-                    );
+                    ui.label(t("epic-connection-rocket-league-must-close-to-repair"));
                     ui.horizontal(|ui| {
                         if ui.button(t("plugin-delete-prompt-yes")).clicked() {
                             self.run(ctx);
@@ -76,7 +75,10 @@ impl RepairState {
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
                     if let Err(error) = result {
-                        ui.label(t_args("epic-connection-could-not-repair-the-epic-connection", &[("error", error.to_string().into())]));
+                        ui.label(t_args(
+                            "epic-connection-could-not-repair-the-epic-connection",
+                            &[("error", error.to_string().into())],
+                        ));
                     } else {
                         ui.label(t("epic-connection-epic-connection-repaired"));
                     }

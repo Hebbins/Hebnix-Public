@@ -148,6 +148,12 @@ pub fn parent_file_dialog(dialog: rfd::FileDialog) -> rfd::FileDialog {
         .unwrap_or(dialog)
 }
 
+pub fn parent_message_dialog(dialog: rfd::MessageDialog) -> rfd::MessageDialog {
+    find_hebnix_window(true)
+        .map(|hwnd| dialog.clone().set_parent(&DialogParent(hwnd)))
+        .unwrap_or(dialog)
+}
+
 fn focus_window(hwnd: HWND) -> bool {
     unsafe {
         if !IsWindow(Some(hwnd)).as_bool() {

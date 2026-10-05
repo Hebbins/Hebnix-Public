@@ -123,7 +123,12 @@ fn collect(package: &UpkPackage) -> Result<Vec<Slot>, String> {
         }
         let material = strip(&package.name_of(export.object_name)).to_string();
         let (props, _) = package.serialized_props(export)?;
-        for entry in array_entries(package, &props, export.serial_offset, "VectorParameterValues")? {
+        for entry in array_entries(
+            package,
+            &props,
+            export.serial_offset,
+            "VectorParameterValues",
+        )? {
             let Some(name) = entry.iter().find(|p| p.name == "ParameterName") else {
                 continue;
             };
@@ -146,7 +151,12 @@ fn collect(package: &UpkPackage) -> Result<Vec<Slot>, String> {
                 values: read_f32s(package, value.value_offset, 4)?,
             });
         }
-        for entry in array_entries(package, &props, export.serial_offset, "ScalarParameterValues")? {
+        for entry in array_entries(
+            package,
+            &props,
+            export.serial_offset,
+            "ScalarParameterValues",
+        )? {
             let Some(name) = entry.iter().find(|p| p.name == "ParameterName") else {
                 continue;
             };

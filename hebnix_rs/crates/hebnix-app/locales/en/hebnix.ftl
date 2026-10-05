@@ -731,6 +731,14 @@ tab-no-applied-items-match-the-search = No applied items match the search.
 tab-no-items-match-the-search = No items match the search.
 tab-replace-with-decal = Replace with decal
 tab-replace-item = Replace item
+tab-manual-mode = Manual Mode
+tab-walkthrough-mode = Walkthrough Mode
+tab-walkthrough-find-item = Select an item you want in game
+tab-walkthrough-select-owned = Select an item you own and want to replace
+tab-walkthrough-selected = Selected: { $item }
+tab-walkthrough-back = Back
+tab-walkthrough-no-replacements = No compatible items match the search and filters.
+tab-walkthrough-applied-swap = Applied Swap
 
 ## patcher/wheel_alignment.rs
 build-this-car-s-skeleton-is-unsupported = This car's skeleton is unsupported: four standard wheel anchors are required
@@ -842,6 +850,8 @@ colours-status-restored = Original stadium, HUD and garage palette colours resto
 colours-status-ball-applied = Ball shape applied. Restart Rocket League to test it.
 colours-status-ball-restored = Original ball shape restored.
 spoofer-certificate-status = Certificate Status:
+spoofer-certificate-required-title = Certificate Required
+spoofer-certificate-required-message = The Certificate must be installed first
 multiplayer-checking-launch-command = Checking the Rocket League launch command...
 maps-none-replaced-yet = You haven't replaced any map yet.
 

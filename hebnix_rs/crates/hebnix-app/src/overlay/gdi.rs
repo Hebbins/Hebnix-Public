@@ -286,6 +286,68 @@ pub fn image(hdc: HDC, path: &str, x: i32, y: i32, w: i32, h: i32, opacity: f32)
     });
 }
 
+pub fn capture_image(
+    hdc: HDC,
+    frame: &crate::plugins::window_capture::CapturedFrame,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    opacity: f32,
+) {
+    if frame.width == 0 || frame.height == 0 || w <= 0 || h <= 0 {
+        return;
+    }
+    let info = BITMAPINFO {
+        bmiHeader: BITMAPINFOHEADER {
+            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+            biWidth: frame.width as i32,
+            biHeight: -(frame.height as i32),
+            biPlanes: 1,
+            biBitCount: 32,
+            biCompression: BI_RGB.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let mut bits = std::ptr::null_mut();
+    unsafe {
+        let Ok(bitmap) = CreateDIBSection(Some(hdc), &info, DIB_RGB_COLORS, &mut bits, None, 0)
+        else {
+            return;
+        };
+        if bits.is_null() {
+            let _ = DeleteObject(HGDIOBJ(bitmap.0));
+            return;
+        }
+        std::ptr::copy_nonoverlapping(frame.pixels.as_ptr(), bits as *mut u8, frame.pixels.len());
+        let source = CreateCompatibleDC(Some(hdc));
+        let old = SelectObject(source, HGDIOBJ(bitmap.0));
+        let blend = BLENDFUNCTION {
+            BlendOp: AC_SRC_OVER as u8,
+            BlendFlags: 0,
+            SourceConstantAlpha: (opacity.clamp(0.0, 1.0) * 255.0) as u8,
+            AlphaFormat: AC_SRC_ALPHA as u8,
+        };
+        let _ = AlphaBlend(
+            hdc,
+            x,
+            y,
+            w,
+            h,
+            source,
+            0,
+            0,
+            frame.width as i32,
+            frame.height as i32,
+            blend,
+        );
+        SelectObject(source, old);
+        let _ = DeleteDC(source);
+        let _ = DeleteObject(HGDIOBJ(bitmap.0));
+    }
+}
+
 static CLASS_REGISTERED: AtomicBool = AtomicBool::new(false);
 
 unsafe extern "system" fn wnd_proc(

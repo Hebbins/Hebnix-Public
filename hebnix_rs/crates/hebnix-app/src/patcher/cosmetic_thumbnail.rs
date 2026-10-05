@@ -107,6 +107,15 @@ fn decode_pixels(
     if width == 0 || height == 0 || width > 4096 || height > 4096 {
         return Err("Invalid thumbnail dimensions".into());
     }
+    if format == "PF_G8" {
+        if bytes.len() != width * height {
+            return Err("Invalid PF_G8 mip size".into());
+        }
+        return Ok(RgbaImage::from_fn(width as u32, height as u32, |x, y| {
+            let value = bytes[y as usize * width + x as usize];
+            image::Rgba([value, value, value, 255])
+        }));
+    }
     let block_size = match format {
         "PF_DXT1" => 8,
         "PF_DXT3" | "PF_DXT5" | "PF_BC7" => 16,
@@ -263,7 +272,6 @@ pub fn extract_png(path: &Path, _category: &str) -> Result<Vec<u8>, String> {
         errors.join("; ")
     ))
 }
-
 
 /// Bake an opaque image into the existing Texture2D, with a complete inline mip
 /// chain. No shared TFC is edited and no absolute bulk-data pointers are emitted.

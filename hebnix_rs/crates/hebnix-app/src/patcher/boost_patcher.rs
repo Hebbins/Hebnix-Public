@@ -1543,7 +1543,8 @@ impl BoostPatcherState {
                     )
                     .clicked()
                 {
-                    let dialog = rfd::FileDialog::new().add_filter(t("ball-zip-archives"), &["zip"]);
+                    let dialog =
+                        rfd::FileDialog::new().add_filter(t("ball-zip-archives"), &["zip"]);
                     if let Some(file) = crate::winutil::parent_file_dialog(dialog).pick_file() {
                         if self.import_zip(&file, tx) {
                             self.source = PatchSource::Custom;
@@ -1602,10 +1603,8 @@ impl BoostPatcherState {
                     ui.vertical_centered(|ui| {
                         if self.boosts.is_empty() {
                             ui.label(
-                                egui::RichText::new(
-                                    t("tab-no-boost-meters-found-in-the"),
-                                )
-                                .color(egui::Color32::GRAY),
+                                egui::RichText::new(t("tab-no-boost-meters-found-in-the"))
+                                    .color(egui::Color32::GRAY),
                             );
                         } else {
                             ui.label(
@@ -1621,7 +1620,13 @@ impl BoostPatcherState {
                 let pages = filtered.len().div_ceil(PAGE_SIZE).max(1);
                 self.page = self.page.min(pages - 1);
                 ui.horizontal(|ui| {
-                    ui.label(t_args("ball-page-page-of-pages", &[("page", (self.page + 1).to_string().into()), ("pages", pages.to_string().into())]));
+                    ui.label(t_args(
+                        "ball-page-page-of-pages",
+                        &[
+                            ("page", (self.page + 1).to_string().into()),
+                            ("pages", pages.to_string().into()),
+                        ],
+                    ));
                     if ui
                         .add_enabled(self.page > 0, egui::Button::new(t("ball-previous")))
                         .clicked()
@@ -1727,10 +1732,9 @@ impl BoostPatcherState {
                                         } else if ui
                                             .add_enabled(
                                                 !busy,
-                                                egui::Button::new(t("ball-apply")).min_size(egui::vec2(
-                                                    ui.available_width(),
-                                                    24.0,
-                                                )),
+                                                egui::Button::new(t("ball-apply")).min_size(
+                                                    egui::vec2(ui.available_width(), 24.0),
+                                                ),
                                             )
                                             .clicked()
                                         {
@@ -1767,12 +1771,16 @@ impl BoostPatcherState {
 
         if let Some(boost_to_delete) = self.confirm_delete.clone() {
             let mut close = false;
-            egui::Window::new(t("render-confirm-deletion")).id(egui::Id::new("Confirm Deletion"))
+            egui::Window::new(t("render-confirm-deletion"))
+                .id(egui::Id::new("Confirm Deletion"))
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label(t_args("tab-are-you-sure-you-want-to", &[("boost_to_delete", boost_to_delete.name.to_string().into())]));
+                    ui.label(t_args(
+                        "tab-are-you-sure-you-want-to",
+                        &[("boost_to_delete", boost_to_delete.name.to_string().into())],
+                    ));
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
                         if ui.button(t("plugin-delete-prompt-yes")).clicked() {

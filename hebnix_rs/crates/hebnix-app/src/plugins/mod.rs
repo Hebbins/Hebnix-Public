@@ -10,5 +10,6 @@ pub mod lua_api;
 pub mod manager;
 pub mod manifest;
 pub mod store;
+pub mod window_capture;
 
 pub use manager::PluginManager;

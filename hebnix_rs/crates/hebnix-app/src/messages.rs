@@ -17,6 +17,8 @@ pub enum AppMsg {
     Log(String),
     RlApiCaptureReady(Result<(), String>),
     RlApiResponse(Result<Value, String>),
+    ReplayUploadCaptureReady(Result<(), String>),
+    ReplayUploadFinished(crate::auto_upload_replays::UploadResult),
     GameEvent(StatsEvent),
     // periodic RL monitor result. root_dir is the game install folder resolved
     // from the running process, used to auto-fill the configured paths.
