@@ -54,6 +54,7 @@ mod swapper {
     pub use crate::patcher::swapper::*;
 }
 mod theme;
+mod toast;
 mod tray;
 mod ui;
 mod update;

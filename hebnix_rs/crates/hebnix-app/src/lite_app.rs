@@ -129,8 +129,7 @@ pub struct LiteApp {
     overlay_rect: Option<(i32, i32, i32, i32)>,
     overlay_rect_checked: Option<std::time::Instant>,
     plugin_monitor_size: (f32, f32),
-    plugin_monitor_checked: Option<std::time::Instant>,
-    startup_enabled: bool,
+    plugin_monitor_checked: Option<std::time::Instant>,    startup_enabled: bool,
     fullscreen_notice: bool,
     fullscreen_notice_dismissed: bool,
     statsapi_notice: Option<String>,
@@ -345,8 +344,7 @@ impl LiteApp {
             overlay_rect: None,
             overlay_rect_checked: None,
             plugin_monitor_size: (1920.0, 1080.0),
-            plugin_monitor_checked: None,
-            startup_enabled: winutil::is_startup_enabled(),
+            plugin_monitor_checked: None,            startup_enabled: winutil::is_startup_enabled(),
             fullscreen_notice: false,
             fullscreen_notice_dismissed: false,
             statsapi_notice: None,
@@ -602,6 +600,7 @@ impl LiteApp {
                         }
                     }
                 }
+                AppMsg::Toast { .. } => {}
                 AppMsg::PluginHttpRes {
                     slug,
                     req_id,
@@ -2842,8 +2841,11 @@ impl LiteApp {
                     .map(|runtime| (plugin.slug.clone(), runtime.host.window.borrow().clone()))
             })
             .collect::<Vec<_>>();
+        let focus_ok = hebnix_sdk::process::is_rocket_league_focused()
+            || winutil::foreground_window_is_ours();
         for (slug, state) in windows {
             let viewport_id = egui::ViewportId::from_hash_of(("lite_plugin_window", &slug));
+            let shown = state.shown(focus_ok);
             let mut builder = egui::ViewportBuilder::default()
                 .with_title(state.title.clone())
                 .with_inner_size([
@@ -2855,13 +2857,13 @@ impl LiteApp {
                 .with_resizable(false)
                 .with_transparent(true)
                 .with_mouse_passthrough(false)
-                .with_visible(state.open)
+                .with_visible(shown)
                 .with_taskbar(false);
             if let Some((x, y)) = state.pos {
                 builder = builder.with_position([x, y]);
             }
             ctx.show_viewport_immediate(viewport_id, builder, |ui, _| {
-                if !state.open {
+                if !shown {
                     return;
                 }
                 let ctx = ui.ctx().clone();

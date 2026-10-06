@@ -46,6 +46,7 @@ pub struct SettingsCfg {
     pub suppress_fullscreen_warning: bool,
     pub suppress_statsapi_rate_warning: bool,
     pub allow_draw_on_hebnix_focus: bool,
+    pub toast_position: crate::toast::ToastPos,
     pub restrict_hotkey_to_hebnix_or_rocket_league: bool,
     /// relaunch elevated on start, the hosts file needs admin
     pub run_as_admin: bool,
@@ -81,6 +82,7 @@ impl Default for SettingsCfg {
             suppress_fullscreen_warning: false,
             suppress_statsapi_rate_warning: false,
             allow_draw_on_hebnix_focus: true,
+            toast_position: Default::default(),
             restrict_hotkey_to_hebnix_or_rocket_league: true,
             run_as_admin: false,
             discord_rich_presence: true,

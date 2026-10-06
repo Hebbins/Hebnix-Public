@@ -145,6 +145,8 @@ pub struct WindowState {
     pub height: SizeSpec,
     pub close_button: bool,
     pub opacity: f32,
+    /// keep it shown over every app. off means it hides unless the game or hebnix has focus
+    pub always_on_top: bool,
     /// where we ask egui to put the window, set on open only. an observed
     /// position fed back into the builder is a SetWindowPos mid drag, and over
     /// a dpi boundary the read and the write use different scales.
@@ -162,10 +164,18 @@ impl Default for WindowState {
             height: SizeSpec::Fixed(160.0),
             close_button: false,
             opacity: 0.9,
+            always_on_top: false,
             pos: None,
             last_pos: None,
             pos_dirty: false,
         }
+    }
+}
+
+impl WindowState {
+    /// focus_ok is the game or hebnix holding the foreground
+    pub fn shown(&self, focus_ok: bool) -> bool {
+        self.open && (self.always_on_top || focus_ok)
     }
 }
 
@@ -2458,6 +2468,9 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                     if let Ok(o) = opts.get::<f32>("opacity") {
                         win.opacity = o.clamp(0.0, 1.0); // 0 for a bare overlay
                     }
+                    if let Ok(top) = opts.get::<bool>("always_on_top") {
+                        win.always_on_top = top;
+                    }
                 }
                 if win.title.is_empty() {
                     win.title = host.display_name.borrow().clone();
@@ -2517,6 +2530,18 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             "set_title",
             lua.create_function(move |_, title: String| {
                 host.window.borrow_mut().title = title;
+                Ok(())
+            })?,
+        )?;
+    }
+    {
+        // window.set_always_on_top(true) keeps it shown over every app, default
+        // is hidden unless the game or hebnix has focus
+        let host = Rc::clone(&host);
+        window.set(
+            "set_always_on_top",
+            lua.create_function(move |_, on: bool| {
+                host.window.borrow_mut().always_on_top = on;
                 Ok(())
             })?,
         )?;
@@ -3399,6 +3424,46 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         lua.create_function(move |_, handle: u64| Ok(capture_host.captures.stop(handle)))?,
     )?;
     hebnix.set("capture", capture)?;
+
+    // hebnix.toast(text, {accent=, background=, text=, duration=, image=}), shows
+    // over the game and lands in the notifications tab. colors are "#rrggbb[aa]",
+    // duration is seconds (1.5 to 5), image is a path inside the plugin assets folder.
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "toast",
+            lua.create_function(move |_, (text, opts): (String, Option<Table>)| {
+                let color = |key: &str| {
+                    opts.as_ref()
+                        .and_then(|t| t.get::<String>(key).ok())
+                        .and_then(|s| crate::toast::parse_hex(&s))
+                };
+                let image = opts
+                    .as_ref()
+                    .and_then(|t| t.get::<String>("image").ok())
+                    .and_then(|rel| match asset_path(&host.dir, &rel) {
+                        Ok(path) => Some(path.to_string_lossy().into_owned()),
+                        Err(error) => {
+                            host.log(&format!("toast image: {error}"));
+                            None
+                        }
+                    });
+                let _ = host.tx.send(AppMsg::Toast {
+                    slug: host.slug.clone(),
+                    name: host.display_name.borrow().clone(),
+                    text: crate::toast::clip_text(&text).to_string(),
+                    style: crate::toast::ToastStyle {
+                        accent: color("accent"),
+                        background: color("background"),
+                        text: color("text"),
+                        duration: opts.as_ref().and_then(|t| t.get::<f32>("duration").ok()),
+                        image,
+                    },
+                });
+                Ok(())
+            })?,
+        )?;
+    }
 
     lua.globals().set("hebnix", hebnix)?;
 

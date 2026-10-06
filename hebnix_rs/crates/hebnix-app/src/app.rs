@@ -285,12 +285,13 @@ enum Tab {
     Colours,
     Settings,
     Plugins,
+    Notifications,
     RlApi,
     About,
 }
 
 impl Tab {
-    const ALL: [Self; 9] = [
+    const ALL: [Self; 10] = [
         Self::Console,
         Self::Workshop,
         Self::Spoofer,
@@ -298,6 +299,7 @@ impl Tab {
         Self::Patcher,
         Self::Settings,
         Self::Plugins,
+        Self::Notifications,
         Self::RlApi,
         Self::About,
     ];
@@ -312,6 +314,7 @@ impl Tab {
             Self::Colours => t("tab-colours"),
             Self::Settings => t("tab-settings"),
             Self::Plugins => t("tab-plugins"),
+            Self::Notifications => t("tab-notifications"),
             Self::RlApi => t("tab-rlapi"),
             Self::About => t("tab-about"),
         }
@@ -328,6 +331,7 @@ impl Tab {
             Self::Colours => "Colours",
             Self::Settings => "Settings",
             Self::Plugins => "Plugins",
+            Self::Notifications => "Notifications",
             Self::RlApi => "Experimental",
             Self::About => "About",
         }
@@ -529,13 +533,14 @@ pub struct HebnixApp {
     last_size: (u32, u32),
     overlay: crate::overlay::Overlay,
     native_overlay: crate::overlay::native::NativeOverlay,
+    toasts: crate::toast::ToastCenter,
+    toast_view: crate::ui::toasts::ToastView,
     webview: Option<crate::webview::host::WebviewHost>,
     overlay_unavailable_said: bool,
     overlay_rect: Option<(i32, i32, i32, i32)>,
     overlay_rect_checked: Option<std::time::Instant>,
     plugin_monitor_size: (f32, f32),
     plugin_monitor_checked: Option<std::time::Instant>,
-
     update_info: Option<crate::update::UpdateInfo>,
     update_downloading: bool,
     update_error: Option<String>,
@@ -1033,13 +1038,14 @@ impl HebnixApp {
             last_size,
             overlay: crate::overlay::Overlay::new(),
             native_overlay: crate::overlay::native::NativeOverlay::new(),
+            toasts: Default::default(),
+            toast_view: Default::default(),
             webview: None,
             overlay_unavailable_said: false,
             overlay_rect: None,
             overlay_rect_checked: None,
             plugin_monitor_size: (1920.0, 1080.0),
             plugin_monitor_checked: None,
-
             update_info: None,
             update_downloading: false,
             update_error: None,
@@ -2289,6 +2295,12 @@ impl HebnixApp {
                         }
                     }
                 }
+                AppMsg::Toast {
+                    slug,
+                    name,
+                    text,
+                    style,
+                } => self.toasts.push(&slug, &name, &text, style),
                 AppMsg::PluginHttpRes {
                     slug,
                     req_id,
@@ -4417,6 +4429,7 @@ impl HebnixApp {
                                         t("settings-language-label"),
                                         t("settings-theme-label"),
                                         t("settings-opacity-label"),
+                                        t("settings-toast-position-label"),
                                     ],
                                 );
                                 ui.horizontal(|ui| {
@@ -4560,6 +4573,30 @@ impl HebnixApp {
                                         );
                                     }
                                     if slider.drag_stopped() || slider.lost_focus() {
+                                        self.save_config();
+                                    }
+                                });
+
+                                ui.horizontal(|ui| {
+                                    ui.add_sized(
+                                        [label_w, 20.0],
+                                        egui::Label::new(t("settings-toast-position-label")),
+                                    );
+                                    let mut changed = false;
+                                    egui::ComboBox::from_id_salt("toast_position_select")
+                                        .selected_text(self.config.settings.toast_position.label())
+                                        .show_ui(ui, |ui| {
+                                            for pos in crate::toast::ToastPos::ALL {
+                                                changed |= ui
+                                                    .selectable_value(
+                                                        &mut self.config.settings.toast_position,
+                                                        pos,
+                                                        pos.label(),
+                                                    )
+                                                    .changed();
+                                            }
+                                        });
+                                    if changed {
                                         self.save_config();
                                     }
                                 });
@@ -6650,6 +6687,7 @@ impl HebnixApp {
 
     fn render_game_overlay(&mut self) {
         if !self.last_rl_open {
+            self.toasts.update(false);
             crate::overlay::set_webview_clickable(false);
             self.overlay.hide();
             self.native_overlay.hide();
@@ -6692,7 +6730,10 @@ impl HebnixApp {
         );
         let focused = crate::overlay::has_render_focus();
         crate::overlay::set_webview_clickable(focused && webview_accepts_input);
-        if (slugs.is_empty() && !webview_wants) || !focused {
+        let has_toast = self
+            .toasts
+            .update(hebnix_sdk::process::is_rocket_league_focused());
+        if (slugs.is_empty() && !webview_wants && !has_toast) || !focused {
             self.overlay.hide();
             self.native_overlay.hide();
             self.overlay_rect = None;
@@ -6743,16 +6784,19 @@ impl HebnixApp {
         }
 
         let mut errors = Vec::new();
-        if slugs.is_empty() {
+        if slugs.is_empty() && !has_toast {
             self.native_overlay.hide();
         } else {
             let plugin_manager = &mut self.plugin_mgr;
+            let toasts = &mut self.toasts;
+            let toast_pos = self.config.settings.toast_position;
             self.native_overlay.frame(rect, |width, height| {
                 for slug in &slugs {
                     if let Err(error) = plugin_manager.render_overlay_gdi(slug, width, height) {
                         errors.push(format!("[Core] Overlay error in '{slug}': {error}"));
                     }
                 }
+                toasts.draw(width, height, toast_pos);
             });
         }
         for error in errors {
@@ -6795,10 +6839,12 @@ impl HebnixApp {
                 active_plugins.push((plugin.slug.clone(), win));
             }
         }
+        let focus_ok = hebnix_sdk::process::is_rocket_league_focused()
+            || winutil::foreground_window_is_ours();
 
         for (slug, win) in active_plugins {
             let viewport_id = egui::ViewportId::from_hash_of(("plugin_window", &slug));
-            let should_be_visible = win.open;
+            let should_be_visible = win.shown(focus_ok);
             let size = [
                 win.width.resolve(mon_w, ppp),
                 win.height.resolve(mon_h, ppp),
@@ -7067,10 +7113,16 @@ impl eframe::App for HebnixApp {
                         Tab::Patcher,
                         Tab::Settings,
                         Tab::Plugins,
+                        Tab::Notifications,
                         Tab::RlApi,
                         Tab::About,
                     ] {
-                        ui.selectable_value(&mut self.tab, tab, tab.label());
+                        let label = if tab == Tab::Notifications {
+                            crate::ui::toasts::tab_label(&self.toasts)
+                        } else {
+                            tab.label()
+                        };
+                        ui.selectable_value(&mut self.tab, tab, label);
                     }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -7594,6 +7646,10 @@ impl eframe::App for HebnixApp {
 
                     Tab::Settings => self.render_settings_tab(ui),
                     Tab::Plugins => self.render_plugins_tab(ui),
+                    Tab::Notifications => {
+                        self.toasts.mark_read();
+                        self.toast_view.render(ui, &mut self.toasts);
+                    }
                     Tab::RlApi => {
                         let cooked_pc = PathBuf::from(&self.config.settings.rl_path)
                             .join("TAGame")
@@ -7794,8 +7850,11 @@ impl eframe::App for HebnixApp {
 
         let fast = self.last_rl_open
             && (self.plugin_mgr.has_tick_plugins()
-                || !self.plugin_mgr.overlay_plugins().is_empty());
-        let heartbeat = if fast {
+                || !self.plugin_mgr.overlay_plugins().is_empty()
+                || self.toasts.has_work());
+        let heartbeat = if self.toasts.showing() {
+            Duration::from_millis(16)
+        } else if fast {
             Duration::from_millis(50)
         } else {
             Duration::from_millis(500)

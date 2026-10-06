@@ -17,6 +17,7 @@ mod plugins;
 mod runtime_assets;
 mod statsapi_ini;
 mod theme;
+mod toast;
 mod tray;
 mod update;
 mod ui {

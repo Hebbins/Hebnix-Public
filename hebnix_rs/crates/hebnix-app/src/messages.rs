@@ -96,6 +96,13 @@ pub enum AppMsg {
         slug: String,
         data: serde_json::Value,
     },
+    // hebnix.toast from a plugin
+    Toast {
+        slug: String,
+        name: String,
+        text: String,
+        style: crate::toast::ToastStyle,
+    },
     // http result, slug picks the plugin that asked
     PluginHttpRes {
         slug: String,
