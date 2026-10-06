@@ -51,6 +51,7 @@ pub enum AppMsg {
         message: String,
     },
     BackgroundChangerDone(Result<String, String>),
+    BackgroundChangerProgress(String),
     WorkshopMultiplayerProgress(String),
     // result of spawning the tsnet sidecar and requesting the tailnet come up
     WorkshopTailnetStarted {

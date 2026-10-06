@@ -16,6 +16,7 @@ use mlua::{Lua, LuaSerdeExt, SerializeOptions, Table, Value as LuaValue, Variadi
 use hebnix_sdk::tracker::TrackerClient;
 
 use crate::messages::AppMsg;
+use crate::plugins::cvar::{CvarRegistry, CvarValue};
 use crate::plugins::store::PluginStore;
 use crate::plugins::window_capture::WindowCaptureRegistry;
 
@@ -35,6 +36,9 @@ pub struct HostShared {
     /// Directory containing DefaultStatsAPI.ini and the game configuration
     /// files exposed through the deliberately small Lua config API.
     pub rl_config_dir: PathBuf,
+    /// Process-local values registered by enabled plugins. Any plugin may read
+    /// or write them; ownership is used to clean them up when a plugin unloads.
+    pub cvars: CvarRegistry,
 }
 
 const RL_CONFIG_FILES: [(&str, &str); 2] = [
@@ -170,7 +174,7 @@ pub struct HostCtx {
     pub slug: String,
     pub display_name: RefCell<String>,
     pub tx: Sender<AppMsg>,
-    pub store: RefCell<PluginStore>,
+    pub store: Rc<RefCell<PluginStore>>,
     pub window: RefCell<WindowState>,
     pub shared: Rc<RefCell<HostShared>>,
     /// draft buffers for text inputs (key to current text)
@@ -1271,6 +1275,88 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                 Ok(())
             })?,
         )?;
+    }
+
+    // Process-local plugin communication variables. Registration is owned by
+    // the calling plugin, while reads and writes are intentionally shared.
+    {
+        let cvar = lua.create_table()?;
+
+        let register_host = Rc::clone(&host);
+        cvar.set(
+            "register",
+            lua.create_function(move |_, name: String| {
+                let result = register_host
+                    .shared
+                    .borrow_mut()
+                    .cvars
+                    .register(&name, &register_host.slug, Rc::clone(&register_host.store));
+                if let Err(error) = &result {
+                    register_host.log(&format!("Error: {error}."));
+                }
+                Ok(result.is_ok())
+            })?,
+        )?;
+
+        let set_host = Rc::clone(&host);
+        cvar.set(
+            "set",
+            lua.create_function(move |_, (name, value): (String, LuaValue)| {
+                let value = match value {
+                    LuaValue::String(value) => {
+                        CvarValue::String(value.to_string_lossy().to_string())
+                    }
+                    LuaValue::Integer(value) => CvarValue::Integer(value),
+                    LuaValue::Number(value) if value.is_finite() => CvarValue::Number(value),
+                    _ => {
+                        set_host.log(&format!(
+                            "Error: cvar '{name}' only accepts strings and finite numbers."
+                        ));
+                        return Ok(false);
+                    }
+                };
+                let result = set_host.shared.borrow_mut().cvars.set(&name, value);
+                if let Err(error) = &result {
+                    set_host.log(&format!("Error: {error}."));
+                }
+                Ok(result.is_ok())
+            })?,
+        )?;
+
+        let get_host = Rc::clone(&host);
+        cvar.set(
+            "get",
+            lua.create_function(move |lua, name: String| {
+                let value = get_host.shared.borrow().cvars.get(&name);
+                match value {
+                    None => Ok((LuaValue::Nil, Some("not_registered"))),
+                    Some(None) => Ok((LuaValue::Nil, Some("unset"))),
+                    Some(Some(CvarValue::String(value))) => {
+                        Ok((LuaValue::String(lua.create_string(value)?), None))
+                    }
+                    Some(Some(CvarValue::Integer(value))) => Ok((LuaValue::Integer(value), None)),
+                    Some(Some(CvarValue::Number(value))) => Ok((LuaValue::Number(value), None)),
+                }
+            })?,
+        )?;
+
+        let delete_host = Rc::clone(&host);
+        cvar.set(
+            "delete",
+            lua.create_function(move |_, name: String| {
+                let result = delete_host
+                    .shared
+                    .borrow_mut()
+                    .cvars
+                    .delete(&name, &delete_host.slug);
+                if let Err(error) = &result {
+                    delete_host.log(&format!("Error: {error}."));
+                }
+                Ok(result.is_ok())
+            })?,
+        )?;
+
+        hebnix.set("cvar", cvar)?;
     }
 
     // Persisted settings

@@ -877,6 +877,10 @@ impl WorkshopState {
         self.background_changer.finish(result)
     }
 
+    pub fn update_background_changer_progress(&mut self, message: String) -> String {
+        self.background_changer.progress(message)
+    }
+
     /// installs a freshly fetched cdn catalog, keeping the maps the player
     /// imported themselves
     pub fn set_catalog(&mut self, items: Vec<Value>) {

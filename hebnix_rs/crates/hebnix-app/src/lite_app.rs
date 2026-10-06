@@ -928,6 +928,8 @@ impl LiteApp {
                 self.console.write("  plugin load <name>   - load a disabled plugin");
                 self.console.write("  plugin reload <name> - reload an enabled plugin");
                 self.console.write("  plugin unload <name> - unloads an enabled plugin");
+                self.console.write("  cvar <name>          - gets a registered plugin cvar");
+                self.console.write("  cvar <name> <value>  - sets a cvar (quote string values)");
                 self.console.write("  quit                 - force kills the Rocket League process");
                 self.console.write("  restart              - restarts Rocket League through Steam or Epic");
             }
@@ -938,6 +940,7 @@ impl LiteApp {
                 self.console.write(format!("[Console] StatsAPI: 127.0.0.1:{} | game running: {} | port open: {} | listener connected: {}", self.current_api_port, self.last_rl_open, self.last_api_open, self.currently_connected));
             }
             Some("clear") => self.console.clear(),
+            Some("cvar") => self.console.write(self.plugin_mgr.execute_cvar_command(&raw)),
             Some("quit") => {
                 self.console
                     .write("[Console] Killing RocketLeague process threads and exiting...");
@@ -1038,7 +1041,7 @@ impl LiteApp {
                 }
             }
             _ => self.console.write(
-                "[Console] Unknown command. Try: help, info, server, webview, clear, quit, restart, plugins list, plugin load|reload|unload <name>",
+                "[Console] Unknown command. Try: help, info, server, webview, cvar, clear, quit, restart, plugins list, plugin load|reload|unload <name>",
             ),
         }
     }

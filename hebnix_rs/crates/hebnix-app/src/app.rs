@@ -1271,8 +1271,8 @@ impl HebnixApp {
         self.spoofer_cert_installed = !needs_certificate;
         let missing_api_key = self.config.replay_upload.api_key.trim().is_empty();
         let session = hebnix_sdk::rlapi::session::shared_game_session();
-        let restart_required = hebnix_sdk::process::is_rocket_league_running()
-            && !session.has_connection();
+        let restart_required =
+            hebnix_sdk::process::is_rocket_league_running() && !session.has_connection();
         let mut issues = Vec::new();
         if missing_api_key {
             issues.push("Enter a ballchasing.com API key.".to_string());
@@ -1281,9 +1281,7 @@ impl HebnixApp {
             issues.push("Hebnix must be running as administrator.".to_string());
         }
         if needs_certificate {
-            issues.push(
-                "Install the Hebnix proxy certificate in Spoofer > Settings.".to_string(),
-            );
+            issues.push("Install the Hebnix proxy certificate in Spoofer > Settings.".to_string());
         }
         if restart_required {
             issues.push(
@@ -1397,10 +1395,8 @@ impl HebnixApp {
             ui.label("Replay name:");
             config_changed |= ui
                 .add(
-                    egui::TextEdit::singleline(
-                        &mut self.config.replay_upload.naming_template,
-                    )
-                    .desired_width(520.0),
+                    egui::TextEdit::singleline(&mut self.config.replay_upload.naming_template)
+                        .desired_width(520.0),
                 )
                 .changed();
         });
@@ -1712,9 +1708,7 @@ impl HebnixApp {
         self.spoofer_cert_installed = spoofer::ca::is_current_installed(&self.base_dir);
         if self.spoofer_cert_installed {
             self.spoofer_certificate_prompt_open = false;
-        } else if self.spoofer_master
-            && (self.spoofer_http_proxy || self.spoofer_socket_proxy)
-        {
+        } else if self.spoofer_master && (self.spoofer_http_proxy || self.spoofer_socket_proxy) {
             self.spoofer_certificate_prompt_open = true;
         }
     }
@@ -1837,17 +1831,15 @@ impl HebnixApp {
                             ) {
                                 self.auto_upload_replays.stop();
                                 self.spoofer_mgr.disable_rlapi();
-                                self.replay_upload_start_prompt = Some(
-                                    ReplayUploadStartPrompt {
-                                        issues: vec![format!(
-                                            "RLAPI capture was enabled, but Rocket League could not be restarted: {error}"
-                                        )],
-                                        restart_required: false,
-                                        needs_admin: false,
-                                        needs_certificate: false,
-                                        missing_api_key: false,
-                                    },
-                                );
+                                self.replay_upload_start_prompt = Some(ReplayUploadStartPrompt {
+                                    issues: vec![format!(
+                                        "RLAPI capture was enabled, but Rocket League could not be restarted: {error}"
+                                    )],
+                                    restart_required: false,
+                                    needs_admin: false,
+                                    needs_certificate: false,
+                                    missing_api_key: false,
+                                });
                             }
                         }
                     }
@@ -2206,6 +2198,10 @@ impl HebnixApp {
                 }
                 AppMsg::BackgroundChangerDone(result) => {
                     let message = self.workshop.finish_background_changer(result);
+                    self.console.write(message);
+                }
+                AppMsg::BackgroundChangerProgress(message) => {
+                    let message = self.workshop.update_background_changer_progress(message);
                     self.console.write(message);
                 }
                 AppMsg::WorkshopMultiplayerProgress(status) => {
@@ -2863,6 +2859,10 @@ impl HebnixApp {
                 self.console
                     .write("  plugin unload <name> - unloads an enabled plugin");
                 self.console
+                    .write("  cvar <name>          - gets a registered plugin cvar");
+                self.console
+                    .write("  cvar <name> <value>  - sets a cvar (quote string values)");
+                self.console
                     .write("  quit                 - force kills the Rocket League process");
                 self.console
                     .write("  restart              - restarts Rocket League through Steam or Epic");
@@ -2977,6 +2977,9 @@ impl HebnixApp {
                 self.console.write(format!("[Console] StatsAPI: 127.0.0.1:{} | game running: {} | port open: {} | listener connected: {}", self.current_api_port, self.last_rl_open, self.last_api_open, self.currently_connected));
             }
             "clear" => self.console.clear(),
+            "cvar" => self
+                .console
+                .write(self.plugin_mgr.execute_cvar_command(&raw)),
             "quit" => {
                 self.console
                     .write("[Console] Killing RocketLeague process threads and exiting...");
@@ -3060,7 +3063,7 @@ impl HebnixApp {
                 }
             }
             _ => {
-                self.console.write(format!("[Console] Command '{raw}' unrecognized. Options: help, info, plugins list, plugin, clear, quit, restart"));
+                self.console.write(format!("[Console] Command '{raw}' unrecognized. Options: help, info, plugins list, plugin, cvar, clear, quit, restart"));
             }
         }
     }

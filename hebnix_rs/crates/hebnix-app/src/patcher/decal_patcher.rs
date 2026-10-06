@@ -2418,6 +2418,41 @@ fn normalize_catalog_name(value: &str) -> String {
         .collect()
 }
 
+fn sort_and_deduplicate_decal_targets(
+    targets: &mut Vec<(String, SkinInfo)>,
+    preferred_car_key: &str,
+) {
+    targets.sort_by(|left, right| {
+        left.1
+            .name
+            .to_ascii_lowercase()
+            .cmp(&right.1.name.to_ascii_lowercase())
+            .then_with(|| {
+                let left_is_fallback = !left.0.eq_ignore_ascii_case(preferred_car_key);
+                let right_is_fallback = !right.0.eq_ignore_ascii_case(preferred_car_key);
+                left_is_fallback.cmp(&right_is_fallback)
+            })
+            .then_with(|| left.0.cmp(&right.0))
+    });
+
+    // API catalogs can repeat a package under different names, or repeat a
+    // display name across car-specific and universal entries. Either form is
+    // indistinguishable in the picker, so keep one deterministic target and
+    // prefer the selected car's entry over the universal fallback.
+    let mut seen_packages = HashSet::new();
+    let mut seen_names = HashSet::new();
+    targets.retain(|(_, skin)| {
+        let package = skin.upk_path.to_ascii_lowercase();
+        let name = skin.name.trim().to_ascii_lowercase();
+        if seen_packages.contains(&package) || seen_names.contains(&name) {
+            return false;
+        }
+        seen_packages.insert(package);
+        seen_names.insert(name);
+        true
+    });
+}
+
 impl DecalPatcherState {
     pub fn new(base_dir: &Path, config: &Config) -> Self {
         let decals_dir = base_dir.join("decals");
@@ -2715,14 +2750,7 @@ impl DecalPatcherState {
                     .map(move |skin| (car.car_key.clone(), skin))
             })
             .collect::<Vec<_>>();
-        targets.sort_by(|left, right| {
-            left.1
-                .name
-                .to_ascii_lowercase()
-                .cmp(&right.1.name.to_ascii_lowercase())
-                .then_with(|| left.0.cmp(&right.0))
-        });
-        targets.dedup_by(|left, right| left.1.upk_path.eq_ignore_ascii_case(&right.1.upk_path));
+        sort_and_deduplicate_decal_targets(&mut targets, body_car_key);
         targets
     }
 
@@ -4440,5 +4468,52 @@ impl DecalPatcherState {
                 egui::Color32::WHITE,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn skin(name: &str, upk_path: &str) -> SkinInfo {
+        SkinInfo {
+            id: name.to_ascii_lowercase(),
+            name: name.to_string(),
+            upk_path: upk_path.to_string(),
+        }
+    }
+
+    #[test]
+    fn decal_targets_deduplicate_non_adjacent_package_paths() {
+        let mut targets = vec![
+            ("OCTANE".to_string(), skin("Zulu", "Skin_Duplicate.upk")),
+            ("OCTANE".to_string(), skin("Middle", "Skin_Unique.upk")),
+            ("UNIVERSAL".to_string(), skin("Alpha", "skin_duplicate.UPK")),
+        ];
+
+        sort_and_deduplicate_decal_targets(&mut targets, "OCTANE");
+
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].1.name, "Alpha");
+        assert_eq!(targets[1].1.name, "Middle");
+    }
+
+    #[test]
+    fn decal_targets_deduplicate_display_names_and_prefer_selected_car() {
+        let mut targets = vec![
+            (
+                "UNIVERSAL".to_string(),
+                skin("Flames", "Universal_Flames.upk"),
+            ),
+            ("OCTANE".to_string(), skin("flames", "Octane_Flames.upk")),
+            ("OCTANE".to_string(), skin("Flame-Lane", "Flame_Lane.upk")),
+        ];
+
+        sort_and_deduplicate_decal_targets(&mut targets, "OCTANE");
+
+        assert_eq!(targets.len(), 2);
+        assert_eq!(targets[0].1.name, "Flame-Lane");
+        assert_eq!(targets[1].0, "OCTANE");
+        assert_eq!(targets[1].1.name, "flames");
     }
 }

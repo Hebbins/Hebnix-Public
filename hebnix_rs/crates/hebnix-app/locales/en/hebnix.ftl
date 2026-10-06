@@ -512,6 +512,17 @@ render-download = Download
 ## ui/workshop/background_changer.rs
 render-keep-an-arena-s-gameplay-and = Keep an arena's gameplay and networking, but borrow another arena's fog, sky, buildings, and distant scenery.
 render-approved-sources-are-filtered-to-keep = Approved sources are filtered to keep only sky, atmosphere, buildings, and distant scenery; donor arena geometry is removed.
+render-custom-backgrounds-are-loaded-from-path = Custom .udk/.upk backgrounds are loaded from { $path }
+render-background-folder = Background Folder
+render-apply-background-to-all-unchanged-maps = Apply Background to All Unchanged Maps
+render-all-installed-maps-already-have-background-changes = All installed maps already have background changes.
+render-applying-background-to-map-count = Applying background to maps… { $done }/{ $total }
+render-apply-background-to-all-maps = Apply Background to All Maps
+render-applying-to-all-maps-may-take-a-long-time = This can take a long time. Maps are processed one at a time and appear in Active Changes as they finish.
+render-bulk-background-map-counts = { $targets } maps will be changed. { $skipped } existing changes will be skipped.
+render-existing-background-changes-will-not-be-overwritten = Existing map background changes will not be overwritten.
+render-apply-to-all = Apply to All
+render-cancel = Cancel
 render-close-rocket-league-before-applying-or = Close Rocket League before applying or restoring a background. Changes load when the game starts.
 render-no-supported-arena-packages-were-found = No supported arena packages were found in the configured Rocket League folder.
 render-scan-again = Scan Again

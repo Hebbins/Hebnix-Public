@@ -11,6 +11,7 @@ use super::upk_package::{ExportEntry, Prop, UpkPackage, strip};
 const BACKUP_SUFFIX: &str = ".hbnx_mapbak";
 const MANIFEST: &str = "background_swaps.json";
 const NO_BACKGROUND_DONOR: &str = "__HBNX_NO_BACKGROUND__";
+pub const CUSTOM_DONOR_PREFIX: &str = "custom:";
 const SAFE_DONORS: &[&str] = &[
     "ShatterShot_VFX",
     "BG_Stadium_10A_P",
@@ -131,24 +132,32 @@ fn apply(
     donor_name: &str,
 ) -> Result<String, String> {
     validate_name(host_name)?;
-    validate_name(donor_name)?;
-    if !SAFE_DONORS
-        .iter()
-        .any(|x| x.eq_ignore_ascii_case(donor_name))
-    {
-        return Err("That package is not a game-safe background donor.".into());
-    }
+    let custom_donor = donor_name.starts_with(CUSTOM_DONOR_PREFIX);
+    let donor_path = if custom_donor {
+        custom_donor_path(donor_name)?
+    } else {
+        validate_name(donor_name)?;
+        if !SAFE_DONORS
+            .iter()
+            .any(|x| x.eq_ignore_ascii_case(donor_name))
+        {
+            return Err("That package is not a game-safe background donor.".into());
+        }
+        map_path(cooked, donor_name)
+    };
     if host_name.eq_ignore_ascii_case(donor_name) {
         return Err("Pick two different arenas.".into());
     }
     ensure_game_closed("applying a background")?;
     let host_path = map_path(cooked, host_name);
-    let donor_path = map_path(cooked, donor_name);
     if !host_path.is_file() {
         return Err(format!("Host arena is missing: {host_name}.upk"));
     }
     if !donor_path.is_file() {
-        return Err(format!("Background arena is missing: {donor_name}.upk"));
+        return Err(format!(
+            "Background package is missing: {}",
+            donor_path.display()
+        ));
     }
     let mut state = load_state(state_dir)?;
     undo_core(cooked, &mut state, host_name)?;
@@ -162,13 +171,13 @@ fn apply(
         return Err("This arena has a background backup that Hebnix does not own. Restore it before changing this background.".into());
     }
     std::fs::copy(&host_path, &backup).map_err(|e| format!("Could not back up host arena: {e}"))?;
-    let donor_backup = backup_path(&donor_path);
-    let donor_source = if donor_backup.is_file() {
-        donor_backup
+    let donor_backup = (!custom_donor).then(|| backup_path(&donor_path));
+    let donor_source = if donor_backup.as_ref().is_some_and(|path| path.is_file()) {
+        donor_backup.unwrap()
     } else {
         donor_path.clone()
     };
-    let result = apply_inner(cooked, &host_path, &donor_source, donor_name);
+    let result = apply_inner(cooked, &host_path, &donor_source, donor_name, custom_donor);
     match result {
         Ok((copy_name, patched_sub_levels)) => {
             state.insert(
@@ -215,31 +224,36 @@ fn apply_inner(
     host_path: &Path,
     donor_path: &Path,
     donor_name: &str,
+    custom_donor: bool,
 ) -> Result<(String, Vec<String>), String> {
     let mut host = UpkPackage::load(host_path)?;
     let slot = host
         .find_stream_name_index()
         .ok_or("This map has no streaming slot and cannot host a background")?;
     let slot_name = host.names[slot].clone();
-    let copy_name = make_copy_name(donor_name, slot_name.len())?;
+    let copy_name = make_copy_name(&donor_copy_label(donor_name), slot_name.len())?;
     let generated = map_path(cooked, &copy_name);
     let scenery_source = if donor_name.eq_ignore_ascii_case("BG_NeoTokyo_Hax") {
         package_source(cooked, "neotokyo_hax_signs_off_p")?
     } else {
         donor_path.to_path_buf()
     };
-    std::fs::copy(&scenery_source, &generated)
-        .map_err(|e| format!("Could not create donor scenery package: {e}"))?;
     let donor = UpkPackage::load(donor_path)?;
-    let mut generated_pkg = UpkPackage::load(&generated)?;
-    let retained = patch_donor_outside_only(&mut generated_pkg)?;
+    let retained = if custom_donor {
+        write_filtered_custom_background(&scenery_source, &generated)?
+    } else {
+        std::fs::copy(&scenery_source, &generated)
+            .map_err(|e| format!("Could not create donor scenery package: {e}"))?;
+        let mut generated_pkg = UpkPackage::load(&generated)?;
+        let retained = patch_donor_outside_only(&mut generated_pkg, false)?;
+        generated_pkg.save(&generated)?;
+        retained
+    };
     if retained == 0 {
         return Err(format!(
             "'{donor_name}' has no recognised sky or out-of-bounds scenery to transfer"
         ));
     }
-    generated_pkg.save(&generated)?;
-
     let preserve_host_atmosphere = donor_name.eq_ignore_ascii_case("BG_NeoTokyo_Hax");
     let stream_indices = host.find_all_stream_name_indices();
     let mut patched_sub_levels = Vec::new();
@@ -325,7 +339,10 @@ fn remove_background_inner(
     host.save(host_path)?;
     Ok((copy_name, patched_sub_levels))
 }
-fn patch_donor_outside_only(package: &mut UpkPackage) -> Result<usize, String> {
+fn patch_donor_outside_only(
+    package: &mut UpkPackage,
+    permissive_custom: bool,
+) -> Result<usize, String> {
     let mut patches = Vec::new();
     let mut retained = 0usize;
     for e in &package.exports {
@@ -350,7 +367,11 @@ fn patch_donor_outside_only(package: &mut UpkPackage) -> Result<usize, String> {
             if reference != 0 {
                 let mesh_name = package.obj_name(reference);
                 let mesh = strip(&mesh_name);
-                if donor_outside_scope(mesh) {
+                if if permissive_custom {
+                    custom_donor_outside_scope(mesh)
+                } else {
+                    donor_outside_scope(mesh)
+                } {
                     retained += 1
                 } else {
                     patches.push((off, vec![0; 4]))
@@ -383,6 +404,18 @@ fn patch_donor_outside_only(package: &mut UpkPackage) -> Result<usize, String> {
                 }
             }
         }
+        if class == "BrushComponent" || class == "ModelComponent" {
+            for p in &props {
+                if p.tag_type == "ObjectProperty"
+                    && (p.name == "Brush" || p.name == "Model" || p.name == "BrushAggGeom")
+                {
+                    let off = e.serial_offset + p.value_offset;
+                    if package.read_int(off)? != 0 {
+                        patches.push((off, vec![0; 4]));
+                    }
+                }
+            }
+        }
         if mesh_prop.is_some()
             || class.contains("Collision")
             || class == "BrushComponent"
@@ -400,6 +433,56 @@ fn patch_donor_outside_only(package: &mut UpkPackage) -> Result<usize, String> {
         }
     }
     apply_patches(package, patches)?;
+    Ok(retained)
+}
+
+/// Parses and filters a custom background in memory without changing the source file.
+/// This is also useful to validate newly dropped-in packages before applying them.
+#[allow(dead_code)]
+pub fn analyze_custom_background(path: &Path) -> Result<usize, String> {
+    let mut package = UpkPackage::load(path)?;
+    patch_donor_outside_only(&mut package, true)
+}
+
+#[allow(dead_code)]
+pub fn custom_background_mesh_report(path: &Path) -> Result<Vec<(bool, String, String)>, String> {
+    let package = UpkPackage::load(path)?;
+    let mut report = Vec::new();
+    for export in &package.exports {
+        let class_name = package.class_of(export);
+        let class = strip(&class_name);
+        let property = match class {
+            "StaticMeshComponent" | "InstancedStaticMeshComponent" => "StaticMesh",
+            "SkeletalMeshComponent" => "SkeletalMesh",
+            _ => continue,
+        };
+        let Some(prop) = package
+            .parse_props(export)
+            .into_iter()
+            .find(|prop| prop.name == property && prop.tag_type == "ObjectProperty")
+        else {
+            continue;
+        };
+        let reference = package.read_int(export.serial_offset + prop.value_offset)?;
+        if reference == 0 {
+            continue;
+        }
+        let mesh = strip(&package.obj_name(reference)).to_string();
+        report.push((
+            custom_donor_outside_scope(&mesh),
+            mesh,
+            package.object_path(export.table_index as i32 + 1),
+        ));
+    }
+    Ok(report)
+}
+
+pub fn write_filtered_custom_background(source: &Path, output: &Path) -> Result<usize, String> {
+    let mut package = UpkPackage::load(source)?;
+    let retained = patch_donor_outside_only(&mut package, true)?;
+    package.save(output)?;
+    UpkPackage::load(output)
+        .map_err(|error| format!("Filtered background failed round-trip validation: {error}"))?;
     Ok(retained)
 }
 
@@ -653,11 +736,32 @@ fn donor_outside_scope(mesh: &str) -> bool {
     is_core_background(mesh) || is_extended_scenery(mesh)
 }
 
+fn custom_donor_outside_scope(mesh: &str) -> bool {
+    !is_gameplay_structure(mesh) && !is_custom_arena_shell(mesh)
+}
+
+fn is_custom_arena_shell(mesh: &str) -> bool {
+    let n = mesh.to_ascii_lowercase();
+    [
+        "oobfloor",
+        "side_frame",
+        "side_trim",
+        "inner_glass",
+        "midglass",
+        "midhexglass",
+        "adframes",
+        "matineecam",
+    ]
+    .iter()
+    .any(|hint| n.contains(hint))
+        || matches!(n.as_str(), "net" | "ad1" | "ad2")
+}
+
 fn host_background_scope(mesh: &str) -> bool {
     if is_gameplay_structure(mesh) {
         return false;
     }
-    is_core_background(mesh)
+    is_core_background(mesh) || is_extended_scenery(mesh)
 }
 
 fn is_core_background(mesh: &str) -> bool {
@@ -754,6 +858,14 @@ fn is_gameplay_structure(mesh: &str) -> bool {
     let n = mesh.to_ascii_lowercase();
     [
         "goal",
+        "field_",
+        "field.",
+        "field-",
+        "cs_field",
+        "playingfield",
+        "playfield",
+        "pitch",
+        "soccar",
         "boostpad",
         "collision",
         "centerpiece",
@@ -772,6 +884,7 @@ fn is_gameplay_structure(mesh: &str) -> bool {
         "ball_defaultball",
         "circle_sprite",
         "bleacheregg",
+        "simplicity_",
     ]
     .iter()
     .any(|hint| n.contains(hint))
@@ -800,6 +913,50 @@ fn make_copy_name(donor: &str, len: usize) -> Result<String, String> {
     }
     name.truncate(len);
     Ok(name)
+}
+
+fn donor_copy_label(donor: &str) -> String {
+    donor
+        .strip_prefix(CUSTOM_DONOR_PREFIX)
+        .and_then(|name| Path::new(name).file_stem())
+        .and_then(|name| name.to_str())
+        .unwrap_or(donor)
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+pub fn custom_backgrounds_dir() -> Result<PathBuf, String> {
+    let executable = std::env::current_exe()
+        .map_err(|e| format!("Could not locate the Hebnix executable: {e}"))?;
+    let parent = executable
+        .parent()
+        .ok_or("The Hebnix executable has no parent folder")?;
+    Ok(parent.join("backgrounds"))
+}
+
+fn custom_donor_path(donor: &str) -> Result<PathBuf, String> {
+    let file_name = donor
+        .strip_prefix(CUSTOM_DONOR_PREFIX)
+        .ok_or("Invalid custom background identifier")?;
+    let candidate = Path::new(file_name);
+    if candidate.file_name().and_then(|name| name.to_str()) != Some(file_name) {
+        return Err("Invalid custom background filename.".into());
+    }
+    let extension = candidate
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    if !extension.eq_ignore_ascii_case("upk") && !extension.eq_ignore_ascii_case("udk") {
+        return Err("Custom backgrounds must be .upk or .udk files.".into());
+    }
+    Ok(custom_backgrounds_dir()?.join(candidate))
 }
 
 fn undo(cooked: &Path, state_dir: &Path, host: &str) -> Result<String, String> {
@@ -945,4 +1102,24 @@ fn backup_path(path: &Path) -> PathBuf {
 }
 fn friendly(name: &str) -> String {
     name.replace('_', " ").trim().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn supplied_senju_background_is_filterable_when_present() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/release/backgrounds/Senju_city.udk");
+        if !path.is_file() {
+            return;
+        }
+        let mut package =
+            UpkPackage::load(&path).expect("Senju City should be a readable UE3 package");
+        let retained = patch_donor_outside_only(&mut package, true)
+            .expect("Senju City should support exterior filtering");
+        assert!(retained > 0, "Senju City should retain exterior meshes");
+        eprintln!("Senju City retained {retained} exterior mesh/particle components");
+    }
 }
