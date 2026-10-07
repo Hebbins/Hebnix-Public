@@ -48,6 +48,10 @@ pub fn run(
     }
     std::fs::create_dir_all(state_dir)
         .map_err(|e| format!("Could not create background state folder: {e}"))?;
+    let discarded_stale = synchronize_build(cooked, state_dir)?;
+    if discarded_stale && matches!(command, "undo" | "reset") {
+        return Err("Rocket League was updated. Hebnix discarded the old background backups and active entries instead of restoring arenas from the previous build. Apply the background again to start fresh.".into());
+    }
     match command {
         "apply" => apply(
             cooked,
@@ -60,6 +64,48 @@ pub fn run(
         "reset" => reset(cooked, state_dir),
         _ => Err("Invalid background changer command".into()),
     }
+}
+
+fn synchronize_build(cooked: &Path, state_dir: &Path) -> Result<bool, String> {
+    let backup_root = cooked.join("Backups");
+    std::fs::create_dir_all(&backup_root)
+        .map_err(|e| format!("Could not create {}: {e}", backup_root.display()))?;
+    let marker = backup_root.join("background-build.sha256");
+    let current = super::backup_guard::build_id(cooked)?;
+    let recorded = std::fs::read_to_string(&marker).unwrap_or_default();
+    let backups = matching_files(cooked, |name| name.ends_with(".upk.hbnx_mapbak"));
+    let manifest = state_dir.join(MANIFEST);
+    let stale = recorded.trim() != current && (!backups.is_empty() || manifest.is_file());
+    if stale {
+        for path in backups {
+            std::fs::remove_file(&path).map_err(|e| {
+                format!("Could not discard stale map backup {}: {e}", path.display())
+            })?;
+        }
+        for path in matching_files(cooked, |name| {
+            name.starts_with("HBNX_") && name.ends_with(".upk")
+        }) {
+            std::fs::remove_file(&path).map_err(|e| {
+                format!(
+                    "Could not remove stale generated map {}: {e}",
+                    path.display()
+                )
+            })?;
+        }
+        if manifest.is_file() {
+            std::fs::remove_file(&manifest).map_err(|e| {
+                format!(
+                    "Could not discard stale background state {}: {e}",
+                    manifest.display()
+                )
+            })?;
+        }
+    }
+    if recorded.trim() != current {
+        std::fs::write(&marker, current)
+            .map_err(|e| format!("Could not write {}: {e}", marker.display()))?;
+    }
+    Ok(stale)
 }
 
 fn remove_background(cooked: &Path, state_dir: &Path, host_name: &str) -> Result<String, String> {

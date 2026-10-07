@@ -712,6 +712,12 @@ fn restore_arena_boost_colours(cooked_pc: &Path, backups_dir: &Path) -> Result<(
 }
 
 fn apply(cooked_pc: &Path, backups_dir: &Path, settings: &ColourSettings) -> Result<(), String> {
+    crate::patcher::backup_guard::prepare(
+        cooked_pc,
+        backups_dir,
+        "colours-build.sha256",
+        |name| name == BACKUP_NAME,
+    )?;
     let live = cooked_pc.join("TAGame.upk");
     if !live.is_file() {
         return Err(format!(
@@ -777,6 +783,9 @@ fn apply(cooked_pc: &Path, backups_dir: &Path, settings: &ColourSettings) -> Res
 }
 
 fn restore(cooked_pc: &Path, backups_dir: &Path) -> Result<(), String> {
+    crate::patcher::backup_guard::check(cooked_pc, backups_dir, "colours-build.sha256", |name| {
+        name == BACKUP_NAME
+    })?;
     let live = cooked_pc.join("TAGame.upk");
     let backup = backups_dir.join(BACKUP_NAME);
     if !backup.is_file() {

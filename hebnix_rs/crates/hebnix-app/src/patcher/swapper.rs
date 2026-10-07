@@ -1,6 +1,7 @@
 use crate::i18n::{t, t_args};
 use crate::messages::AppMsg;
 use crate::patcher::painted_swap::{self, SwapPaint};
+use crate::patcher::backup_guard;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use eframe::egui;
 use serde::{Deserialize, Serialize};
@@ -80,6 +81,12 @@ impl SwapCategory {
             Self::Wheels => "wheels",
         }
     }
+
+    fn from_slug(value: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|category| category.slug().eq_ignore_ascii_case(value))
+    }
 }
 
 #[derive(Clone)]
@@ -110,6 +117,13 @@ struct ActiveSwap {
     paint: SwapPaint,
     #[serde(default)]
     target_thumbnail: Option<String>,
+}
+
+#[derive(Default)]
+pub struct PresetApplyReport {
+    pub applied: usize,
+    pub skipped: Vec<String>,
+    pub skipped_indexes: Vec<usize>,
 }
 
 fn patch_boost_bnk(source: &Path, target_backup: &Path, destination: &Path) -> Result<(), String> {
@@ -736,6 +750,7 @@ impl SwapperState {
         cooked_pc: &Path,
         backups_dir: &Path,
     ) -> Result<(), String> {
+        backup_guard::synchronize_install(cooked_pc, backups_dir)?;
         if source.upk.eq_ignore_ascii_case(&target.upk) {
             return Err("Choose two different items".into());
         }
@@ -892,6 +907,7 @@ impl SwapperState {
         cooked_pc: &Path,
         backups_dir: &Path,
     ) -> Result<usize, String> {
+        backup_guard::check_install(cooked_pc, backups_dir)?;
         self.load_active(backups_dir);
         let mut restored = 0;
         let mut errors = Vec::new();
@@ -957,6 +973,7 @@ impl SwapperState {
         cooked_pc: &Path,
         backups_dir: &Path,
     ) -> Result<(), String> {
+        backup_guard::check_install(cooked_pc, backups_dir)?;
         let backup = backups_dir.join(format!("{target_upk}.bak"));
         let live = cooked_pc.join(target_upk);
         if !backup.is_file() {
@@ -1011,6 +1028,102 @@ impl SwapperState {
     pub fn active_count(&mut self, backups_dir: &Path) -> usize {
         self.load_active(backups_dir);
         self.active.len()
+    }
+
+    pub fn apply_preset_swaps(
+        &mut self,
+        swaps: &[Value],
+        cooked_pc: &Path,
+        backups_dir: &Path,
+    ) -> PresetApplyReport {
+        self.load_active(backups_dir);
+        let mut report = PresetApplyReport::default();
+        for (index, value) in swaps.iter().enumerate() {
+            let saved = match serde_json::from_value::<ActiveSwap>(value.clone()) {
+                Ok(saved) => saved,
+                Err(error) => {
+                    report.skipped.push(format!("Invalid swap entry: {error}"));
+                    report.skipped_indexes.push(index);
+                    continue;
+                }
+            };
+            let Some(category) = SwapCategory::from_slug(&saved.category) else {
+                report
+                    .skipped
+                    .push(format!("{}: unknown category '{}'", saved.source_name, saved.category));
+                report.skipped_indexes.push(index);
+                continue;
+            };
+            let Some(items) = self.catalogs.get(&category).cloned() else {
+                report.skipped.push(format!(
+                    "{} -> {}: the {} catalog is unavailable",
+                    saved.source_name,
+                    saved.target_name,
+                    category.slug()
+                ));
+                report.skipped_indexes.push(index);
+                continue;
+            };
+            let Some(source) = items
+                .iter()
+                .find(|item| item.upk.eq_ignore_ascii_case(&saved.source_upk))
+                .cloned()
+            else {
+                report.skipped.push(format!(
+                    "{}: item is not in the local {} catalog",
+                    saved.source_name,
+                    category.slug()
+                ));
+                report.skipped_indexes.push(index);
+                continue;
+            };
+            let Some(target) = items
+                .iter()
+                .find(|item| item.upk.eq_ignore_ascii_case(&saved.target_upk))
+                .cloned()
+            else {
+                report.skipped.push(format!(
+                    "{}: target is not in the local {} catalog",
+                    saved.target_name,
+                    category.slug()
+                ));
+                report.skipped_indexes.push(index);
+                continue;
+            };
+
+            if self
+                .active
+                .iter()
+                .any(|active| active.target_upk.eq_ignore_ascii_case(&target.upk))
+                && let Err(error) = self.restore_swap(&target.upk, cooked_pc, backups_dir)
+            {
+                report.skipped.push(format!(
+                    "{} -> {}: could not restore the current change: {error}",
+                    source.name, target.name
+                ));
+                report.skipped_indexes.push(index);
+                continue;
+            }
+
+            match self.apply_swap(
+                category,
+                &source,
+                &target,
+                saved.paint,
+                1.0,
+                cooked_pc,
+                backups_dir,
+            ) {
+                Ok(()) => report.applied += 1,
+                Err(error) => {
+                    report
+                        .skipped
+                        .push(format!("{} -> {}: {error}", source.name, target.name));
+                    report.skipped_indexes.push(index);
+                }
+            }
+        }
+        report
     }
 
     pub fn restore_all_active(

@@ -473,6 +473,7 @@ pub struct HebnixApp {
     stats_tx: crossbeam_channel::Sender<hebnix_sdk::stats::StatsEvent>,
     monitor: Monitor,
     discord_presence: crate::discord_presence::DiscordPresence,
+    discord_link: crate::discord_link::DiscordLinkState,
     plugin_mgr: PluginManager,
     tray: Option<Tray>,
     hotkey: Option<ToggleHotkey>,
@@ -986,6 +987,7 @@ impl HebnixApp {
             stats_tx,
             monitor,
             discord_presence,
+            discord_link: crate::discord_link::DiscordLinkState::new(&base_dir),
             plugin_mgr,
             tray,
             hotkey,
@@ -1447,7 +1449,155 @@ impl HebnixApp {
         ui.separator();
         self.auto_upload_replays.show(ui, &session.status());
     }
-    fn render_presets_tab(&mut self, ui: &mut egui::Ui, backups_dir: &std::path::Path) {
+    fn process_preset_operations(
+        &mut self,
+        cooked_pc: &std::path::Path,
+        backups_dir: &std::path::Path,
+        ctx: &egui::Context,
+    ) {
+        self.patcher_ball.poll_ops(&self.tx, ctx, &mut self.config);
+        self.patcher_boost.poll_ops(&self.tx, &mut self.config);
+        self.patcher_decal.handle_op_result(&self.tx, &mut self.config);
+        if self.patcher_ball.processing_target.is_none()
+            && self.patcher_ball.active_ball.is_none()
+            && let Some(name) = self.presets.pending_ball.take()
+            && let Err(error) = self.patcher_ball.begin_apply_named(
+                &name, cooked_pc, backups_dir, &self.tx, ctx,
+            )
+        {
+            self.presets.status.push_str(&format!("\nSkipped ball '{name}': {error}"));
+            self.presets.missing.push(crate::presets::MissingItem::Patch {
+                kind: "ball".into(), key: None,
+            });
+        }
+        if self.patcher_boost.processing_target.is_none()
+            && self.patcher_boost.active_boost.is_none()
+            && let Some(name) = self.presets.pending_boost.take()
+            && let Err(error) = self.patcher_boost.begin_apply_named(
+                &name, cooked_pc, backups_dir, &self.tx, ctx,
+            )
+        {
+            self.presets.status.push_str(&format!("\nSkipped boost '{name}': {error}"));
+            self.presets.missing.push(crate::presets::MissingItem::Patch {
+                kind: "boost".into(), key: None,
+            });
+        }
+        if self.patcher_decal.processing_target.is_none() && !self.presets.pending_decals.is_empty() {
+            let (key, name) = self.presets.pending_decals.remove(0);
+            let (car, skin) = key
+                .split_once('|')
+                .map(|(car, skin)| (car.to_string(), skin.to_string()))
+                .unwrap_or_default();
+            if let Err(error) = self.patcher_decal.apply_decal_to_skin(
+                &name, &car, &skin, 1.0, cooked_pc, backups_dir, &self.tx, ctx,
+            ) {
+                self.presets.status.push_str(&format!("\nSkipped decal '{name}': {error}"));
+                self.presets.missing.push(crate::presets::MissingItem::Patch {
+                    kind: "decals".into(), key: Some(key),
+                });
+            }
+        }
+    }
+
+    fn apply_selected_preset(
+        &mut self,
+        cooked_pc: &std::path::Path,
+        backups_dir: &std::path::Path,
+        ctx: &egui::Context,
+    ) {
+        if crate::messages::block_item_action_if_game_running(&self.tx) {
+            return;
+        }
+        let Some(preset) = self.presets.presets.get(self.presets.selected).cloned() else { return };
+        self.presets.missing.clear();
+        self.presets.pending_ball = None;
+        self.presets.pending_boost = None;
+        self.presets.pending_decals.clear();
+        let swap_report = self.swapper.apply_preset_swaps(&preset.swaps, cooked_pc, backups_dir);
+        self.presets.missing.extend(
+            swap_report.skipped_indexes.iter().copied().map(crate::presets::MissingItem::Swap),
+        );
+        let mut messages = swap_report.skipped;
+        let mut queued = 0usize;
+        if preset.include_patches {
+            let patches = preset.patches.as_object();
+            if let Some(name) = patches.and_then(|p| p.get("ball")).and_then(|v| v.as_str()) {
+                if !self.patcher_ball.balls.iter().any(|item| item.name == name) {
+                    messages.push(format!("Ball '{name}' is not installed locally"));
+                    self.presets.missing.push(crate::presets::MissingItem::Patch { kind: "ball".into(), key: None });
+                } else if self.patcher_ball.active_ball.is_some() {
+                    self.presets.pending_ball = Some(name.to_string());
+                    self.patcher_ball.begin_restore(cooked_pc, backups_dir, &self.tx, ctx);
+                    queued += 1;
+                } else if let Err(error) = self.patcher_ball.begin_apply_named(name, cooked_pc, backups_dir, &self.tx, ctx) {
+                    messages.push(error);
+                } else {
+                    queued += 1;
+                }
+            }
+            if let Some(name) = patches.and_then(|p| p.get("boost")).and_then(|v| v.as_str()) {
+                if !self.patcher_boost.boosts.iter().any(|item| item.name == name) {
+                    messages.push(format!("Boost '{name}' is not installed locally"));
+                    self.presets.missing.push(crate::presets::MissingItem::Patch { kind: "boost".into(), key: None });
+                } else if self.patcher_boost.active_boost.is_some() {
+                    self.presets.pending_boost = Some(name.to_string());
+                    self.patcher_boost.begin_restore(cooked_pc, backups_dir, &self.tx, ctx);
+                    queued += 1;
+                } else if let Err(error) = self.patcher_boost.begin_apply_named(name, cooked_pc, backups_dir, &self.tx, ctx) {
+                    messages.push(error);
+                } else {
+                    queued += 1;
+                }
+            }
+            if let Some(decals) = patches.and_then(|p| p.get("decals")).and_then(|v| v.as_object()) {
+                for (key, value) in decals {
+                    let Some(name) = value.as_str() else { continue };
+                    let Some((car, skin)) = key.split_once('|') else {
+                        messages.push(format!("Decal '{name}' has an invalid target"));
+                        self.presets.missing.push(crate::presets::MissingItem::Patch { kind: "decals".into(), key: Some(key.clone()) });
+                        continue;
+                    };
+                    if self.patcher_decal.preset_item_available(name, car, skin) {
+                        self.presets.pending_decals.push((key.clone(), name.into()));
+                        queued += 1;
+                    } else {
+                        messages.push(format!("Decal '{name}' or its target '{key}' is not installed locally"));
+                        self.presets.missing.push(crate::presets::MissingItem::Patch { kind: "decals".into(), key: Some(key.clone()) });
+                    }
+                }
+            }
+            if let Some(cars) = patches.and_then(|p| p.get("cars")).and_then(|v| v.as_object()) {
+                for (target, value) in cars {
+                    let Some(name) = value.as_str() else { continue };
+                    if let Err(error) = self.patcher_car.apply_preset(
+                        name, target, cooked_pc, backups_dir, &self.tx, &mut self.config,
+                    ) {
+                        messages.push(format!("Car '{name}': {error}"));
+                        self.presets.missing.push(crate::presets::MissingItem::Patch { kind: "cars".into(), key: Some(target.clone()) });
+                    } else {
+                        queued += 1;
+                    }
+                }
+            }
+        }
+        self.presets.status = format!(
+            "Applied {} swap(s); queued/applied {queued} patch item(s).", swap_report.applied
+        );
+        if !messages.is_empty() {
+            self.presets.status.push_str("\nSkipped items:\n- ");
+            self.presets.status.push_str(&messages.join("\n- "));
+        }
+        self.process_preset_operations(cooked_pc, backups_dir, ctx);
+    }
+
+    fn render_presets_tab(
+        &mut self,
+        ui: &mut egui::Ui,
+        cooked_pc: &std::path::Path,
+        backups_dir: &std::path::Path,
+        ctx: &egui::Context,
+    ) {
+        self.process_preset_operations(cooked_pc, backups_dir, ctx);
         ui.heading(t("presets-presets"));
         ui.label(t("presets-save-and-restore-named-collections-of"));
         ui.horizontal(|ui| {
@@ -1500,35 +1650,111 @@ impl HebnixApp {
                     }
                 }
             }
-            if ui
-                .add_enabled(
-                    !self.presets.presets.is_empty(),
-                    egui::Button::new(t("presets-delete")),
-                )
-                .clicked()
-            {
-                self.presets.delete_selected();
-            }
         });
         ui.separator();
         if self.presets.presets.is_empty() {
             ui.weak(t("presets-no-presets-saved"));
-            return;
-        }
-        let names: Vec<String> = self
-            .presets
-            .presets
-            .iter()
-            .map(|p| p.name.clone())
-            .collect();
-        egui::ComboBox::from_id_salt("preset_select")
-            .selected_text(&names[self.presets.selected])
-            .show_ui(ui, |ui| {
-                for (index, name) in names.iter().enumerate() {
-                    ui.selectable_value(&mut self.presets.selected, index, name);
+        } else {
+            let names: Vec<String> = self.presets.presets.iter().map(|p| p.name.clone()).collect();
+            egui::ComboBox::from_id_salt("preset_select")
+                .selected_text(&names[self.presets.selected])
+                .show_ui(ui, |ui| {
+                    for (index, name) in names.iter().enumerate() {
+                        ui.selectable_value(&mut self.presets.selected, index, name);
+                    }
+                });
+            ui.horizontal(|ui| {
+                if ui.button("Apply Preset").clicked() {
+                    self.apply_selected_preset(cooked_pc, backups_dir, ctx);
+                }
+                if ui.button("Edit Preset").clicked() {
+                    self.presets.begin_edit_selected();
+                }
+                if ui.button(t("presets-delete")).clicked() {
+                    self.presets.delete_selected();
                 }
             });
-        if let Some(preset) = self.presets.presets.get(self.presets.selected) {
+        }
+        let editing = self.presets.editing.is_some();
+        let mut save_edit = false;
+        let mut cancel_edit = false;
+        if let Some(draft) = self.presets.editing.as_mut() {
+            ui.group(|ui| {
+                ui.strong("Edit preset");
+                ui.horizontal(|ui| {
+                    ui.label(t("presets-name"));
+                    ui.text_edit_singleline(&mut draft.name);
+                    ui.checkbox(&mut draft.include_patches, t("presets-include-patches"));
+                });
+                let mut remove_swap = None;
+                for (index, swap) in draft.swaps.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        let source = swap.get("source_name").and_then(|v| v.as_str()).unwrap_or("?");
+                        let target = swap.get("target_name").and_then(|v| v.as_str()).unwrap_or("?");
+                        ui.label(source);
+                        let arrow =
+                            ui.allocate_response(egui::vec2(18.0, 18.0), egui::Sense::hover());
+                        let visuals = ui.style().interact(&arrow);
+                        let center = arrow.rect.center();
+                        ui.painter().line_segment(
+                            [
+                                center + egui::vec2(-3.5, -3.5),
+                                center + egui::vec2(0.0, 0.0),
+                            ],
+                            visuals.fg_stroke,
+                        );
+                        ui.painter().line_segment(
+                            [
+                                center + egui::vec2(0.0, 0.0),
+                                center + egui::vec2(-3.5, 3.5),
+                            ],
+                            visuals.fg_stroke,
+                        );
+                        ui.label(target);
+                        if ui.small_button("Remove").clicked() { remove_swap = Some(index); }
+                    });
+                }
+                if let Some(index) = remove_swap { draft.swaps.remove(index); }
+                let mut remove_patch = None;
+                if let Some(patches) = draft.patches.as_object() {
+                    for (kind, value) in patches {
+                        if let Some(entries) = value.as_object() {
+                            for (key, item) in entries {
+                                ui.horizontal(|ui| {
+                                    ui.label(format!("{kind} / {key}: {item}"));
+                                    if ui.small_button("Remove").clicked() { remove_patch = Some((kind.clone(), Some(key.clone()))); }
+                                });
+                            }
+                        } else if !value.is_null() {
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{kind}: {value}"));
+                                if ui.small_button("Remove").clicked() { remove_patch = Some((kind.clone(), None)); }
+                            });
+                        }
+                    }
+                }
+                if let Some((kind, key)) = remove_patch {
+                    if let Some(patches) = draft.patches.as_object_mut() {
+                        if let Some(key) = key {
+                            if let Some(entries) = patches.get_mut(&kind).and_then(|v| v.as_object_mut()) { entries.remove(&key); }
+                        } else { patches.remove(&kind); }
+                    }
+                }
+                ui.horizontal(|ui| {
+                    if ui.button("Save Changes").clicked() {
+                        save_edit = true;
+                    }
+                    if ui.button("Cancel").clicked() { cancel_edit = true; }
+                });
+            });
+        }
+        if save_edit && let Err(error) = self.presets.save_edit() {
+            self.presets.status = error;
+        }
+        if cancel_edit {
+            self.presets.cancel_edit();
+        }
+        if !editing && let Some(preset) = self.presets.presets.get(self.presets.selected) {
             ui.add_space(8.0);
             ui.strong(format!(
                 "{}{}",
@@ -1577,8 +1803,41 @@ impl HebnixApp {
                     }
                 }
             }
-            ui.weak(t("presets-preset-contents-are-shown-above-applying"));
         }
+        if !self.presets.status.is_empty() {
+            ui.separator();
+            ui.label(&self.presets.status);
+        }
+        if !self.presets.missing.is_empty() {
+            ui.horizontal(|ui| {
+                if ui.button("Remove Missing Items from Preset").clicked()
+                    && let Err(error) = self.presets.remove_missing_selected()
+                { self.presets.status = error; }
+                if ui.button("Ignore Missing Items").clicked() {
+                    self.presets.missing.clear();
+                    self.presets.status.clear();
+                }
+            });
+        }
+        ui.separator();
+        ui.strong("Preset Key");
+        ui.label("Share or paste a base64 preset key. Imported items remain listed even when their local files are missing.");
+        ui.add(egui::TextEdit::multiline(&mut self.presets.preset_key).desired_rows(3).desired_width(f32::INFINITY));
+        ui.horizontal(|ui| {
+            if ui.add_enabled(!self.presets.presets.is_empty(), egui::Button::new("Show Preset Key")).clicked() {
+                match self.presets.selected_key() {
+                    Ok(key) => self.presets.preset_key = key,
+                    Err(error) => self.presets.status = error,
+                }
+            }
+            if ui.button("Import Preset").clicked() {
+                let key = self.presets.preset_key.clone();
+                match self.presets.import_key(&key) {
+                    Ok(()) => self.presets.status = "Preset imported. Missing local items will be skipped when applied.".into(),
+                    Err(error) => self.presets.status = error,
+                }
+            }
+        });
     }
 
     fn save_friends_internal(&self) {
@@ -4978,6 +5237,8 @@ impl HebnixApp {
                                     self.save_config();
                                     self.refresh_discord_presence();
                                 }
+                                let ctx = ui.ctx().clone();
+                                self.discord_link.show(ui, &ctx);
                             }
 
                             HebnixSettingsTab::ActionButton => {
@@ -7611,7 +7872,7 @@ impl eframe::App for HebnixApp {
                                         });
                                 }
                                 PatcherSubTab::Presets => {
-                                    self.render_presets_tab(ui, &backups_dir);
+                                    self.render_presets_tab(ui, &cooked_pc, &backups_dir, ctx);
                                 }
                                 }
                             });

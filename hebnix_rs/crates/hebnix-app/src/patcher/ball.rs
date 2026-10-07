@@ -351,6 +351,25 @@ impl PatcherState {
         self.spawn_restore_thread(cooked_pc, &upk, backups_dir, tx, ctx);
     }
 
+    pub fn begin_apply_named(
+        &mut self,
+        name: &str,
+        cooked_pc: &Path,
+        backups_dir: &Path,
+        tx: &Sender<AppMsg>,
+        ctx: &egui::Context,
+    ) -> Result<(), String> {
+        let ball = self
+            .balls
+            .iter()
+            .find(|ball| ball.name == name)
+            .cloned()
+            .ok_or_else(|| format!("Ball '{name}' is not installed locally"))?;
+        let upk = cooked_pc.join("Mutators_Balls_SF.upk");
+        self.spawn_apply_thread(&ball, cooked_pc, &upk, backups_dir, tx, ctx);
+        Ok(())
+    }
+
     pub fn poll_ops(&mut self, tx: &Sender<AppMsg>, ctx: &egui::Context, config: &mut Config) {
         let mut received = false;
         while let Ok(op) = self.local_rx.try_recv() {
@@ -372,6 +391,10 @@ impl PatcherState {
                     ));
                 }
                 PatcherOp::Error(error) => {
+                    if error.starts_with("Rocket League was updated") {
+                        self.active_ball = None;
+                        config.patcher.active_ball = None;
+                    }
                     let _ = tx.send(AppMsg::Log(format!("[Patcher] Error: {error}")));
                 }
             }
@@ -483,6 +506,11 @@ impl PatcherState {
                     ));
                 }
                 PatcherOp::Error(e) => {
+                    if e.starts_with("Rocket League was updated") {
+                        self.active_ball = None;
+                        config.patcher.active_ball = None;
+                        let _ = config.save(&self.base_dir);
+                    }
                     let _ = tx.send(AppMsg::Log(format!("[Patcher] Error: {}", e)));
                 }
             }
@@ -595,6 +623,11 @@ impl PatcherState {
                     ));
                 }
                 PatcherOp::Error(e) => {
+                    if e.starts_with("Rocket League was updated") {
+                        self.active_ball = None;
+                        config.patcher.active_ball = None;
+                        let _ = config.save(&self.base_dir);
+                    }
                     let _ = tx.send(AppMsg::Log(format!("[Patcher] Error: {}", e)));
                 }
             }

@@ -527,6 +527,34 @@ impl CarPatcherState {
         Ok(())
     }
 
+    pub fn apply_preset(
+        &mut self,
+        patch_name: &str,
+        expected_target: &str,
+        cooked_pc: &Path,
+        backups_dir: &Path,
+        tx: &Sender<AppMsg>,
+        config: &mut Config,
+    ) -> Result<(), String> {
+        let car = self
+            .cars
+            .iter()
+            .find(|car| car.name == patch_name)
+            .cloned()
+            .ok_or_else(|| format!("Car patch '{patch_name}' is not installed locally"))?;
+        let target = self.resolve_body(car.body_id)?;
+        if !target.upk_path.eq_ignore_ascii_case(expected_target) {
+            return Err(format!(
+                "Car patch '{patch_name}' now targets {}, not {expected_target}",
+                target.upk_path
+            ));
+        }
+        if self.active_cars.contains_key(&target.upk_path) {
+            self.restore(&target.upk_path, cooked_pc, backups_dir, tx, config)?;
+        }
+        self.apply(&car, cooked_pc, backups_dir, tx, config)
+    }
+
     pub fn restore(
         &mut self,
         target_upk: &str,
@@ -540,9 +568,19 @@ impl CarPatcherState {
         }
         let target_upk = upk_file_name(target_upk)?;
         let car_backups = Self::backup_dir(backups_dir);
-        backup_guard::check(cooked_pc, &car_backups, "car-build.sha256", |name| {
-            name.to_ascii_lowercase().ends_with(".upk.bak")
-        })?;
+        if let Err(error) = backup_guard::check(
+            cooked_pc,
+            &car_backups,
+            "car-build.sha256",
+            |name| name.to_ascii_lowercase().ends_with(".upk.bak"),
+        ) {
+            if error.starts_with("Rocket League was updated") {
+                self.active_cars.clear();
+                config.patcher.active_cars.clear();
+                let _ = config.save(&self.base_dir);
+            }
+            return Err(error);
+        }
         let backup = car_backups.join(format!("{target_upk}.bak"));
         if !backup.is_file() {
             return Err(format!("No original backup exists for {target_upk}"));

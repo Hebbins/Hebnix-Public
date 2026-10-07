@@ -1391,6 +1391,24 @@ impl BoostPatcherState {
         self.spawn_restore_thread(cooked_pc, backups_dir, tx, ctx);
     }
 
+    pub fn begin_apply_named(
+        &mut self,
+        name: &str,
+        cooked_pc: &Path,
+        backups_dir: &Path,
+        tx: &Sender<AppMsg>,
+        ctx: &egui::Context,
+    ) -> Result<(), String> {
+        let boost = self
+            .boosts
+            .iter()
+            .find(|boost| boost.name == name)
+            .cloned()
+            .ok_or_else(|| format!("Boost '{name}' is not installed locally"))?;
+        self.spawn_apply_thread(&boost, cooked_pc, backups_dir, tx, ctx);
+        Ok(())
+    }
+
     pub fn poll_ops(&mut self, tx: &Sender<AppMsg>, config: &mut Config) {
         while let Ok(op) = self.local_rx.try_recv() {
             self.processing_target = None;
@@ -1408,6 +1426,10 @@ impl BoostPatcherState {
                     ));
                 }
                 BoostOp::Error(error) => {
+                    if error.starts_with("Rocket League was updated") {
+                        self.active_boost = None;
+                        config.patcher.active_boost = None;
+                    }
                     let _ = tx.send(AppMsg::Log(format!("[Boost] Error: {error}")));
                 }
             }
@@ -1490,6 +1512,11 @@ impl BoostPatcherState {
                     ));
                 }
                 BoostOp::Error(e) => {
+                    if e.starts_with("Rocket League was updated") {
+                        self.active_boost = None;
+                        config.patcher.active_boost = None;
+                        let _ = config.save(&self.base_dir);
+                    }
                     let _ = tx.send(AppMsg::Log(format!("[Boost] Error: {}", e)));
                 }
             }

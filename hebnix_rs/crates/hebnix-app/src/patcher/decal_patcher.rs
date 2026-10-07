@@ -1784,6 +1784,7 @@ enum DecalOp {
         name: String,
         active_key: String,
         target_upk: String,
+        replaced_keys: Vec<String>,
     },
     Restored {
         active_key: String,
@@ -2454,6 +2455,11 @@ fn sort_and_deduplicate_decal_targets(
 }
 
 impl DecalPatcherState {
+    pub fn preset_item_available(&self, decal_name: &str, car_key: &str, skin_id: &str) -> bool {
+        self.decals.iter().any(|decal| decal.name == decal_name)
+            && self.find_skin(car_key, skin_id).is_ok()
+    }
+
     pub fn new(base_dir: &Path, config: &Config) -> Self {
         let decals_dir = base_dir.join("decals");
         let _ = fs::create_dir_all(&decals_dir);
@@ -2810,6 +2816,9 @@ impl DecalPatcherState {
         if crate::messages::block_item_action_if_game_running(tx) {
             return Ok(());
         }
+        if crate::patcher::backup_guard::synchronize_install(cooked_pc, backups_dir)? {
+            self.active_decals.clear();
+        }
         self.validate_key_file()?;
 
         let decal_name_owned = decal_name.to_string();
@@ -2818,17 +2827,23 @@ impl DecalPatcherState {
 
         let skin_info = self.find_skin(car_key, skin_id)?;
         let active_key = format!("{car_key}|{skin_id}");
-        if self.active_decals.contains_key(&active_key)
-            || self.active_decals.keys().any(|key| {
-                key.split_once('|')
-                    .and_then(|(active_car, active_skin)| {
-                        self.find_skin(active_car, active_skin).ok()
-                    })
-                    .is_some_and(|skin| skin.upk_path.eq_ignore_ascii_case(&skin_info.upk_path))
+        let replaced_keys = self
+            .active_decals
+            .keys()
+            .filter(|key| {
+                *key == &active_key
+                    || key.split_once('|')
+                        .and_then(|(active_car, active_skin)| {
+                            self.find_skin(active_car, active_skin).ok()
+                        })
+                        .is_some_and(|skin| {
+                            skin.upk_path.eq_ignore_ascii_case(&skin_info.upk_path)
+                        })
             })
-        {
-            return Err(t("apply-decal-to-skin-this-decal-target-already-has-an").to_string());
-        }
+            .cloned()
+            .collect::<Vec<_>>();
+        // Replacing a preset target is intentional. The worker restores the
+        // original texture regions below before installing the requested decal.
 
         let decal = self
             .decals
@@ -2909,6 +2924,7 @@ impl DecalPatcherState {
         let donor_upks_clone = donor_upks;
         let local_tx = self.local_tx.clone();
         let ctx_clone = ctx.clone();
+        let replaced_keys_clone = replaced_keys;
 
         std::thread::spawn(move || {
             let progress_tx = local_tx.clone();
@@ -2989,6 +3005,7 @@ impl DecalPatcherState {
                         name: decal_name_clone,
                         active_key: format!("{}|{}", car_key_clone, skin_id_clone),
                         target_upk,
+                        replaced_keys: replaced_keys_clone,
                     });
                 }
                 Err(e) => {
@@ -3012,6 +3029,10 @@ impl DecalPatcherState {
     ) -> Result<(), String> {
         if crate::messages::block_item_action_if_game_running(tx) {
             return Ok(());
+        }
+        if let Err(error) = crate::patcher::backup_guard::check_install(cooked_pc, backups_dir) {
+            self.active_decals.clear();
+            return Err(error);
         }
         let active_key = format!("{}|{}", car_key, skin_id);
         let decal_name = self
@@ -3073,6 +3094,10 @@ impl DecalPatcherState {
     ) -> Result<(), String> {
         if crate::messages::block_item_action_if_game_running(tx) {
             return Ok(());
+        }
+        if let Err(error) = crate::patcher::backup_guard::check_install(cooked_pc, backups_dir) {
+            self.active_decals.clear();
+            return Err(error);
         }
         let mut target_candidates = HashSet::new();
         for active_key in self.active_decals.keys() {
@@ -3193,10 +3218,14 @@ impl DecalPatcherState {
                     name,
                     active_key,
                     target_upk,
+                    replaced_keys,
                 } => {
                     self.processing_target = None;
                     self.progress = None;
                     self.progress_label.clear();
+                    for replaced in replaced_keys {
+                        self.active_decals.remove(&replaced);
+                    }
                     self.active_decals.insert(active_key, name.clone());
                     self.target_by_decal.remove(&name);
                     active_changed = true;

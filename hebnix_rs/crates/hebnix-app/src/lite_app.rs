@@ -91,6 +91,7 @@ pub struct LiteApp {
     stats_tx: Sender<StatsEvent>,
     monitor: Monitor,
     discord_presence: crate::discord_presence::DiscordPresence,
+    discord_link: crate::discord_link::DiscordLinkState,
     plugin_mgr: PluginManager,
     tray: Option<Tray>,
     hotkey: Option<ToggleHotkey>,
@@ -296,7 +297,7 @@ impl LiteApp {
         );
 
         let mut app = Self {
-            base_dir,
+            base_dir: base_dir.clone(),
             themes_dir,
             fonts_dir,
             plugin_dir,
@@ -308,6 +309,7 @@ impl LiteApp {
             stats_tx,
             monitor,
             discord_presence,
+            discord_link: crate::discord_link::DiscordLinkState::new(&base_dir),
             plugin_mgr,
             tray,
             hotkey,
@@ -2422,6 +2424,8 @@ impl LiteApp {
             self.save_config();
             self.refresh_discord_presence();
         }
+        let ctx = ui.ctx().clone();
+        self.discord_link.show(ui, &ctx);
     }
 
     fn render_system_settings(&mut self, ui: &mut egui::Ui) {

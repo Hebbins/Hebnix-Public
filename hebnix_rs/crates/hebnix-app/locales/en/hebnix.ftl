@@ -100,6 +100,19 @@ discord-show-gamemode = Show gamemode
 discord-custom = Custom
 discord-custom-hint = Custom message
 discord-custom-disabled-note = The custom message is disabled while Game State is selected.
+discord-link-heading = Link Account to Hebnix Server
+discord-link-instruction = Type !link in the Hebnix Discord Server
+discord-link-code = Code:
+discord-link-button = Link
+discord-link-status-ready = Ready to link.
+discord-link-status-linking = Linking account…
+discord-link-status-linked = Account linked.
+discord-link-status-code-required = Enter the code from the Hebnix Discord Server.
+discord-link-status-game-required = Rocket League must be open before linking an account.
+discord-link-status-player-required = Could not find your Rocket League account. Launch Rocket League and try again.
+discord-link-status-start-failed = Could not start the Discord link request.
+discord-link-status-save-failed = Account linked, but Hebnix could not remember it.
+discord-linked-accounts = Linked Accounts:
 
 ## settings: system
 system-start-with-windows = Start with Windows:

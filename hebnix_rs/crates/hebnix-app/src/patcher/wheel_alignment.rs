@@ -270,6 +270,15 @@ fn transaction(
 ) -> Result<String, String> {
     ensure_closed()?;
     settings.validate()?;
+    let backups = cooked.join("Backups");
+    match action {
+        TransactionAction::Apply => {
+            super::backup_guard::synchronize_install(cooked, &backups)?;
+        }
+        TransactionAction::Revert | TransactionAction::RevertAndForget => {
+            super::backup_guard::check_install(cooked, &backups)?;
+        }
+    }
     if Path::new(file).components().count() != 1
         || !file.to_ascii_lowercase().ends_with(".upk")
         || file.contains(['/', '\\', ':'])
