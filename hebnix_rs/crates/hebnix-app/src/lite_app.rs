@@ -19,7 +19,7 @@ use crate::plugins::PluginManager;
 use crate::tray::Tray;
 use crate::{dpi_fix, statsapi_ini, theme, winutil};
 
-pub const APP_VERSION: &str = "2.2.0";
+pub const APP_VERSION: &str = "2.2.2";
 pub const DEFAULT_WIDTH: f32 = 760.0;
 pub const DEFAULT_HEIGHT: f32 = 520.0;
 pub const MIN_WIDTH: f32 = 520.0;
@@ -91,6 +91,7 @@ pub struct LiteApp {
     stats_tx: Sender<StatsEvent>,
     monitor: Monitor,
     discord_presence: crate::discord_presence::DiscordPresence,
+    discord_link: crate::discord_link::DiscordLinkState,
     plugin_mgr: PluginManager,
     tray: Option<Tray>,
     hotkey: Option<ToggleHotkey>,
@@ -129,8 +130,7 @@ pub struct LiteApp {
     overlay_rect: Option<(i32, i32, i32, i32)>,
     overlay_rect_checked: Option<std::time::Instant>,
     plugin_monitor_size: (f32, f32),
-    plugin_monitor_checked: Option<std::time::Instant>,
-    startup_enabled: bool,
+    plugin_monitor_checked: Option<std::time::Instant>,    startup_enabled: bool,
     fullscreen_notice: bool,
     fullscreen_notice_dismissed: bool,
     statsapi_notice: Option<String>,
@@ -297,7 +297,7 @@ impl LiteApp {
         );
 
         let mut app = Self {
-            base_dir,
+            base_dir: base_dir.clone(),
             themes_dir,
             fonts_dir,
             plugin_dir,
@@ -309,6 +309,7 @@ impl LiteApp {
             stats_tx,
             monitor,
             discord_presence,
+            discord_link: crate::discord_link::DiscordLinkState::new(&base_dir),
             plugin_mgr,
             tray,
             hotkey,
@@ -345,8 +346,7 @@ impl LiteApp {
             overlay_rect: None,
             overlay_rect_checked: None,
             plugin_monitor_size: (1920.0, 1080.0),
-            plugin_monitor_checked: None,
-            startup_enabled: winutil::is_startup_enabled(),
+            plugin_monitor_checked: None,            startup_enabled: winutil::is_startup_enabled(),
             fullscreen_notice: false,
             fullscreen_notice_dismissed: false,
             statsapi_notice: None,
@@ -602,6 +602,7 @@ impl LiteApp {
                         }
                     }
                 }
+                AppMsg::Toast { .. } => {}
                 AppMsg::PluginHttpRes {
                     slug,
                     req_id,
@@ -928,6 +929,8 @@ impl LiteApp {
                 self.console.write("  plugin load <name>   - load a disabled plugin");
                 self.console.write("  plugin reload <name> - reload an enabled plugin");
                 self.console.write("  plugin unload <name> - unloads an enabled plugin");
+                self.console.write("  cvar <name>          - gets a registered plugin cvar");
+                self.console.write("  cvar <name> <value>  - sets a cvar (quote string values)");
                 self.console.write("  quit                 - force kills the Rocket League process");
                 self.console.write("  restart              - restarts Rocket League through Steam or Epic");
             }
@@ -938,6 +941,7 @@ impl LiteApp {
                 self.console.write(format!("[Console] StatsAPI: 127.0.0.1:{} | game running: {} | port open: {} | listener connected: {}", self.current_api_port, self.last_rl_open, self.last_api_open, self.currently_connected));
             }
             Some("clear") => self.console.clear(),
+            Some("cvar") => self.console.write(self.plugin_mgr.execute_cvar_command(&raw)),
             Some("quit") => {
                 self.console
                     .write("[Console] Killing RocketLeague process threads and exiting...");
@@ -1038,7 +1042,7 @@ impl LiteApp {
                 }
             }
             _ => self.console.write(
-                "[Console] Unknown command. Try: help, info, server, webview, clear, quit, restart, plugins list, plugin load|reload|unload <name>",
+                "[Console] Unknown command. Try: help, info, server, webview, cvar, clear, quit, restart, plugins list, plugin load|reload|unload <name>",
             ),
         }
     }
@@ -2420,6 +2424,8 @@ impl LiteApp {
             self.save_config();
             self.refresh_discord_presence();
         }
+        let ctx = ui.ctx().clone();
+        self.discord_link.show(ui, &ctx);
     }
 
     fn render_system_settings(&mut self, ui: &mut egui::Ui) {
@@ -2839,8 +2845,11 @@ impl LiteApp {
                     .map(|runtime| (plugin.slug.clone(), runtime.host.window.borrow().clone()))
             })
             .collect::<Vec<_>>();
+        let focus_ok = hebnix_sdk::process::is_rocket_league_focused()
+            || winutil::foreground_window_is_ours();
         for (slug, state) in windows {
             let viewport_id = egui::ViewportId::from_hash_of(("lite_plugin_window", &slug));
+            let shown = state.shown(focus_ok);
             let mut builder = egui::ViewportBuilder::default()
                 .with_title(state.title.clone())
                 .with_inner_size([
@@ -2852,13 +2861,13 @@ impl LiteApp {
                 .with_resizable(false)
                 .with_transparent(true)
                 .with_mouse_passthrough(false)
-                .with_visible(state.open)
+                .with_visible(shown)
                 .with_taskbar(false);
             if let Some((x, y)) = state.pos {
                 builder = builder.with_position([x, y]);
             }
             ctx.show_viewport_immediate(viewport_id, builder, |ui, _| {
-                if !state.open {
+                if !shown {
                     return;
                 }
                 let ctx = ui.ctx().clone();

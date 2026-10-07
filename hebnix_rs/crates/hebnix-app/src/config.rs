@@ -46,6 +46,7 @@ pub struct SettingsCfg {
     pub suppress_fullscreen_warning: bool,
     pub suppress_statsapi_rate_warning: bool,
     pub allow_draw_on_hebnix_focus: bool,
+    pub toast_position: crate::toast::ToastPos,
     pub restrict_hotkey_to_hebnix_or_rocket_league: bool,
     /// relaunch elevated on start, the hosts file needs admin
     pub run_as_admin: bool,
@@ -84,6 +85,7 @@ impl Default for SettingsCfg {
             suppress_fullscreen_warning: false,
             suppress_statsapi_rate_warning: false,
             allow_draw_on_hebnix_focus: true,
+            toast_position: Default::default(),
             restrict_hotkey_to_hebnix_or_rocket_league: true,
             run_as_admin: false,
             discord_rich_presence: true,
@@ -147,6 +149,35 @@ pub enum PatchSource {
 pub struct SpeedPatchCfg {
     /// show a speed picker on the Items page decal and swap rows
     pub items_page: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ReplayUploadCfg {
+    pub provider: String,
+    pub api_key: String,
+    #[serde(default = "default_replay_naming_template")]
+    pub naming_template: String,
+    pub visibility: String,
+    pub group_id: String,
+    pub debug_logging: bool,
+}
+
+fn default_replay_naming_template() -> String {
+    "Hebnix - {gamemode} - {date} {time24}".to_string()
+}
+
+impl Default for ReplayUploadCfg {
+    fn default() -> Self {
+        Self {
+            provider: "ballchasing.com".to_string(),
+            api_key: String::new(),
+            naming_template: default_replay_naming_template(),
+            visibility: "private".to_string(),
+            group_id: String::new(),
+            debug_logging: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -297,6 +328,7 @@ pub struct Config {
     pub rl_launch: RlLaunchCfg,
     pub patcher: PatcherCfg,
     pub speed_patch: SpeedPatchCfg,
+    pub replay_upload: ReplayUploadCfg,
     pub action_button: ActionButtonCfg,
     /// enabled state keyed by plugin slug
     pub plugins: BTreeMap<String, bool>,
@@ -404,7 +436,6 @@ fn parse_ini_bool(v: &str, default: bool) -> bool {
         _ => default,
     }
 }
-
 
 /// App root dir: `%AppData%\Hebnix`, or `HEBNIX_BASE_DIR` for dev runs.
 pub fn base_dir() -> PathBuf {

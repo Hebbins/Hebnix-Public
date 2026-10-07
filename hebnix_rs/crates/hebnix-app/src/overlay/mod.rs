@@ -187,6 +187,18 @@ pub fn polygon(points: &[(f32, f32)], color: Rgba) {
 pub fn image(path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32, radius: f32) {
     native::image(path, x, y, w, h, opacity, radius);
 }
+
+pub fn capture_image(
+    handle: u64,
+    frame: &crate::plugins::window_capture::CapturedFrame,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    opacity: f32,
+) {
+    native::capture_image(handle, frame, x, y, w, h, opacity);
+}
 /// the overlay window. inner is None when DirectComposition would not start,
 /// then every method no-ops and there is no overlay at all.
 pub struct Overlay {

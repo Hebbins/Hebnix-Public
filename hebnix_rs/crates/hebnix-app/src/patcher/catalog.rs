@@ -343,12 +343,21 @@ impl PatchCatalog {
                 }
                 ui.strong(short(field(item, "name"), 28));
                 ui.label(
-                    egui::RichText::new(t_args("card-by-field", &[("field", (field(item, "author")).to_string().into())]))
-                        .italics()
-                        .size(11.0)
-                        .color(egui::Color32::GRAY),
+                    egui::RichText::new(t_args(
+                        "card-by-field",
+                        &[("field", (field(item, "author")).to_string().into())],
+                    ))
+                    .italics()
+                    .size(11.0)
+                    .color(egui::Color32::GRAY),
                 );
-                ui.weak(t_args("card-number-downloads", &[("number", (number(item, "download_count")).to_string().into())]));
+                ui.weak(t_args(
+                    "card-number-downloads",
+                    &[(
+                        "number",
+                        (number(item, "download_count")).to_string().into(),
+                    )],
+                ));
                 let label = if busy {
                     t("card-downloading")
                 } else if downloaded {

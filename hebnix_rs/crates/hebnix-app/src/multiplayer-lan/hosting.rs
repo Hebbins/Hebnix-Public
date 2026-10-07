@@ -185,7 +185,10 @@ impl HostSession {
 
     /// players blocked this session, by name
     pub fn blocked(&self) -> Vec<(std::net::IpAddr, String)> {
-        self.map_sync.as_ref().map(MapSync::blocked).unwrap_or_default()
+        self.map_sync
+            .as_ref()
+            .map(MapSync::blocked)
+            .unwrap_or_default()
     }
 
     pub fn suspend(&mut self) {

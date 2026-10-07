@@ -17,6 +17,8 @@ pub enum AppMsg {
     Log(String),
     RlApiCaptureReady(Result<(), String>),
     RlApiResponse(Result<Value, String>),
+    ReplayUploadCaptureReady(Result<(), String>),
+    ReplayUploadFinished(crate::auto_upload_replays::UploadResult),
     GameEvent(StatsEvent),
     /// text chat read off the LAN match traffic (see multiplayer_lan::chat_capture)
     ChatMessage(crate::multiplayer_lan::ChatMessage),
@@ -51,6 +53,7 @@ pub enum AppMsg {
         message: String,
     },
     BackgroundChangerDone(Result<String, String>),
+    BackgroundChangerProgress(String),
     WorkshopMultiplayerProgress(String),
     // result of spawning the tsnet sidecar and requesting the tailnet come up
     WorkshopTailnetStarted {
@@ -94,6 +97,13 @@ pub enum AppMsg {
     OverlayPost {
         slug: String,
         data: serde_json::Value,
+    },
+    // hebnix.toast from a plugin
+    Toast {
+        slug: String,
+        name: String,
+        text: String,
+        style: crate::toast::ToastStyle,
     },
     // http result, slug picks the plugin that asked
     PluginHttpRes {

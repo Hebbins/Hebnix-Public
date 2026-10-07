@@ -1,6 +1,6 @@
 //! Offline, baseline-relative alignment. Never use the swapper's stock backup.
-use crate::i18n::{t, t_args};
 use super::upk_package::{UpkPackage, strip};
+use crate::i18n::{t, t_args};
 use eframe::egui;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -183,9 +183,7 @@ fn build(baseline: &Path, output: &Path, s: Settings) -> Result<(), String> {
         spans.push(at + 12..at + 40);
     }
     if found.len() != 4 {
-        return Err(
-            t("build-this-car-s-skeleton-is-unsupported").into(),
-        );
+        return Err(t("build-this-car-s-skeleton-is-unsupported").into());
     }
     if before
         .iter()
@@ -272,6 +270,15 @@ fn transaction(
 ) -> Result<String, String> {
     ensure_closed()?;
     settings.validate()?;
+    let backups = cooked.join("Backups");
+    match action {
+        TransactionAction::Apply => {
+            super::backup_guard::synchronize_install(cooked, &backups)?;
+        }
+        TransactionAction::Revert | TransactionAction::RevertAndForget => {
+            super::backup_guard::check_install(cooked, &backups)?;
+        }
+    }
     if Path::new(file).components().count() != 1
         || !file.to_ascii_lowercase().ends_with(".upk")
         || file.contains(['/', '\\', ':'])
@@ -399,10 +406,7 @@ fn transaction(
         }
         Ok(t("drop-alignment-reverted-and-removed-from-the").into())
     } else if action == TransactionAction::Revert {
-        Ok(
-            t("drop-alignment-reverted-to-captured-baseline")
-                .into(),
-        )
+        Ok(t("drop-alignment-reverted-to-captured-baseline").into())
     } else {
         Ok(t("drop-alignment-applied-and-verified-test-stee").into())
     }
@@ -502,7 +506,10 @@ impl WheelAlignmentState {
                         .unwrap_or("Load car catalog"),
                 )
                 .show_ui(ui, |ui| {
-                    ui.add(egui::TextEdit::singleline(&mut self.search).hint_text(t("render-filter-cars")));
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.search)
+                            .hint_text(t("render-filter-cars")),
+                    );
                     ui.separator();
                     for (i, (name, _)) in self.cars.iter().enumerate() {
                         if name.to_lowercase().contains(&self.search.to_lowercase())
@@ -542,9 +549,7 @@ impl WheelAlignmentState {
                     .step_by(0.25)
                     .text(t("render-left-right-track-width")),
             );
-            ui.weak(
-                t("render-mirrored-adjustment-positive-moves-both"),
-            );
+            ui.weak(t("render-mirrored-adjustment-positive-moves-both"));
             if ui
                 .add_enabled(!rl_open, egui::Button::new(t("render-apply-alignment")))
                 .on_disabled_hover_text(t("render-close-rocket-league-before-changing-alig"))
@@ -557,7 +562,10 @@ impl WheelAlignmentState {
             if ui.button(t("render-revert-to-0")).clicked() {
                 self.settings = Settings::default();
             }
-            ui.label(t_args("render-edited-cars-edited", &[("edited", (self.edited.len()).to_string().into())]));
+            ui.label(t_args(
+                "render-edited-cars-edited",
+                &[("edited", (self.edited.len()).to_string().into())],
+            ));
             egui::ScrollArea::vertical()
                 .id_salt("alignment_edited_cars")
                 .max_height(200.0)
@@ -581,9 +589,9 @@ impl WheelAlignmentState {
                             }
                             if ui
                                 .add_enabled(!rl_open, egui::Button::new("X"))
-                                .on_disabled_hover_text(
-                                    t("render-close-rocket-league-before-restoring-ali"),
-                                )
+                                .on_disabled_hover_text(t(
+                                    "render-close-rocket-league-before-restoring-ali",
+                                ))
                                 .clicked()
                             {
                                 action = Some((

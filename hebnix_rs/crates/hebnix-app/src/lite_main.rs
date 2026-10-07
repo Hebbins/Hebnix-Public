@@ -2,6 +2,7 @@
 
 mod config;
 mod deep_link;
+mod discord_link;
 mod discord_presence;
 mod dpi_fix;
 mod epic_connection;
@@ -17,6 +18,7 @@ mod plugins;
 mod runtime_assets;
 mod statsapi_ini;
 mod theme;
+mod toast;
 mod tray;
 mod update;
 mod ui {

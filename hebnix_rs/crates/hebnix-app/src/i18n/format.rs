@@ -37,7 +37,10 @@ pub fn number(n: f64, decimals: usize) -> String {
 pub fn int_for(lang: &str, n: i64) -> String {
     let (group, _) = separators(lang);
     let sign = if n < 0 { "-" } else { "" };
-    format!("{sign}{}", group_digits(&n.unsigned_abs().to_string(), group))
+    format!(
+        "{sign}{}",
+        group_digits(&n.unsigned_abs().to_string(), group)
+    )
 }
 
 pub fn number_for(lang: &str, n: f64, decimals: usize) -> String {

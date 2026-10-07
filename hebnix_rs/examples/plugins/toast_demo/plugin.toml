@@ -1,0 +1,4 @@
+name = "Toast Demo"
+author = "nixvio64"
+version = "1.0.0"
+entry = "main.lua"
