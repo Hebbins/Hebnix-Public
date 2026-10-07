@@ -139,26 +139,38 @@ fn idle_activity(
 ) -> (String, String) {
     if !settings.discord_game_state {
         return (
-            nonempty(&settings.discord_custom_message, &t("discord-presence-playing")),
+            nonempty(
+                &settings.discord_custom_message,
+                &t("discord-presence-playing"),
+            ),
             String::new(),
         );
     }
     if !rocket_league_open {
         return (String::new(), String::new());
     }
-    (t("discord-presence-in-game"), t("discord-presence-main-menu"))
+    (
+        t("discord-presence-in-game"),
+        t("discord-presence-main-menu"),
+    )
 }
 
 fn match_activity(settings: &crate::config::SettingsCfg, info: &MatchInfo) -> (String, String) {
     let details = if settings.discord_game_state {
         t("discord-presence-in-match")
     } else {
-        nonempty(&settings.discord_custom_message, &t("discord-presence-playing"))
+        nonempty(
+            &settings.discord_custom_message,
+            &t("discord-presence-playing"),
+        )
     };
     let mut fields = Vec::with_capacity(3);
     if settings.discord_game_state {
         if settings.discord_show_score && !info.score.is_empty() {
-            fields.push(t_args("discord-presence-score", &[("score", info.score.as_str().into())]));
+            fields.push(t_args(
+                "discord-presence-score",
+                &[("score", info.score.as_str().into())],
+            ));
         }
         if settings.discord_show_map && !info.map.is_empty() {
             fields.push(info.map.clone());

@@ -17,6 +17,8 @@ pub enum AppMsg {
     Log(String),
     RlApiCaptureReady(Result<(), String>),
     RlApiResponse(Result<Value, String>),
+    ReplayUploadCaptureReady(Result<(), String>),
+    ReplayUploadFinished(crate::auto_upload_replays::UploadResult),
     GameEvent(StatsEvent),
     // periodic RL monitor result. root_dir is the game install folder resolved
     // from the running process, used to auto-fill the configured paths.
@@ -49,6 +51,7 @@ pub enum AppMsg {
         message: String,
     },
     BackgroundChangerDone(Result<String, String>),
+    BackgroundChangerProgress(String),
     WorkshopMultiplayerProgress(String),
     // result of spawning the tsnet sidecar and requesting the tailnet come up
     WorkshopTailnetStarted {
@@ -92,6 +95,13 @@ pub enum AppMsg {
     OverlayPost {
         slug: String,
         data: serde_json::Value,
+    },
+    // hebnix.toast from a plugin
+    Toast {
+        slug: String,
+        name: String,
+        text: String,
+        style: crate::toast::ToastStyle,
     },
     // http result, slug picks the plugin that asked
     PluginHttpRes {

@@ -27,9 +27,11 @@ use crate::spoofer::socket::SocketProxy;
 pub const PROXY_HOST: &str = "127.0.0.1";
 pub const PROXY_PORT: u16 = 8080;
 pub const MAX_NAME_LENGTH: usize = 32;
-// Intercept config for title and rank routing, and Epic API for name/friends.
-// PsyNet RPC is reached through config when rank spoofing is enabled.
-const REDIRECT_HOSTS: [&str; 2] = ["api.epicgames.dev", TITLE_HOST];
+// Intercept Epic's account API only for name/friends, and PsyNet config only
+// for title/rank routing.  These must stay independent: redirecting the game
+// config host for an account-only spoof forces Rocket League's startup/auth
+// path through the local proxy when it has nothing to do there.
+const ACCOUNT_HOST: &str = "api.epicgames.dev";
 
 const INET_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
 
@@ -273,12 +275,15 @@ impl SpooferManager {
                 && hebnix_sdk::process::is_rocket_league_running())
     }
 
-    fn redirect_hosts(&self) -> &'static [&'static str] {
-        if self.http_active.load(Ordering::Relaxed) || self.socket_active.load(Ordering::Relaxed) {
-            &REDIRECT_HOSTS
-        } else {
-            &[TITLE_HOST]
+    fn redirect_hosts(&self) -> Vec<&'static str> {
+        let mut hosts = Vec::with_capacity(2);
+        if self.http_active.load(Ordering::Relaxed) {
+            hosts.push(ACCOUNT_HOST);
         }
+        if self.socket_active.load(Ordering::Relaxed) || self.rlapi_running() {
+            hosts.push(TITLE_HOST);
+        }
+        hosts
     }
 
     pub fn enable_rlapi(&self) -> Result<(), String> {
@@ -544,7 +549,7 @@ impl SpooferManager {
             .lock()
             .map_err(|_| "reverse proxy lock poisoned")?;
         if slot.is_some() {
-            return hosts::set_redirects(self.redirect_hosts());
+            return hosts::set_redirects(&self.redirect_hosts());
         }
         let ca = Arc::new(ca::ensure(&self.base_dir)?);
         if !ca::is_current_installed(&self.base_dir) {
@@ -557,7 +562,10 @@ impl SpooferManager {
             return Err("The hosts file needs administrator, restart Hebnix as admin".into());
         }
         let mut real_ips = HashMap::new();
-        for host in REDIRECT_HOSTS {
+        // The account proxy may start before Titles turn on. Pin both possible
+        // redirect targets now so a later hosts-file change cannot make an
+        // unpinned upstream request resolve back to our own listener.
+        for host in [ACCOUNT_HOST, TITLE_HOST] {
             real_ips.insert(host.to_string(), dns::resolve_a(host)?);
         }
         real_ips.insert(
@@ -594,7 +602,7 @@ impl SpooferManager {
         let rules = Arc::new(rules);
         self.ensure_crl(&ca);
         let proxy = SocketProxy::start(ca, rules, self.tx.clone(), real_ips)?;
-        if let Err(error) = hosts::set_redirects(self.redirect_hosts()) {
+        if let Err(error) = hosts::set_redirects(&self.redirect_hosts()) {
             proxy.stop();
             return Err(error);
         }
@@ -605,7 +613,7 @@ impl SpooferManager {
     /// Reconcile hosts with the shared proxy's actual runtime state.
     pub fn reconcile_hosts(&self) -> Result<(), String> {
         if self.http_running() || self.socket_running() || self.rlapi_running() {
-            hosts::set_redirects(self.redirect_hosts())
+            hosts::set_redirects(&self.redirect_hosts())
         } else {
             hosts::clear()
         }

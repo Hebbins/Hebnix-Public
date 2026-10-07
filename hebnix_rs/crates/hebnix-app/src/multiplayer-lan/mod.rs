@@ -25,8 +25,8 @@ pub use map_sync::{
     TransferProgress, fetch_map_file, hash_file, is_local_map_id, local_map_id, valid_map_id,
 };
 pub use models::{
-    CreateRoomRequest, JoinRoomRequest, JoinedRoom, LeaveRoomRequest, Room,
-    RoomCredentials, UpdatePlayerRequest,
+    CreateRoomRequest, JoinRoomRequest, JoinedRoom, LeaveRoomRequest, Room, RoomCredentials,
+    UpdatePlayerRequest,
 };
 pub use tsnet_sidecar::{PeerInfo, TsState, TsnetSidecarHandle, find_sidecar_dir, redact};
 

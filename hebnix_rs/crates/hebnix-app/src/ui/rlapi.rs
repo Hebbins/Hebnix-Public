@@ -95,7 +95,11 @@ impl RlApiPanel {
             if ui
                 .add_enabled(
                     !self.starting,
-                    egui::Button::new(if enabled { t("hebnix-install-disable") } else { t("hebnix-install-enable") }),
+                    egui::Button::new(if enabled {
+                        t("hebnix-install-disable")
+                    } else {
+                        t("hebnix-install-enable")
+                    }),
                 )
                 .clicked()
             {

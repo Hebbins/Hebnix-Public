@@ -23,17 +23,25 @@ pub mod upk_keys;
 pub mod upk_package;
 pub mod wheel_alignment;
 
-use crate::i18n::t;
 use crate::config::PatchSource;
+use crate::i18n::t;
 
 pub(crate) fn patch_source_selector(ui: &mut eframe::egui::Ui, source: &mut PatchSource) -> bool {
     ui.horizontal(|ui| {
         let mut changed = ui
-            .selectable_value(source, PatchSource::Catalog, t("patch-source-selector-catalog"))
+            .selectable_value(
+                source,
+                PatchSource::Catalog,
+                t("patch-source-selector-catalog"),
+            )
             .changed();
         ui.label("|");
         changed |= ui
-            .selectable_value(source, PatchSource::Custom, t("patch-source-selector-local"))
+            .selectable_value(
+                source,
+                PatchSource::Custom,
+                t("patch-source-selector-local"),
+            )
             .changed();
         changed
     })

@@ -123,7 +123,12 @@ fn collect(package: &UpkPackage) -> Result<Vec<Slot>, String> {
         }
         let material = strip(&package.name_of(export.object_name)).to_string();
         let (props, _) = package.serialized_props(export)?;
-        for entry in array_entries(package, &props, export.serial_offset, "VectorParameterValues")? {
+        for entry in array_entries(
+            package,
+            &props,
+            export.serial_offset,
+            "VectorParameterValues",
+        )? {
             let Some(name) = entry.iter().find(|p| p.name == "ParameterName") else {
                 continue;
             };
@@ -146,7 +151,12 @@ fn collect(package: &UpkPackage) -> Result<Vec<Slot>, String> {
                 values: read_f32s(package, value.value_offset, 4)?,
             });
         }
-        for entry in array_entries(package, &props, export.serial_offset, "ScalarParameterValues")? {
+        for entry in array_entries(
+            package,
+            &props,
+            export.serial_offset,
+            "ScalarParameterValues",
+        )? {
             let Some(name) = entry.iter().find(|p| p.name == "ParameterName") else {
                 continue;
             };
@@ -404,6 +414,7 @@ fn run_job(
     let backup = backups_dir.join(format!("{name}.bak"));
     match job {
         Job::Patch => {
+            crate::patcher::backup_guard::synchronize_install(cooked_pc, backups_dir)?;
             std::fs::create_dir_all(backups_dir).map_err(|e| e.to_string())?;
             if !backup.is_file() {
                 std::fs::copy(package, &backup)
@@ -424,6 +435,7 @@ fn run_job(
             })
         }
         Job::Restore => {
+            crate::patcher::backup_guard::check_install(cooked_pc, backups_dir)?;
             if !backup.is_file() {
                 return Err(t_args("speed-patch-no-backup", &[("file", name.into())]));
             }

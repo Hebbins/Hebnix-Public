@@ -500,6 +500,9 @@ pub fn apply_with_colours(
     colours: bool,
 ) -> Result<(), String> {
     selection(source, donor)?;
+    super::backup_guard::prepare(cooked, backups, "ball-visual-build.sha256", |name| {
+        name.eq_ignore_ascii_case("BallVisual")
+    })?;
     let mut swaps = active(backups)?;
     if swaps.iter().any(|s| s.source == source) {
         return Err(
@@ -628,6 +631,9 @@ pub fn restore(cooked: &Path, backups: &Path, source: usize) -> Result<(), Strin
     if source >= BALLS.len() {
         return Err("Invalid ball selection".into());
     }
+    super::backup_guard::check(cooked, backups, "ball-visual-build.sha256", |name| {
+        name.eq_ignore_ascii_case("BallVisual")
+    })?;
     let mut swaps = active(backups)?;
     let swap = swaps
         .iter()

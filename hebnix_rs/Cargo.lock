@@ -2437,7 +2437,7 @@ dependencies = [
 
 [[package]]
 name = "hebnix-app"
-version = "2.2.0"
+version = "2.2.2"
 dependencies = [
  "aes",
  "base64 0.21.7",
@@ -2477,6 +2477,7 @@ dependencies = [
  "socket2 0.5.10",
  "sys-locale",
  "thiserror 2.0.18",
+ "time",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
@@ -3625,6 +3626,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.118",
+]
+
+[[package]]
+name = "num_threads"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -5738,7 +5748,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb87b95ec50ddfa440816d227a17b2ccbdda963a316a727fda0fc4334f7d134"
 dependencies = [
  "deranged",
+ "libc",
  "num-conv",
+ "num_threads",
  "powerfmt",
  "serde_core",
  "time-core",

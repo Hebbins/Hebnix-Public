@@ -121,7 +121,6 @@ fn absolute_uri_path(target: &str) -> &str {
     if target.starts_with('/') { target } else { "/" }
 }
 
-
 const SKIP_REQ_HEADERS: [&str; 5] = [
     "host",
     "content-length",

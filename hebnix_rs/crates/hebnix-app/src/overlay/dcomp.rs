@@ -109,6 +109,34 @@ fn load_d2d_bitmap(ctx: &ID2D1DeviceContext, path: &str) -> Option<ID2D1Bitmap1>
     }
 }
 
+fn capture_d2d_bitmap(
+    ctx: &ID2D1DeviceContext,
+    frame: &crate::plugins::window_capture::CapturedFrame,
+) -> Option<ID2D1Bitmap1> {
+    let props = D2D1_BITMAP_PROPERTIES1 {
+        pixelFormat: D2D1_PIXEL_FORMAT {
+            format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+        },
+        dpiX: 96.0,
+        dpiY: 96.0,
+        bitmapOptions: D2D1_BITMAP_OPTIONS_NONE,
+        colorContext: std::mem::ManuallyDrop::new(None),
+    };
+    unsafe {
+        ctx.CreateBitmap(
+            D2D_SIZE_U {
+                width: frame.width,
+                height: frame.height,
+            },
+            Some(frame.pixels.as_ptr() as *const _),
+            frame.width * 4,
+            &props,
+        )
+        .ok()
+    }
+}
+
 /// rl's faces as a private directwrite collection built once from the ttfs rl_font rebuilds. None if rl isn't installed or dwrite5 is missing, falls back to segoe
 fn rl_collection(factory: &IDWriteFactory) -> Option<IDWriteFontCollection> {
     thread_local! {
@@ -199,6 +227,8 @@ pub struct D2dCanvas {
     dwrite: IDWriteFactory,
     d2d_factory: ID2D1Factory1,
     image_cache: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, ID2D1Bitmap1>>>,
+    capture_cache:
+        std::rc::Rc<std::cell::RefCell<std::collections::HashMap<u64, (u64, ID2D1Bitmap1)>>>,
 }
 
 impl D2dCanvas {
@@ -407,7 +437,9 @@ impl D2dCanvas {
             None => ("Segoe UI", None),
         };
         let family: Vec<u16> = format!("{name}\0").encode_utf16().collect();
-        let locale: Vec<u16> = format!("{}\0", crate::i18n::current_bcp47()).encode_utf16().collect();
+        let locale: Vec<u16> = format!("{}\0", crate::i18n::current_bcp47())
+            .encode_utf16()
+            .collect();
         unsafe {
             let weight = if bold {
                 DWRITE_FONT_WEIGHT_BOLD
@@ -534,6 +566,51 @@ impl D2dCanvas {
             }
         }
     }
+
+    pub fn capture_image(
+        &self,
+        handle: u64,
+        frame: &crate::plugins::window_capture::CapturedFrame,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        opacity: f32,
+    ) {
+        let mut cache = self.capture_cache.borrow_mut();
+        let needs_upload = cache
+            .get(&handle)
+            .map(|(serial, _)| *serial != frame.serial)
+            .unwrap_or(true);
+        if needs_upload {
+            let Some(bitmap) = capture_d2d_bitmap(&self.ctx, frame) else {
+                return;
+            };
+            if cache.len() >= 32 && !cache.contains_key(&handle) {
+                cache.clear();
+            }
+            cache.insert(handle, (frame.serial, bitmap));
+        }
+        let Some((_, bitmap)) = cache.get(&handle) else {
+            return;
+        };
+        let dest = D2D_RECT_F {
+            left: x,
+            top: y,
+            right: x + w,
+            bottom: y + h,
+        };
+        unsafe {
+            self.ctx.DrawBitmap(
+                bitmap,
+                Some(&dest as *const _),
+                opacity.clamp(0.0, 1.0),
+                D2D1_INTERPOLATION_MODE_LINEAR,
+                None,
+                None,
+            );
+        }
+    }
 }
 
 /// segoe ui pixel width of a string, for marquee layout without a live canvas
@@ -548,7 +625,9 @@ pub fn measure_text(s: &str, size: f32, bold: bool) -> f32 {
         };
         unsafe {
             let family: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
-            let locale: Vec<u16> = format!("{}\0", crate::i18n::current_bcp47()).encode_utf16().collect();
+            let locale: Vec<u16> = format!("{}\0", crate::i18n::current_bcp47())
+                .encode_utf16()
+                .collect();
             let weight = if bold {
                 DWRITE_FONT_WEIGHT_BOLD
             } else {
@@ -607,6 +686,8 @@ pub struct DcompOverlay {
     dcomp_visual: IDCompositionVisual,
     swapchain: Option<IDXGISwapChain1>,
     image_cache: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, ID2D1Bitmap1>>>,
+    capture_cache:
+        std::rc::Rc<std::cell::RefCell<std::collections::HashMap<u64, (u64, ID2D1Bitmap1)>>>,
 }
 
 impl DcompOverlay {
@@ -676,6 +757,9 @@ impl DcompOverlay {
                 dcomp_visual,
                 swapchain: None,
                 image_cache: std::rc::Rc::new(std::cell::RefCell::new(
+                    std::collections::HashMap::new(),
+                )),
+                capture_cache: std::rc::Rc::new(std::cell::RefCell::new(
                     std::collections::HashMap::new(),
                 )),
             })
@@ -790,6 +874,7 @@ impl DcompOverlay {
                     dwrite: self.dwrite.clone(),
                     d2d_factory: self.d2d_factory.clone(),
                     image_cache: self.image_cache.clone(),
+                    capture_cache: self.capture_cache.clone(),
                 };
                 draw_fn(canvas, w as f32, h as f32);
             }

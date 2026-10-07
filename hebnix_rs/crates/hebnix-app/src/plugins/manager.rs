@@ -13,6 +13,7 @@ use hebnix_sdk::stats::StatsEvent;
 
 use crate::config::Config;
 use crate::messages::AppMsg;
+use crate::plugins::cvar::{ConsoleCvarCommand, CvarRegistry, parse_console_command};
 use crate::plugins::lua_api::{self, HostCtx, HostShared, WindowState};
 use crate::plugins::manifest::{DiscoveredPlugin, PluginManifest, discover_plugins};
 use crate::plugins::store::PluginStore;
@@ -95,6 +96,7 @@ impl PluginManager {
                 platform: String::new(),
                 suppress_plugin_logs: false,
                 rl_config_dir: PathBuf::new(),
+                cvars: CvarRegistry::default(),
             })),
             last_pos_flush: std::time::Instant::now(),
             last_tick_dispatch: std::time::Instant::now() - std::time::Duration::from_secs(1),
@@ -371,12 +373,13 @@ impl PluginManager {
             slug: disc.slug.clone(),
             display_name: RefCell::new(disc.manifest.name.clone()),
             tx: self.tx.clone(),
-            store: RefCell::new(PluginStore::load(&self.plugin_dir, &disc.slug)),
+            store: Rc::new(RefCell::new(PluginStore::load(&self.plugin_dir, &disc.slug))),
             window: RefCell::new(WindowState::default()),
             shared: Rc::clone(&self.shared),
             text_bufs: RefCell::new(Default::default()),
             dir: self.plugin_dir.join(&disc.slug),
             assets: RefCell::new(Default::default()),
+            captures: Default::default(),
             read_roots,
         });
 
@@ -430,6 +433,32 @@ impl PluginManager {
             }
         }
         let _ = Self::call_callback_on(plugin, "on_unload", ());
+        if let Some(runtime) = &plugin.runtime {
+            runtime
+                .host
+                .shared
+                .borrow_mut()
+                .cvars
+                .unregister_owner(&plugin.slug);
+        }
+    }
+
+    pub fn execute_cvar_command(&self, raw: &str) -> String {
+        match parse_console_command(raw) {
+            Ok(ConsoleCvarCommand::Get { name }) => match self.shared.borrow().cvars.get(&name) {
+                None => format!("[Console] Cvar '{name}' has not been registered by a plugin."),
+                Some(None) => format!("[Console] {name} is unset."),
+                Some(Some(value)) => format!("[Console] {name} = {value}"),
+            },
+            Ok(ConsoleCvarCommand::Set { name, value }) => {
+                let display = value.to_string();
+                match self.shared.borrow_mut().cvars.set(&name, value) {
+                    Ok(()) => format!("[Console] {name} = {display}"),
+                    Err(error) => format!("[Console] {error}."),
+                }
+            }
+            Err(error) => format!("[Console] Invalid cvar command: {error}."),
+        }
     }
 
     fn call_callback_on(
