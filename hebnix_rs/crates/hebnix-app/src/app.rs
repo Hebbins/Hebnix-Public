@@ -27,7 +27,7 @@ use crate::ui::console::ConsoleState;
 use crate::ui::workshop::{ImageState, WorkshopState};
 use crate::winutil;
 
-pub const APP_VERSION: &str = "2.2.1";
+pub const APP_VERSION: &str = "2.2.2";
 
 pub const DEFAULT_WIDTH: f32 = 1250.0;
 pub const DEFAULT_HEIGHT: f32 = 700.0;

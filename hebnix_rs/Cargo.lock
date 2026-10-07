@@ -2437,7 +2437,7 @@ dependencies = [
 
 [[package]]
 name = "hebnix-app"
-version = "2.2.1"
+version = "2.2.2"
 dependencies = [
  "aes",
  "base64 0.21.7",
