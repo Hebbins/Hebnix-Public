@@ -22,6 +22,12 @@ pub enum AppMsg {
         slug: String,
         data: serde_json::Value,
     },
+    Toast {
+        slug: String,
+        name: String,
+        text: String,
+        style: crate::toast::ToastStyle,
+    },
     PluginHttpRes {
         slug: String,
         req_id: String,

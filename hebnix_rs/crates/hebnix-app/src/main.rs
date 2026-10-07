@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod app;
+mod auto_upload_replays;
 mod patcher;
 mod ball {
     pub use crate::patcher::ball::*;
@@ -22,6 +23,7 @@ mod decal_patcher {
     pub use crate::patcher::decal_patcher::*;
 }
 mod deep_link;
+mod discord_link;
 mod discord_presence;
 mod dpi_fix;
 mod epic_connection;
@@ -32,9 +34,9 @@ mod i18n;
 mod item_spawning;
 mod messages;
 mod monitor;
+mod multiplayer_assets;
 #[path = "multiplayer-lan/mod.rs"]
 mod multiplayer_lan;
-mod multiplayer_assets;
 mod overlay;
 mod veryimportantfile;
 mod patch_core {
@@ -53,6 +55,7 @@ mod swapper {
     pub use crate::patcher::swapper::*;
 }
 mod theme;
+mod toast;
 mod tray;
 mod ui;
 mod update;

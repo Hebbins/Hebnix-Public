@@ -138,6 +138,23 @@ pub fn image(path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32, radius: f
     });
 }
 
+pub fn capture_image(
+    handle: u64,
+    frame: &crate::plugins::window_capture::CapturedFrame,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    opacity: f32,
+) {
+    with_canvas(|canvas| match canvas {
+        Canvas::Gdi(hdc) => {
+            gdi::capture_image(*hdc, frame, x as i32, y as i32, w as i32, h as i32, opacity)
+        }
+        Canvas::D2d(canvas) => canvas.capture_image(handle, frame, x, y, w, h, opacity),
+    });
+}
+
 /// the overlay window, whichever backend the machine supports
 pub enum NativeOverlay {
     Dcomp(dcomp::DcompOverlay),

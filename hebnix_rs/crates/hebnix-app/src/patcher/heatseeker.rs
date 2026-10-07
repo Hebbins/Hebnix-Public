@@ -24,6 +24,7 @@ fn rgb(colour: [u8; 3], intensity: f32) -> [u8; 12] {
 /// Replaces only local high-speed Heatseeker effects. It always rebuilds from
 /// a pristine backup, so it cannot alter the team-coloured normal glow.
 pub fn apply(cooked_pc: &Path, backups_dir: &Path, max_speed: [u8; 3]) -> Result<(), String> {
+    super::backup_guard::synchronize_install(cooked_pc, backups_dir)?;
     let live = cooked_pc.join(PACKAGE_NAME);
     if !live.is_file() {
         return Err(format!(
@@ -123,6 +124,7 @@ pub fn apply(cooked_pc: &Path, backups_dir: &Path, max_speed: [u8; 3]) -> Result
 }
 
 pub fn restore(cooked_pc: &Path, backups_dir: &Path) -> Result<(), String> {
+    super::backup_guard::check_install(cooked_pc, backups_dir)?;
     let backup = backups_dir.join(BACKUP_NAME);
     if !backup.exists() {
         return Ok(());

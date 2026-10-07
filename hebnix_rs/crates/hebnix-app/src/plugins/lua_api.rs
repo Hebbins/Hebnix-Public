@@ -16,7 +16,9 @@ use mlua::{Lua, LuaSerdeExt, SerializeOptions, Table, Value as LuaValue, Variadi
 use hebnix_sdk::tracker::TrackerClient;
 
 use crate::messages::AppMsg;
+use crate::plugins::cvar::{CvarRegistry, CvarValue};
 use crate::plugins::store::PluginStore;
+use crate::plugins::window_capture::WindowCaptureRegistry;
 
 use rodio::{Decoder, OutputStream, Sink};
 
@@ -34,6 +36,9 @@ pub struct HostShared {
     /// Directory containing DefaultStatsAPI.ini and the game configuration
     /// files exposed through the deliberately small Lua config API.
     pub rl_config_dir: PathBuf,
+    /// Process-local values registered by enabled plugins. Any plugin may read
+    /// or write them; ownership is used to clean them up when a plugin unloads.
+    pub cvars: CvarRegistry,
 }
 
 const RL_CONFIG_FILES: [(&str, &str); 2] = [
@@ -140,6 +145,8 @@ pub struct WindowState {
     pub height: SizeSpec,
     pub close_button: bool,
     pub opacity: f32,
+    /// keep it shown over every app. off means it hides unless the game or hebnix has focus
+    pub always_on_top: bool,
     /// where we ask egui to put the window, set on open only. an observed
     /// position fed back into the builder is a SetWindowPos mid drag, and over
     /// a dpi boundary the read and the write use different scales.
@@ -157,10 +164,18 @@ impl Default for WindowState {
             height: SizeSpec::Fixed(160.0),
             close_button: false,
             opacity: 0.9,
+            always_on_top: false,
             pos: None,
             last_pos: None,
             pos_dirty: false,
         }
+    }
+}
+
+impl WindowState {
+    /// focus_ok is the game or hebnix holding the foreground
+    pub fn shown(&self, focus_ok: bool) -> bool {
+        self.open && (self.always_on_top || focus_ok)
     }
 }
 
@@ -169,7 +184,7 @@ pub struct HostCtx {
     pub slug: String,
     pub display_name: RefCell<String>,
     pub tx: Sender<AppMsg>,
-    pub store: RefCell<PluginStore>,
+    pub store: Rc<RefCell<PluginStore>>,
     pub window: RefCell<WindowState>,
     pub shared: Rc<RefCell<HostShared>>,
     /// draft buffers for text inputs (key to current text)
@@ -178,6 +193,9 @@ pub struct HostCtx {
     pub dir: std::path::PathBuf,
     /// asset bytes by relative path. None means it failed and was already logged, the ui callbacks run every frame so it can only be said once.
     pub assets: RefCell<std::collections::HashMap<String, Option<std::sync::Arc<[u8]>>>>,
+    /// Native window captures owned by this plugin. Dropping the host stops
+    /// and joins every capture worker.
+    pub captures: WindowCaptureRegistry,
     /// canonicalized directory roots this plugin may read via read_file,
     /// expanded from [permissions] read_roots in its plugin.toml
     pub read_roots: Vec<std::path::PathBuf>,
@@ -1267,6 +1285,88 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                 Ok(())
             })?,
         )?;
+    }
+
+    // Process-local plugin communication variables. Registration is owned by
+    // the calling plugin, while reads and writes are intentionally shared.
+    {
+        let cvar = lua.create_table()?;
+
+        let register_host = Rc::clone(&host);
+        cvar.set(
+            "register",
+            lua.create_function(move |_, name: String| {
+                let result = register_host
+                    .shared
+                    .borrow_mut()
+                    .cvars
+                    .register(&name, &register_host.slug, Rc::clone(&register_host.store));
+                if let Err(error) = &result {
+                    register_host.log(&format!("Error: {error}."));
+                }
+                Ok(result.is_ok())
+            })?,
+        )?;
+
+        let set_host = Rc::clone(&host);
+        cvar.set(
+            "set",
+            lua.create_function(move |_, (name, value): (String, LuaValue)| {
+                let value = match value {
+                    LuaValue::String(value) => {
+                        CvarValue::String(value.to_string_lossy().to_string())
+                    }
+                    LuaValue::Integer(value) => CvarValue::Integer(value),
+                    LuaValue::Number(value) if value.is_finite() => CvarValue::Number(value),
+                    _ => {
+                        set_host.log(&format!(
+                            "Error: cvar '{name}' only accepts strings and finite numbers."
+                        ));
+                        return Ok(false);
+                    }
+                };
+                let result = set_host.shared.borrow_mut().cvars.set(&name, value);
+                if let Err(error) = &result {
+                    set_host.log(&format!("Error: {error}."));
+                }
+                Ok(result.is_ok())
+            })?,
+        )?;
+
+        let get_host = Rc::clone(&host);
+        cvar.set(
+            "get",
+            lua.create_function(move |lua, name: String| {
+                let value = get_host.shared.borrow().cvars.get(&name);
+                match value {
+                    None => Ok((LuaValue::Nil, Some("not_registered"))),
+                    Some(None) => Ok((LuaValue::Nil, Some("unset"))),
+                    Some(Some(CvarValue::String(value))) => {
+                        Ok((LuaValue::String(lua.create_string(value)?), None))
+                    }
+                    Some(Some(CvarValue::Integer(value))) => Ok((LuaValue::Integer(value), None)),
+                    Some(Some(CvarValue::Number(value))) => Ok((LuaValue::Number(value), None)),
+                }
+            })?,
+        )?;
+
+        let delete_host = Rc::clone(&host);
+        cvar.set(
+            "delete",
+            lua.create_function(move |_, name: String| {
+                let result = delete_host
+                    .shared
+                    .borrow_mut()
+                    .cvars
+                    .delete(&name, &delete_host.slug);
+                if let Err(error) = &result {
+                    delete_host.log(&format!("Error: {error}."));
+                }
+                Ok(result.is_ok())
+            })?,
+        )?;
+
+        hebnix.set("cvar", cvar)?;
     }
 
     // Persisted settings
@@ -2368,6 +2468,9 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
                     if let Ok(o) = opts.get::<f32>("opacity") {
                         win.opacity = o.clamp(0.0, 1.0); // 0 for a bare overlay
                     }
+                    if let Ok(top) = opts.get::<bool>("always_on_top") {
+                        win.always_on_top = top;
+                    }
                 }
                 if win.title.is_empty() {
                     win.title = host.display_name.borrow().clone();
@@ -2427,6 +2530,18 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
             "set_title",
             lua.create_function(move |_, title: String| {
                 host.window.borrow_mut().title = title;
+                Ok(())
+            })?,
+        )?;
+    }
+    {
+        // window.set_always_on_top(true) keeps it shown over every app, default
+        // is hidden unless the game or hebnix has focus
+        let host = Rc::clone(&host);
+        window.set(
+            "set_always_on_top",
+            lua.create_function(move |_, on: bool| {
+                host.window.borrow_mut().always_on_top = on;
                 Ok(())
             })?,
         )?;
@@ -3260,6 +3375,96 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         hebnix.set("overlay", overlay)?;
     }
 
+    // hebnix.capture: enumerate visible top-level windows and manage opaque,
+    // plugin-scoped capture handles. Capture workers never execute Lua.
+    let capture = lua.create_table()?;
+    let capture_host = Rc::clone(&host);
+    capture.set(
+        "windows",
+        lua.create_function(move |lua, ()| {
+            let result = lua.create_table()?;
+            for (index, window) in capture_host.captures.windows().into_iter().enumerate() {
+                let item = lua.create_table()?;
+                item.set("id", window.id)?;
+                item.set("title", window.title)?;
+                item.set("process", window.process)?;
+                result.set(index + 1, item)?;
+            }
+            Ok(result)
+        })?,
+    )?;
+    let capture_host = Rc::clone(&host);
+    capture.set(
+        "window_capture_start",
+        lua.create_function(move |_, (window_id, opts): (String, Option<Table>)| {
+            let fps = opts
+                .as_ref()
+                .and_then(|table| table.get::<u32>("fps").ok())
+                .unwrap_or(30);
+            let cursor = opts
+                .as_ref()
+                .and_then(|table| table.get::<bool>("cursor").ok())
+                .unwrap_or(false);
+            let plugin_name = capture_host.display_name.borrow().clone();
+            Ok(capture_host
+                .captures
+                .start(&window_id, fps, cursor, &plugin_name))
+        })?,
+    )?;
+    let capture_host = Rc::clone(&host);
+    capture.set(
+        "window_capture_frame",
+        lua.create_function(move |_, handle: u64| {
+            Ok(capture_host.captures.frame(handle).map(|_| handle))
+        })?,
+    )?;
+    let capture_host = Rc::clone(&host);
+    capture.set(
+        "window_capture_stop",
+        lua.create_function(move |_, handle: u64| Ok(capture_host.captures.stop(handle)))?,
+    )?;
+    hebnix.set("capture", capture)?;
+
+    // hebnix.toast(text, {accent=, background=, text=, duration=, image=}), shows
+    // over the game and lands in the notifications tab. colors are "#rrggbb[aa]",
+    // duration is seconds (1.5 to 5), image is a path inside the plugin assets folder.
+    {
+        let host = Rc::clone(&host);
+        hebnix.set(
+            "toast",
+            lua.create_function(move |_, (text, opts): (String, Option<Table>)| {
+                let color = |key: &str| {
+                    opts.as_ref()
+                        .and_then(|t| t.get::<String>(key).ok())
+                        .and_then(|s| crate::toast::parse_hex(&s))
+                };
+                let image = opts
+                    .as_ref()
+                    .and_then(|t| t.get::<String>("image").ok())
+                    .and_then(|rel| match asset_path(&host.dir, &rel) {
+                        Ok(path) => Some(path.to_string_lossy().into_owned()),
+                        Err(error) => {
+                            host.log(&format!("toast image: {error}"));
+                            None
+                        }
+                    });
+                let _ = host.tx.send(AppMsg::Toast {
+                    slug: host.slug.clone(),
+                    name: host.display_name.borrow().clone(),
+                    text: crate::toast::clip_text(&text).to_string(),
+                    style: crate::toast::ToastStyle {
+                        accent: color("accent"),
+                        background: color("background"),
+                        text: color("text"),
+                        duration: opts.as_ref().and_then(|t| t.get::<f32>("duration").ok()),
+                        image,
+                    },
+                });
+                Ok(())
+            })?,
+        )?;
+    }
+
     lua.globals().set("hebnix", hebnix)?;
 
     // Build the ui bridge table and stash it in the registry.
@@ -3470,6 +3675,28 @@ fn build_draw_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                     opt_f32(&opts, "opacity", 1.0),
                     opt_f32(&opts, "radius", 0.0),
                 );
+                Ok(())
+            },
+        )?,
+    )?;
+
+    // draw.capture_image(frame, x, y, width, height, {opacity=1.0})
+    let capture_host = Rc::clone(&host);
+    draw.set(
+        "capture_image",
+        lua.create_function(
+            move |_, (handle, x, y, w, h, opts): (u64, f32, f32, f32, f32, Option<Table>)| {
+                if let Some(frame) = capture_host.captures.frame(handle) {
+                    overlay::capture_image(
+                        handle,
+                        &frame,
+                        x,
+                        y,
+                        w,
+                        h,
+                        opt_f32(&opts, "opacity", 1.0),
+                    );
+                }
                 Ok(())
             },
         )?,

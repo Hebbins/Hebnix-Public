@@ -91,6 +91,7 @@ pub struct UpkPackage {
     pub exports: Vec<ExportEntry>,
     modified_chunks: HashSet<usize>,
     header_dirty: bool,
+    raw_dirty: bool,
 }
 
 struct Cursor<'a> {
@@ -603,6 +604,7 @@ impl UpkPackage {
             exports,
             modified_chunks: HashSet::new(),
             header_dirty: false,
+            raw_dirty: false,
         })
     }
 
@@ -1065,27 +1067,49 @@ impl UpkPackage {
     }
     pub fn patch(&mut self, offset: usize, data: &[u8]) -> Result<(), String> {
         let end = offset.checked_add(data.len()).ok_or("Patch overflow")?;
-        self.image
-            .get_mut(offset..end)
-            .ok_or("Patch is outside UPK")?
-            .copy_from_slice(data);
+        if end > self.image.len() {
+            return Err("Patch is outside UPK".into());
+        }
         if offset >= self.header.name_offset
             && end <= self.header.name_offset + self.decrypted_header.len()
         {
+            self.image[offset..end].copy_from_slice(data);
             let rel = offset - self.header.name_offset;
             self.decrypted_header[rel..rel + data.len()].copy_from_slice(data);
             self.header_dirty = true;
             return Ok(());
         }
-        let idx = self
-            .chunks
-            .iter()
-            .position(|c| {
-                offset >= c.uncompressed_offset
-                    && end <= c.uncompressed_offset + c.uncompressed_size
-            })
-            .ok_or("Patch is not wholly inside one compressed chunk")?;
-        self.modified_chunks.insert(idx);
+        if self.chunks.is_empty() {
+            self.image[offset..end].copy_from_slice(data);
+            self.raw_dirty = true;
+            return Ok(());
+        }
+        let mut covered = offset;
+        let mut touched = Vec::new();
+        while covered < end {
+            let Some((index, chunk_end)) =
+                self.chunks.iter().enumerate().find_map(|(index, chunk)| {
+                    // UE3 can leave alignment bytes between the declared payloads. Repacking already
+                    // assigns that span to the preceding chunk, so patch validation must do the same.
+                    let chunk_end = self
+                        .chunks
+                        .get(index + 1)
+                        .map(|next| next.uncompressed_offset)
+                        .unwrap_or(chunk.uncompressed_offset + chunk.uncompressed_size)
+                        .max(chunk.uncompressed_offset + chunk.uncompressed_size);
+                    (covered >= chunk.uncompressed_offset && covered < chunk_end)
+                        .then_some((index, chunk_end))
+                })
+            else {
+                return Err(format!(
+                    "Patch {offset}..{end} is outside compressed UPK data at byte {covered}"
+                ));
+            };
+            touched.push(index);
+            covered = end.min(chunk_end);
+        }
+        self.image[offset..end].copy_from_slice(data);
+        self.modified_chunks.extend(touched);
         Ok(())
     }
     #[allow(dead_code)]
@@ -1197,6 +1221,17 @@ impl UpkPackage {
         Ok(slot)
     }
     fn repacked(&self) -> Result<Vec<u8>, String> {
+        if self.chunks.is_empty() && (self.raw_dirty || self.header_dirty) {
+            let mut output = self.image.clone();
+            if self.header_dirty && self.key != [0; 32] {
+                let encrypted =
+                    crypt_header(&self.decrypted_header, &self.key, true, &self.header)?;
+                output
+                    [self.header.name_offset..self.header.name_offset + self.encrypted_header_size]
+                    .copy_from_slice(&encrypted);
+            }
+            return Ok(output);
+        }
         if self.modified_chunks.is_empty() {
             let mut output = self.raw.clone();
             if self.header_dirty {

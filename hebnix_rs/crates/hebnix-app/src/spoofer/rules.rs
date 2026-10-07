@@ -700,7 +700,6 @@ pub(crate) fn psy_response_signature(psy_time: &str, body: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(mac.finalize().into_bytes())
 }
 
-
 /// Keep normal spoof rules inactive when only the RLAPI workbench is enabled.
 pub struct EnabledRule {
     pub inner: Box<dyn Rule>,

@@ -225,7 +225,6 @@ pub fn uninstall() -> Result<(), String> {
     certutil(&["-user", "-delstore", "root", COMMON_NAME]).map(|_| ())
 }
 
-
 fn certutil(args: &[&str]) -> Result<String, String> {
     use std::os::windows::process::CommandExt;
 

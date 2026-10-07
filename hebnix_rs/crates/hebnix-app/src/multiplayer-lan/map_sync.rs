@@ -137,8 +137,8 @@ impl PeerLimits {
         let now = Instant::now();
         let peer = peers.entry(ip).or_default();
         let since = peer.refilled.map_or(Duration::MAX, |at| now - at);
-        peer.tokens = (peer.tokens + since.as_secs_f64() / CONNECT_REFILL.as_secs_f64())
-            .min(CONNECT_BURST);
+        peer.tokens =
+            (peer.tokens + since.as_secs_f64() / CONNECT_REFILL.as_secs_f64()).min(CONNECT_BURST);
         peer.refilled = Some(now);
         if peer.open >= MAX_CONNECTIONS_PER_PEER || peer.tokens < 1.0 {
             return false;
@@ -454,7 +454,12 @@ impl MapSync {
         let mut list: Vec<(IpAddr, String)> = self
             .blocked
             .lock()
-            .map(|blocked| blocked.iter().map(|(ip, label)| (*ip, label.clone())).collect())
+            .map(|blocked| {
+                blocked
+                    .iter()
+                    .map(|(ip, label)| (*ip, label.clone()))
+                    .collect()
+            })
             .unwrap_or_default();
         list.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
         list
@@ -462,7 +467,10 @@ impl MapSync {
 }
 
 fn is_blocked(blocked: &Mutex<HashMap<IpAddr, String>>, ip: IpAddr) -> bool {
-    blocked.lock().map(|set| set.contains_key(&ip)).unwrap_or(false)
+    blocked
+        .lock()
+        .map(|set| set.contains_key(&ip))
+        .unwrap_or(false)
 }
 
 impl Drop for MapSync {
@@ -692,7 +700,9 @@ fn download(
         .and_then(|v| v.as_u64())
         .ok_or("peer sent no file size")?;
     if size < MIN_SHARED_BYTES || size > max_bytes {
-        return Err(format!("map size {size} bytes is outside the allowed limit"));
+        return Err(format!(
+            "map size {size} bytes is outside the allowed limit"
+        ));
     }
     progress.total.store(size, Ordering::Relaxed);
     progress.done.store(0, Ordering::Relaxed);

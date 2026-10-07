@@ -699,9 +699,7 @@ impl SteamDownloader {
         let busy = self.busy.load(Ordering::Relaxed);
 
         ui.heading(t("render-download-from-the-steam-workshop"));
-        ui.label(
-            t("render-paste-a-rocket-league-workshop-link"),
-        );
+        ui.label(t("render-paste-a-rocket-league-workshop-link"));
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             ui.label(t("render-hubcap-api-key"));
@@ -729,7 +727,10 @@ impl SteamDownloader {
         let ready = wid.is_some() && has_key && !busy;
         let mut start_with = None;
         ui.horizontal(|ui| {
-            if ui.add_enabled(ready, egui::Button::new(t("render-download-map"))).clicked() {
+            if ui
+                .add_enabled(ready, egui::Button::new(t("render-download-map")))
+                .clicked()
+            {
                 save_settings(runtime_dir, settings);
                 start_with = wid.clone();
             }
@@ -748,7 +749,10 @@ impl SteamDownloader {
                 Some(Ok(map)) => {
                     ui.colored_label(
                         egui::Color32::LIGHT_GREEN,
-                        t_args("render-imported-map-find-it-under-browse", &[("map", map.name.to_string().into())]),
+                        t_args(
+                            "render-imported-map-find-it-under-browse",
+                            &[("map", map.name.to_string().into())],
+                        ),
                     );
                 }
                 Some(Err(error)) => {

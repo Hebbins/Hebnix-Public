@@ -297,10 +297,11 @@ impl ArchiveBrowser {
         let downloading = self.downloading.load(Ordering::Relaxed);
 
         ui.heading(t("render-no-api-key-use-the-rl"));
-        ui.label(
-            t("render-if-you-can-t-get-a"),
+        ui.label(t("render-if-you-can-t-get-a"));
+        ui.hyperlink_to(
+            t("render-open-the-rl-workshop-archive-request"),
+            ARCHIVE_SITE,
         );
-        ui.hyperlink_to(t("render-open-the-rl-workshop-archive-request"), ARCHIVE_SITE);
         ui.add_space(6.0);
 
         let mut download = None;
@@ -308,7 +309,10 @@ impl ArchiveBrowser {
         let loaded = self.shared.lock().is_ok_and(|s| s.index.is_some());
         ui.horizontal(|ui| {
             if !self.show_list {
-                if ui.add_enabled(!loading, egui::Button::new(t("render-show-archive-maps"))).clicked() {
+                if ui
+                    .add_enabled(!loading, egui::Button::new(t("render-show-archive-maps")))
+                    .clicked()
+                {
                     self.show_list = true;
                     if !loaded {
                         self.load(ui.ctx());
@@ -318,7 +322,10 @@ impl ArchiveBrowser {
                 if ui.button(t("render-hide-list")).clicked() {
                     self.show_list = false;
                 }
-                if ui.add_enabled(!loading, egui::Button::new(t("render-refresh-list"))).clicked() {
+                if ui
+                    .add_enabled(!loading, egui::Button::new(t("render-refresh-list")))
+                    .clicked()
+                {
                     self.load(ui.ctx());
                 }
                 ui.add(
@@ -336,8 +343,15 @@ impl ArchiveBrowser {
             match &shared.index {
                 Some(Ok(_)) if !self.show_list => {}
                 Some(Ok(maps)) => {
-                    let shown: Vec<&ArchiveMap> = maps.iter().filter(|m| m.matches(&self.search)).collect();
-                    ui.small(t_args("render-shown-of-maps-maps", &[("shown", (shown.len()).to_string().into()), ("maps", (maps.len()).to_string().into())]));
+                    let shown: Vec<&ArchiveMap> =
+                        maps.iter().filter(|m| m.matches(&self.search)).collect();
+                    ui.small(t_args(
+                        "render-shown-of-maps-maps",
+                        &[
+                            ("shown", (shown.len()).to_string().into()),
+                            ("maps", (maps.len()).to_string().into()),
+                        ],
+                    ));
                     egui::ScrollArea::vertical()
                         .id_salt("archive_maps")
                         .max_height(260.0)
@@ -345,14 +359,20 @@ impl ArchiveBrowser {
                             for map in shown {
                                 ui.horizontal(|ui| {
                                     if ui
-                                        .add_enabled(!downloading, egui::Button::new(t("render-download")))
+                                        .add_enabled(
+                                            !downloading,
+                                            egui::Button::new(t("render-download")),
+                                        )
                                         .clicked()
                                     {
                                         download = Some(map.clone());
                                     }
                                     ui.strong(&map.title);
                                     if !map.author.is_empty() {
-                                        ui.small(t_args("render-by-map", &[("map", map.author.to_string().into())]));
+                                        ui.small(t_args(
+                                            "render-by-map",
+                                            &[("map", map.author.to_string().into())],
+                                        ));
                                     }
                                     let tags = map.categories();
                                     if !tags.is_empty() {
@@ -377,7 +397,10 @@ impl ArchiveBrowser {
                 Some(Ok(map)) => {
                     ui.colored_label(
                         egui::Color32::LIGHT_GREEN,
-                        t_args("render-imported-map-find-it-under-browse", &[("map", map.name.to_string().into())]),
+                        t_args(
+                            "render-imported-map-find-it-under-browse",
+                            &[("map", map.name.to_string().into())],
+                        ),
                     );
                     if !downloading && !shared.delivered {
                         imported = Some(map.clone());

@@ -11,9 +11,10 @@ use windows::Win32::System::Threading::{CreateMutexW, GetCurrentProcessId};
 use windows::Win32::UI::Shell::{ITaskbarList, TaskbarList};
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowW, GWL_EXSTYLE, GetForegroundWindow, GetWindowLongW, GetWindowThreadProcessId,
-    HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, LWA_ALPHA, SW_SHOW, SWP_NOACTIVATE, SWP_NOMOVE,
-    SWP_NOSIZE, SetForegroundWindow, SetLayeredWindowAttributes, SetWindowLongW, SetWindowPos,
-    ShowWindow, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, IsWindow, LWA_ALPHA, SW_RESTORE, SW_SHOW,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SetForegroundWindow, SetLayeredWindowAttributes,
+    SetWindowLongW, SetWindowPos, ShowWindow, SwitchToThisWindow, WS_EX_LAYERED, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW,
 };
 use windows::core::PCWSTR;
 
@@ -43,9 +44,7 @@ pub fn acquire_single_instance() -> Option<HANDLE> {
 
 pub fn focus_existing_instance() {
     if let Some(window) = main_window() {
-        unsafe {
-            let _ = SetForegroundWindow(window);
-        }
+        let _ = focus_window(window);
     }
 }
 
@@ -87,6 +86,12 @@ pub fn parent_file_dialog(dialog: rfd::FileDialog) -> rfd::FileDialog {
         .unwrap_or(dialog)
 }
 
+pub fn parent_message_dialog(dialog: rfd::MessageDialog) -> rfd::MessageDialog {
+    main_window()
+        .map(|hwnd| dialog.clone().set_parent(&DialogParent(hwnd)))
+        .unwrap_or(dialog)
+}
+
 /// note which program we came from. ours doesnt count, the monitor calls this
 /// on its tick so it tracks whatever you were last actually in.
 pub fn note_foreground() {
@@ -121,11 +126,25 @@ pub fn set_main_window_topmost(topmost: bool) {
     }
 }
 
+fn focus_window(window: HWND) -> bool {
+    unsafe {
+        if !IsWindow(Some(window)).as_bool() {
+            return false;
+        }
+        if IsIconic(window).as_bool() {
+            let _ = ShowWindow(window, SW_RESTORE);
+        }
+        if SetForegroundWindow(window).as_bool() {
+            return true;
+        }
+        SwitchToThisWindow(window, true);
+        GetForegroundWindow() == window
+    }
+}
+
 pub fn focus_main_window() {
     if let Some(window) = main_window() {
-        unsafe {
-            let _ = SetForegroundWindow(window);
-        }
+        let _ = focus_window(window);
     }
 }
 
@@ -144,8 +163,8 @@ pub fn focus_rocket_league() {
             if IsIconic(window).as_bool() {
                 return;
             }
-            let _ = SetForegroundWindow(window);
         }
+        let _ = focus_window(window);
     }
 }
 
