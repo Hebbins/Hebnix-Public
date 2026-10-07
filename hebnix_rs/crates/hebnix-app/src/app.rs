@@ -730,6 +730,7 @@ impl HebnixApp {
             cc.egui_ctx.clone(),
         );
 
+        crate::screen::init(tx.clone());
         let mut plugin_mgr = PluginManager::new(plugin_dir.clone(), tx.clone(), APP_VERSION);
         plugin_mgr.refresh(&mut config, true);
         let _ = config.save(&base_dir);
