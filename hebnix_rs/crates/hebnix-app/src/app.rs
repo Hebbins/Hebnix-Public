@@ -5370,6 +5370,18 @@ impl HebnixApp {
                                     }
                                 });
                                 ui.horizontal(|ui| {
+                                    ui.add_sized([label_w, 20.0], egui::Label::new("Export LAN Chat:"));
+                                    let response = ui
+                                        .checkbox(&mut self.config.settings.chat_export, "")
+                                        .on_hover_text(
+                                            "Reads text chat out of LAN match traffic (port 7777), writes it to chat_log.jsonl and sends plugins a ChatMessage event. Needs Hebnix to run as administrator (WinDivert). Quick chats are not included.",
+                                        );
+                                    if response.changed() {
+                                        self.sync_chat_capture();
+                                        self.save_config();
+                                    }
+                                });
+                                ui.horizontal(|ui| {
                                     ui.add_sized(
                                         [label_w, 20.0],
                                         egui::Label::new(t("system-p2p")),
