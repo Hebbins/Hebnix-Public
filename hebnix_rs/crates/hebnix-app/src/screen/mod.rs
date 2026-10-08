@@ -23,7 +23,7 @@ const IDLE_STOP: Duration = Duration::from_secs(10);
 /// frames older than this count as unavailable (RL minimised, capture stalled)
 const STALE_AFTER: Duration = Duration::from_secs(2);
 /// frames copied to the CPU per second while capturing
-const CAPTURE_FPS: u64 = 10;
+const CAPTURE_FPS: u64 = 30;
 
 /// a CPU copy of one captured frame. coordinates passed in are window pixels
 /// from the top-left of GetWindowRect, the same space the overlay draws in;
@@ -135,6 +135,14 @@ pub struct Service {
 }
 
 static SERVICE: OnceLock<Service> = OnceLock::new();
+
+/// true while a plugin is actively reading pixels, so the app can tick and
+/// repaint faster to keep the overlay in step with what's on screen
+pub fn is_active() -> bool {
+    SERVICE.get().is_some_and(|s| {
+        s.worker_running.load(Ordering::Relaxed) && s.idle_for() < Duration::from_secs(1)
+    })
+}
 
 /// call once at startup with the app's message sender
 pub fn init(tx: Sender<AppMsg>) {

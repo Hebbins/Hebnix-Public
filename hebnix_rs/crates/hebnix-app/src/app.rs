@@ -8100,7 +8100,10 @@ impl eframe::App for HebnixApp {
             self.render_install_modal(ctx);
             self.render_rl_launch_setup(ctx);
         }
-        let plugin_tick_interval = if self.last_rl_open {
+        let screen_active = self.last_rl_open && crate::screen::is_active();
+        let plugin_tick_interval = if screen_active {
+            Duration::from_millis(16)
+        } else if self.last_rl_open {
             Duration::from_millis(50)
         } else {
             Duration::from_millis(500)
@@ -8115,6 +8118,8 @@ impl eframe::App for HebnixApp {
                 || !self.plugin_mgr.overlay_plugins().is_empty()
                 || self.toasts.has_work());
         let heartbeat = if self.toasts.showing() {
+            Duration::from_millis(16)
+        } else if screen_active {
             Duration::from_millis(16)
         } else if fast {
             Duration::from_millis(50)
