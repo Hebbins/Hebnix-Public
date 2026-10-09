@@ -63,6 +63,9 @@ pub struct SettingsCfg {
     pub discord_custom_message: String,
     /// let other Workshop multiplayer players download maps from this PC
     pub p2p_file_sharing: bool,
+    /// how often the overlay and plugins update while a plugin is reading the
+    /// screen (fps). lower saves CPU on slower PCs
+    pub overlay_refresh_fps: u32,
 }
 
 impl Default for SettingsCfg {
@@ -93,6 +96,7 @@ impl Default for SettingsCfg {
             discord_show_gamemode: true,
             discord_custom_message: "Playing Rocket League".to_string(),
             p2p_file_sharing: true,
+            overlay_refresh_fps: 60,
         }
     }
 }

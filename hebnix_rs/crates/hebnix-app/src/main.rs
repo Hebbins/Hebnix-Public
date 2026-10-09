@@ -46,6 +46,7 @@ mod plugins;
 mod presets;
 mod rl_launch;
 mod runtime_assets;
+mod screen;
 mod spoofer;
 mod statsapi_ini;
 mod speed_patch {

@@ -730,6 +730,7 @@ impl HebnixApp {
             cc.egui_ctx.clone(),
         );
 
+        crate::screen::init(tx.clone());
         let mut plugin_mgr = PluginManager::new(plugin_dir.clone(), tx.clone(), APP_VERSION);
         plugin_mgr.refresh(&mut config, true);
         let _ = config.save(&base_dir);
@@ -4689,6 +4690,7 @@ impl HebnixApp {
                                         t("settings-theme-label"),
                                         t("settings-opacity-label"),
                                         t("settings-toast-position-label"),
+                                        t("system-default-tab"),
                                     ],
                                 );
                                 ui.horizontal(|ui| {
@@ -4856,6 +4858,31 @@ impl HebnixApp {
                                             }
                                         });
                                     if changed {
+                                        self.save_config();
+                                    }
+                                });
+                                ui.add_space(8.0);
+                                ui.horizontal(|ui| {
+                                    ui.add_sized(
+                                        [label_w, 20.0],
+                                        egui::Label::new(t("system-default-tab")),
+                                    );
+                                    let mut selected =
+                                        Tab::from_config_key(&self.config.settings.default_tab);
+                                    egui::ComboBox::from_id_salt("default_tab")
+                                        .selected_text(selected.label())
+                                        .show_ui(ui, |ui| {
+                                            for tab in Tab::ALL {
+                                                ui.selectable_value(
+                                                    &mut selected,
+                                                    tab,
+                                                    tab.label(),
+                                                );
+                                            }
+                                        });
+                                    if self.config.settings.default_tab != selected.config_key() {
+                                        self.config.settings.default_tab =
+                                            selected.config_key().to_string();
                                         self.save_config();
                                     }
                                 });
@@ -5422,28 +5449,23 @@ impl HebnixApp {
                                         self.spoofer_mgr.shutdown();
                                     }
                                 }
-                                ui.add_space(8.0);
                                 ui.horizontal(|ui| {
                                     ui.add_sized(
                                         [label_w, 20.0],
-                                        egui::Label::new(t("system-default-tab")),
+                                        egui::Label::new("Overlay refresh rate:"),
                                     );
-                                    let mut selected =
-                                        Tab::from_config_key(&self.config.settings.default_tab);
-                                    egui::ComboBox::from_id_salt("default_tab")
-                                        .selected_text(selected.label())
-                                        .show_ui(ui, |ui| {
-                                            for tab in Tab::ALL {
-                                                ui.selectable_value(
-                                                    &mut selected,
-                                                    tab,
-                                                    tab.label(),
-                                                );
-                                            }
-                                        });
-                                    if self.config.settings.default_tab != selected.config_key() {
-                                        self.config.settings.default_tab =
-                                            selected.config_key().to_string();
+                                    let slider = ui
+                                        .add(
+                                            egui::Slider::new(
+                                                &mut self.config.settings.overlay_refresh_fps,
+                                                20..=60,
+                                            )
+                                            .suffix(" fps"),
+                                        )
+                                        .on_hover_text(
+                                            "How often the overlay and plugins update while a plugin is reading the screen (like PfpOverlayV2's menu detection). Lower it to use less CPU on slower PCs, higher is more responsive.",
+                                        );
+                                    if slider.drag_stopped() || slider.lost_focus() {
                                         self.save_config();
                                     }
                                 });
@@ -8099,7 +8121,11 @@ impl eframe::App for HebnixApp {
             self.render_install_modal(ctx);
             self.render_rl_launch_setup(ctx);
         }
-        let plugin_tick_interval = if self.last_rl_open {
+        let screen_active = self.last_rl_open && crate::screen::is_active();
+        let fast_ms = 1000 / u64::from(self.config.settings.overlay_refresh_fps.clamp(20, 60));
+        let plugin_tick_interval = if screen_active {
+            Duration::from_millis(fast_ms)
+        } else if self.last_rl_open {
             Duration::from_millis(50)
         } else {
             Duration::from_millis(500)
@@ -8115,6 +8141,8 @@ impl eframe::App for HebnixApp {
                 || self.toasts.has_work());
         let heartbeat = if self.toasts.showing() {
             Duration::from_millis(16)
+        } else if screen_active {
+            Duration::from_millis(fast_ms)
         } else if fast {
             Duration::from_millis(50)
         } else {
