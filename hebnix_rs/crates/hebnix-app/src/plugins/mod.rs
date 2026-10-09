@@ -10,6 +10,7 @@ pub mod gamepad_icons;
 pub mod lua_api;
 pub mod manager;
 pub mod manifest;
+pub mod media_session;
 pub mod store;
 pub mod window_capture;
 

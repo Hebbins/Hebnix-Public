@@ -1261,6 +1261,89 @@ fn send_multipart_req(
     send_req(req)
 }
 
+// hebnix.screen: read colours off the Rocket League window.
+// coordinates are window pixels from the top-left, the same space draw.* uses.
+// the capture starts on the first call and stops ~10s after the last one.
+//
+//   screen.available()                          -> bool
+//   screen.size()                               -> w, h (nil if no frame)
+//   screen.pixel(x, y)                          -> r, g, b (nil if no frame)
+//   screen.average(x, y, w, h)                  -> r, g, b
+//   screen.match_color(x, y, w, h, r, g, b, tol) -> 0..1 share of matching pixels
+//   screen.cursor()                             -> x, y of the mouse in window pixels
+#[cfg(not(feature = "lite"))]
+fn install_screen_api(lua: &Lua, hebnix: &Table) -> mlua::Result<()> {
+    use crate::screen::service;
+
+    fn frame() -> Option<std::sync::Arc<crate::screen::Frame>> {
+        service()?.frame()
+    }
+    fn px(v: f64) -> i32 {
+        v.round() as i32
+    }
+
+    let screen = lua.create_table()?;
+    screen.set(
+        "available",
+        lua.create_function(|_, ()| Ok(frame().is_some()))?,
+    )?;
+    screen.set(
+        "size",
+        lua.create_function(|_, ()| {
+            Ok(match frame() {
+                Some(f) => (Some(f.width), Some(f.height)),
+                None => (None, None),
+            })
+        })?,
+    )?;
+    screen.set(
+        "pixel",
+        lua.create_function(|_, (x, y): (f64, f64)| {
+            Ok(match frame().and_then(|f| f.pixel(px(x), px(y))) {
+                Some((r, g, b)) => (Some(r), Some(g), Some(b)),
+                None => (None, None, None),
+            })
+        })?,
+    )?;
+    screen.set(
+        "average",
+        lua.create_function(|_, (x, y, w, h): (f64, f64, f64, f64)| {
+            Ok(
+                match frame().and_then(|f| f.average(px(x), px(y), px(w), px(h))) {
+                    Some((r, g, b)) => (Some(r), Some(g), Some(b)),
+                    None => (None, None, None),
+                },
+            )
+        })?,
+    )?;
+    screen.set(
+        "match_color",
+        lua.create_function(
+            |_, (x, y, w, h, r, g, b, tol): (f64, f64, f64, f64, u8, u8, u8, Option<u8>)| {
+                Ok(frame().and_then(|f| {
+                    f.match_color(px(x), px(y), px(w), px(h), (r, g, b), tol.unwrap_or(20))
+                }))
+            },
+        )?,
+    )?;
+    screen.set(
+        "cursor",
+        lua.create_function(|_, ()| {
+            let Some((left, top, _, _)) = hebnix_sdk::process::get_rocket_league_window_rect()
+            else {
+                return Ok((None, None));
+            };
+            let mut p = windows::Win32::Foundation::POINT::default();
+            if unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut p) }.is_err() {
+                return Ok((None, None));
+            }
+            Ok((Some(p.x - left), Some(p.y - top)))
+        })?,
+    )?;
+    hebnix.set("screen", screen)?;
+    Ok(())
+}
+
 const UI_TABLE_REGISTRY: &str = "hebnix_ui_table";
 const DRAW_TABLE_REGISTRY: &str = "hebnix_draw_table";
 
@@ -1589,6 +1672,8 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
     hebnix.set("chat", chat)?;
+    #[cfg(not(feature = "lite"))]
+    install_screen_api(lua, &hebnix)?;
     {
         let host = Rc::clone(&host);
         hebnix.set(
@@ -2902,6 +2987,41 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         "process_running",
         lua.create_function(|_, name: String| {
             Ok(hebnix_sdk::eos::memory::find_process(&name).is_some())
+        })?,
+    )?;
+
+    // whatever windows says is playing (browser, spotify, vlc...), or nil.
+    // position_ms is as of updated_unix_ms, add the time since if playing.
+    // reads a cached snapshot, refreshed about once a second
+    hebnix.set(
+        "media_session",
+        lua.create_function(|lua, ()| {
+            let Some(m) = crate::plugins::media_session::snapshot() else {
+                return Ok(LuaValue::Nil);
+            };
+            let t = lua.create_table()?;
+            t.set("title", m.title)?;
+            t.set("artist", m.artist)?;
+            t.set("album", m.album)?;
+            t.set("album_artist", m.album_artist)?;
+            t.set("app", m.app)?;
+            t.set("status", m.status)?;
+            t.set("is_playing", m.status == "playing")?;
+            t.set("position_ms", m.position_ms)?;
+            t.set("duration_ms", m.duration_ms)?;
+            t.set("updated_unix_ms", m.updated_unix_ms)?;
+            t.set("thumb_rev", m.thumb_rev)?;
+            Ok(LuaValue::Table(t))
+        })?,
+    )?;
+
+    // cover art bytes for the current media_session, nil until it loads.
+    // only changes when thumb_rev does, so fetch it then, not every tick
+    hebnix.set(
+        "media_thumbnail",
+        lua.create_function(|lua, ()| match crate::plugins::media_session::thumbnail() {
+            Some(bytes) => Ok(Some(lua.create_string(&bytes)?)),
+            None => Ok(None),
         })?,
     )?;
 

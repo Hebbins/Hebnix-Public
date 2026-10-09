@@ -1,0 +1,4 @@
+name = "Media Overlay"
+author = "xplodingeggo"
+version = "1.0.0"
+entry = "main.lua"
