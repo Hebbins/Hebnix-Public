@@ -1,6 +1,7 @@
 //! whatever windows reports as "now playing" (the media flyout), via the
 //! system media transport controls. a worker thread polls it and caches a
-//! snapshot so lua reads are just a mutex lock
+//! snapshot so lua reads are just a mutex lock. it only reports while
+//! rocket league is running
 
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -168,6 +169,18 @@ fn worker() {
     let mut thumb_rev = 0u64;
     let mut thumb_tries = 0u8;
     loop {
+        // only report media while rocket league is running, and don't touch
+        // the session manager at all otherwise
+        if !hebnix_sdk::process::is_rocket_league_running() {
+            last_key.clear();
+            thumb_tries = 0;
+            if let Ok(mut sh) = shared().lock() {
+                sh.snap = None;
+                sh.thumb = None;
+            }
+            std::thread::sleep(POLL);
+            continue;
+        }
         let read = manager
             .GetCurrentSession()
             .ok()
