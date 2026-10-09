@@ -181,7 +181,8 @@ fn worker() {
         // the session manager at all otherwise
         if !hebnix_sdk::process::is_rocket_league_running() {
             last_key.clear();
-            thumb_tries = 0;
+            polls_since_track = 0;
+            thumb_hash = 0;
             if let Ok(mut sh) = shared().lock() {
                 sh.snap = None;
                 sh.thumb = None;
