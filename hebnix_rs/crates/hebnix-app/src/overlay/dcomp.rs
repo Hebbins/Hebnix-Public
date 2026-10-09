@@ -73,8 +73,7 @@ fn color(c: Rgba) -> D2D1_COLOR_F {
 }
 
 /// Helper to load a hardware bitmap into Direct2D from standard image files
-fn load_d2d_bitmap(ctx: &ID2D1DeviceContext, path: &str) -> Option<ID2D1Bitmap1> {
-    let img = image::open(path).ok()?.into_rgba8();
+fn load_d2d_bitmap(ctx: &ID2D1DeviceContext, img: &image::RgbaImage) -> Option<ID2D1Bitmap1> {
     let (width, height) = img.dimensions();
     let props = D2D1_BITMAP_PROPERTIES1 {
         pixelFormat: D2D1_PIXEL_FORMAT {
@@ -88,7 +87,7 @@ fn load_d2d_bitmap(ctx: &ID2D1DeviceContext, path: &str) -> Option<ID2D1Bitmap1>
     };
 
     // Premultiply alpha manually before feeding to Direct2D
-    let mut pixels = img.into_raw();
+    let mut pixels = img.as_raw().clone();
     for chunk in pixels.chunks_exact_mut(4) {
         let a = chunk[3] as f32 / 255.0;
         let r = chunk[0];
@@ -107,6 +106,38 @@ fn load_d2d_bitmap(ctx: &ID2D1DeviceContext, path: &str) -> Option<ID2D1Bitmap1>
         )
         .ok()
     }
+}
+
+/// a decoded image on the gpu. gifs hold one bitmap per frame and pick the
+/// frame to draw from the wall clock, everything else has a single bitmap.
+struct D2dImage {
+    bitmaps: Vec<ID2D1Bitmap1>,
+    delays_ms: Vec<u32>,
+    total_ms: u64,
+}
+
+impl D2dImage {
+    fn current(&self) -> &ID2D1Bitmap1 {
+        if self.bitmaps.len() == 1 {
+            return &self.bitmaps[0];
+        }
+        let i = super::gif::index_at(&self.delays_ms, self.total_ms, super::gif::clock_ms());
+        &self.bitmaps[i.min(self.bitmaps.len() - 1)]
+    }
+}
+
+fn load_d2d_image(ctx: &ID2D1DeviceContext, path: &str) -> Option<D2dImage> {
+    let frames = super::gif::load(path)?;
+    let bitmaps = frames
+        .images
+        .iter()
+        .map(|img| load_d2d_bitmap(ctx, img))
+        .collect::<Option<Vec<_>>>()?;
+    Some(D2dImage {
+        bitmaps,
+        delays_ms: frames.delays_ms,
+        total_ms: frames.total_ms,
+    })
 }
 
 fn capture_d2d_bitmap(
@@ -226,7 +257,7 @@ pub struct D2dCanvas {
     brush: ID2D1SolidColorBrush,
     dwrite: IDWriteFactory,
     d2d_factory: ID2D1Factory1,
-    image_cache: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, ID2D1Bitmap1>>>,
+    image_cache: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, std::rc::Rc<D2dImage>>>>,
     capture_cache:
         std::rc::Rc<std::cell::RefCell<std::collections::HashMap<u64, (u64, ID2D1Bitmap1)>>>,
 }
@@ -509,17 +540,18 @@ impl D2dCanvas {
 
     pub fn image(&self, path: &str, x: f32, y: f32, w: f32, h: f32, opacity: f32, radius: f32) {
         let mut cache = self.image_cache.borrow_mut();
-        let bitmap = if let Some(bmp) = cache.get(path) {
-            Some(bmp.clone())
+        let image = if let Some(img) = cache.get(path) {
+            Some(img.clone())
         } else {
-            let bmp = load_d2d_bitmap(&self.ctx, path);
-            if let Some(ref b) = bmp {
-                cache.insert(path.to_string(), b.clone());
+            let img = load_d2d_image(&self.ctx, path).map(std::rc::Rc::new);
+            if let Some(ref i) = img {
+                cache.insert(path.to_string(), i.clone());
             }
-            bmp
+            img
         };
 
-        if let Some(bmp) = bitmap {
+        if let Some(image) = image {
+            let bmp = image.current();
             let dest = D2D_RECT_F {
                 left: x,
                 top: y,
@@ -553,7 +585,7 @@ impl D2dCanvas {
                     self.ctx.PushLayer(&params, None);
                 }
                 self.ctx.DrawBitmap(
-                    &bmp,
+                    bmp,
                     Some(&dest as *const _),
                     opacity.clamp(0.0, 1.0),
                     D2D1_INTERPOLATION_MODE_LINEAR,
@@ -685,7 +717,7 @@ pub struct DcompOverlay {
     dcomp_target: IDCompositionTarget,
     dcomp_visual: IDCompositionVisual,
     swapchain: Option<IDXGISwapChain1>,
-    image_cache: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, ID2D1Bitmap1>>>,
+    image_cache: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<String, std::rc::Rc<D2dImage>>>>,
     capture_cache:
         std::rc::Rc<std::cell::RefCell<std::collections::HashMap<u64, (u64, ID2D1Bitmap1)>>>,
 }

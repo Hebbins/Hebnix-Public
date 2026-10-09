@@ -2990,6 +2990,41 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
 
+    // whatever windows says is playing (browser, spotify, vlc...), or nil.
+    // position_ms is as of updated_unix_ms, add the time since if playing.
+    // reads a cached snapshot, refreshed about once a second
+    hebnix.set(
+        "media_session",
+        lua.create_function(|lua, ()| {
+            let Some(m) = crate::plugins::media_session::snapshot() else {
+                return Ok(LuaValue::Nil);
+            };
+            let t = lua.create_table()?;
+            t.set("title", m.title)?;
+            t.set("artist", m.artist)?;
+            t.set("album", m.album)?;
+            t.set("album_artist", m.album_artist)?;
+            t.set("app", m.app)?;
+            t.set("status", m.status)?;
+            t.set("is_playing", m.status == "playing")?;
+            t.set("position_ms", m.position_ms)?;
+            t.set("duration_ms", m.duration_ms)?;
+            t.set("updated_unix_ms", m.updated_unix_ms)?;
+            t.set("thumb_rev", m.thumb_rev)?;
+            Ok(LuaValue::Table(t))
+        })?,
+    )?;
+
+    // cover art bytes for the current media_session, nil until it loads.
+    // only changes when thumb_rev does, so fetch it then, not every tick
+    hebnix.set(
+        "media_thumbnail",
+        lua.create_function(|lua, ()| match crate::plugins::media_session::thumbnail() {
+            Some(bytes) => Ok(Some(lua.create_string(&bytes)?)),
+            None => Ok(None),
+        })?,
+    )?;
+
     // http put, result lands in this plugin's on_http_response(req_id, status, body)
     {
         let host = Rc::clone(&host);
