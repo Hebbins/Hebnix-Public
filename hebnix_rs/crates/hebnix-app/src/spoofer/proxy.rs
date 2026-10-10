@@ -69,6 +69,7 @@ pub fn serve_one(
 
     let mut body = Body::new(&ctype, std::mem::take(&mut bytes));
     body.request_path = Some(&req.path);
+    body.request_body = Some(&req.body);
     body.response_headers = headers.clone();
     for r in &matching {
         if r.rewrite(&mut body) {
@@ -100,11 +101,11 @@ pub fn serve_one(
     out.push_str(&format!("Content-Length: {}\r\n", body.bytes.len()));
     out.push_str("Connection: close\r\n\r\n");
 
-    tls.write_all(out.as_bytes())
-        .map_err(|e| format!("write head: {e}"))?;
-    tls.write_all(&body.bytes)
-        .map_err(|e| format!("write body: {e}"))?;
-    let _ = tls.flush();
+        tls.write_all(out.as_bytes())
+            .map_err(|e| format!("write head: {e}"))?;
+        tls.write_all(&body.bytes)
+            .map_err(|e| format!("write body: {e}"))?;
+        tls.flush().map_err(|e| format!("flush body: {e}"))?;
     Ok(())
 }
 

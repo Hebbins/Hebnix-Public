@@ -1,4 +1,4 @@
-//! Local PsyNet websocket bridge used by rank spoofing and item spawning.
+//! Local PsyNet websocket bridge used by rank spoofing and RLAPI.
 //!
 //! The config response is rewritten to point PerConURL/PerConURLv2 here. The
 //! bridge forwards every websocket frame to the real service and rewrites only
@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{Receiver, Sender, unbounded};
+use crossbeam_channel::Sender;
 use tungstenite::client::IntoClientRequest;
 use tungstenite::handshake::server::{Request, Response};
 use tungstenite::http::{HeaderName, HeaderValue};
@@ -34,8 +34,7 @@ const FORWARD_HEADERS: &[&str] = &[
 
 pub struct SkillBridge {
     running: Arc<AtomicBool>,
-    outbound: Sender<String>,
-    connections: Arc<AtomicUsize>,
+
 }
 
 impl SkillBridge {
@@ -43,7 +42,6 @@ impl SkillBridge {
         ranks: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
         tx: Sender<AppMsg>,
         dump_path: PathBuf,
-        _base_dir: &std::path::Path,
     ) -> Result<Self, String> {
         let _ = std::fs::write(
             &dump_path,
@@ -57,7 +55,6 @@ impl SkillBridge {
             format!("Rank bridge listening on {LISTEN_ADDR}\n"),
         );
         let running = Arc::new(AtomicBool::new(true));
-        let (outbound, outbound_rx) = unbounded::<String>();
         let connections = Arc::new(AtomicUsize::new(0));
         let thread_connections = Arc::clone(&connections);
         let thread_running = Arc::clone(&running);
@@ -73,14 +70,12 @@ impl SkillBridge {
                     let ranks = Arc::clone(&ranks);
                     let tx = thread_tx.clone();
                     let dump_path = dump_path.clone();
-                    let outbound_rx = outbound_rx.clone();
                     let connections = Arc::clone(&thread_connections);
                     let running = Arc::clone(&thread_running);
                     std::thread::spawn(move || {
                         if let Err(error) = handle_connection(
                             stream,
                             ranks,
-                            outbound_rx,
                             connections,
                             running,
                             &dump_path,
@@ -95,31 +90,19 @@ impl SkillBridge {
             .map_err(|error| format!("cannot start rank websocket bridge: {error}"))?;
         Ok(Self {
             running,
-            outbound,
-            connections,
         })
-    }
-
-    pub fn is_connected(&self) -> bool {
-        self.connections.load(Ordering::Relaxed) > 0
-    }
-
-    pub fn send_text(&self, message: String) -> Result<(), String> {
-        self.outbound
-            .send(message)
-            .map_err(|_| "PsyNet websocket bridge is not running".into())
     }
 
     pub fn stop(&self) {
         self.running.store(false, Ordering::SeqCst);
         let _ = TcpStream::connect(LISTEN_ADDR);
     }
+
 }
 
 fn handle_connection(
     stream: TcpStream,
     ranks: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
-    outbound: Receiver<String>,
     connections: Arc<AtomicUsize>,
     running: Arc<AtomicBool>,
     dump_path: &std::path::Path,
@@ -182,7 +165,6 @@ fn handle_connection(
         }
     }
     let _connection_guard = ConnectionGuard(connections);
-
     local
         .get_mut()
         .set_nonblocking(true)
@@ -223,10 +205,6 @@ fn handle_connection(
                 send_frame(&mut upstream, Message::Text(message))?;
                 progressed = true;
             }
-        }
-        while let Ok(text) = outbound.try_recv() {
-            send_frame(&mut local, Message::Text(text))?;
-            progressed = true;
         }
         match local.read() {
             Ok(message) => {
@@ -274,7 +252,13 @@ fn dump_frame(path: &std::path::Path, direction: &str, message: &Message) {
         return;
     };
     use std::io::Write;
-    let _ = writeln!(file, "\n--- {direction} ---\n{text}");
+    // Payloads and header values may contain authentication/session secrets.
+    // Log only shape; never dump credentials or decrypted service contents.
+    let _ = writeln!(
+        file,
+        "\n--- {direction}: text frame, {} bytes ---",
+        text.len()
+    );
 }
 
 fn request_frame(job: &SessionRequest) -> String {

@@ -11,6 +11,7 @@ pub struct Body<'a> {
     /// Request path, when the response came through the HTTP proxy.  Rules must
     /// use this for endpoints which share a host with unrelated account APIs.
     pub request_path: Option<&'a str>,
+    pub request_body: Option<&'a [u8]>,
     pub bytes: Vec<u8>,
     pub set_headers: Vec<(String, String)>, // these replace whatevers already there
     pub response_headers: Vec<(String, String)>,
@@ -21,6 +22,7 @@ impl<'a> Body<'a> {
         Self {
             content_type,
             request_path: None,
+            request_body: None,
             bytes,
             set_headers: Vec::new(),
             response_headers: Vec::new(),
@@ -498,22 +500,15 @@ impl Rule for TitleRule {
 
 pub struct RankRule {
     pub spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
-    route_item_spawner: Arc<AtomicBool>,
+    route_session: bool,
     announced: AtomicBool,
 }
 
 impl RankRule {
     pub fn new(spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>) -> Self {
-        Self::with_item_spawner(spoofs, Arc::new(AtomicBool::new(false)))
-    }
-
-    pub fn with_item_spawner(
-        spoofs: Arc<Mutex<HashMap<i32, (i32, f64)>>>,
-        route_item_spawner: Arc<AtomicBool>,
-    ) -> Self {
         Self {
             spoofs,
-            route_item_spawner,
+            route_session: false,
             announced: AtomicBool::new(false),
         }
     }
@@ -537,7 +532,7 @@ impl Rule for RankRule {
         };
 
         let spoofs = self.spoofs.lock().unwrap().clone();
-        if spoofs.is_empty() && !self.route_item_spawner.load(Ordering::Relaxed) {
+        if spoofs.is_empty() && !self.route_session {
             return false;
         }
         // Send game RPC through the intercepted config host, then route those
@@ -737,10 +732,35 @@ impl Rule for RlApiRouteRule {
         if !hebnix_sdk::rlapi::session::shared_game_session().enabled() {
             return false;
         }
-        let route = RankRule::with_item_spawner(
-            Arc::new(Mutex::new(HashMap::new())),
-            Arc::new(AtomicBool::new(true)),
-        );
+        let mut route = RankRule::new(Arc::new(Mutex::new(HashMap::new())));
+        route.route_session = true;
         route.rewrite(body)
+    }
+}
+
+#[cfg(test)]
+mod routing_tests {
+    use super::*;
+    #[test]
+    fn session_only_routing_preserves_skills_and_routes_both_websockets() {
+        let mut rule = RankRule::new(Arc::new(Mutex::new(HashMap::new())));
+        rule.route_session = true;
+        let original = serde_json::json!({"Result":{"Skills":[{"Playlist":1,"Tier":5,"Mu":20,"Unknown":"keep"}],"PerConURL":"wss://upstream/one","PerConURLv2":"wss://upstream/two"}});
+        let mut body = Body::new("application/json", original.to_string().into_bytes());
+        assert!(rule.rewrite(&mut body));
+        let rewritten: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(rewritten["Result"]["Skills"], original["Result"]["Skills"]);
+        assert!(rewritten["Result"]["PerConURL"].as_str().unwrap().contains("127.0.0.1:8025"));
+        assert!(rewritten["Result"]["PerConURLv2"].as_str().unwrap().contains("127.0.0.1:8025"));
+    }
+    #[test]
+    fn rank_spoofing_still_updates_only_selected_playlists() {
+        let rule = RankRule::new(Arc::new(Mutex::new(HashMap::from([(1, (19, 1000.0))]))));
+        let original = serde_json::json!({"Result":{"Skills":[{"Playlist":1,"Tier":5,"Mu":20},{"Playlist":2,"Tier":6,"Mu":30}]}});
+        let mut body = Body::new("application/json", original.to_string().into_bytes());
+        assert!(rule.rewrite(&mut body));
+        let rewritten: serde_json::Value = serde_json::from_slice(&body.bytes).unwrap();
+        assert_eq!(rewritten["Result"]["Skills"][0]["Tier"], 19);
+        assert_eq!(rewritten["Result"]["Skills"][1], original["Result"]["Skills"][1]);
     }
 }

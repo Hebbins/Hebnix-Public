@@ -638,6 +638,21 @@ impl SaveData {
     // Inventory
 
     pub fn inventory(&self) -> Vec<OnlineProduct> {
+        // The root defines inventory membership; unreferenced serialization
+        // objects can remain after surgical edits and must not reappear here.
+        if let Some(refs) = self
+            .raw_properties
+            .get("OnlineProducts")
+            .and_then(Value::as_array)
+        {
+            return refs
+                .iter()
+                .filter_map(|id| id.as_u64().and_then(|id| usize::try_from(id).ok()))
+                .filter_map(|index| self.objects.get(index))
+                .filter(|object| object["__type"] == "TAGame.OnlineProduct_TA")
+                .map(parse_online_product)
+                .collect();
+        }
         get_objects(&self.objects, "TAGame.OnlineProduct_TA")
             .into_iter()
             .map(parse_online_product)

@@ -109,6 +109,48 @@ pub fn is_rocket_league_running() -> bool {
     })
 }
 
+/// Fallible name-only enumeration for operations that require confirmed closure.
+/// An enumeration failure is unknown, never evidence that the game is closed.
+pub fn rocket_league_running_checked() -> Result<bool, String> {
+    use windows::Win32::Foundation::{CloseHandle, ERROR_NO_MORE_FILES, GetLastError};
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+        TH32CS_SNAPPROCESS,
+    };
+    unsafe {
+        let snapshot =
+            CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).map_err(|e| e.to_string())?;
+        let result = (|| {
+            let mut entry = PROCESSENTRY32W {
+                dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+                ..Default::default()
+            };
+            Process32FirstW(snapshot, &mut entry).map_err(|e| e.to_string())?;
+            loop {
+                let end = entry
+                    .szExeFile
+                    .iter()
+                    .position(|&c| c == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                if String::from_utf16_lossy(&entry.szExeFile[..end])
+                    .eq_ignore_ascii_case("RocketLeague.exe")
+                {
+                    return Ok(true);
+                }
+                if let Err(e) = Process32NextW(snapshot, &mut entry) {
+                    return if GetLastError() == ERROR_NO_MORE_FILES {
+                        Ok(false)
+                    } else {
+                        Err(e.to_string())
+                    };
+                }
+            }
+        })();
+        let _ = CloseHandle(snapshot);
+        result
+    }
+}
+
 /// find the running RL process + its info. None if not running or the exe
 /// path isn't readable (eac), use is_rocket_league_running for plain liveness.
 pub fn find_rocket_league() -> Option<RlProcessInfo> {

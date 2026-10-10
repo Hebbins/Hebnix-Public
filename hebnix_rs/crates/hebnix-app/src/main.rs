@@ -30,8 +30,7 @@ mod epic_connection;
 mod hosts_file;
 mod hotkey;
 mod i18n;
-#[path = "item-spawning/mod.rs"]
-mod item_spawning;
+mod item_cleanup;
 mod messages;
 mod monitor;
 mod multiplayer_assets;

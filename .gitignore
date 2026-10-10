@@ -6,6 +6,7 @@
 /.nix/
 .vs/
 .vscode/
+.docs/
 
 
 *.pdb
