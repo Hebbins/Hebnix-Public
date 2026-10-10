@@ -1261,6 +1261,89 @@ fn send_multipart_req(
     send_req(req)
 }
 
+// hebnix.screen: read colours off the Rocket League window.
+// coordinates are window pixels from the top-left, the same space draw.* uses.
+// the capture starts on the first call and stops ~10s after the last one.
+//
+//   screen.available()                          -> bool
+//   screen.size()                               -> w, h (nil if no frame)
+//   screen.pixel(x, y)                          -> r, g, b (nil if no frame)
+//   screen.average(x, y, w, h)                  -> r, g, b
+//   screen.match_color(x, y, w, h, r, g, b, tol) -> 0..1 share of matching pixels
+//   screen.cursor()                             -> x, y of the mouse in window pixels
+#[cfg(not(feature = "lite"))]
+fn install_screen_api(lua: &Lua, hebnix: &Table) -> mlua::Result<()> {
+    use crate::screen::service;
+
+    fn frame() -> Option<std::sync::Arc<crate::screen::Frame>> {
+        service()?.frame()
+    }
+    fn px(v: f64) -> i32 {
+        v.round() as i32
+    }
+
+    let screen = lua.create_table()?;
+    screen.set(
+        "available",
+        lua.create_function(|_, ()| Ok(frame().is_some()))?,
+    )?;
+    screen.set(
+        "size",
+        lua.create_function(|_, ()| {
+            Ok(match frame() {
+                Some(f) => (Some(f.width), Some(f.height)),
+                None => (None, None),
+            })
+        })?,
+    )?;
+    screen.set(
+        "pixel",
+        lua.create_function(|_, (x, y): (f64, f64)| {
+            Ok(match frame().and_then(|f| f.pixel(px(x), px(y))) {
+                Some((r, g, b)) => (Some(r), Some(g), Some(b)),
+                None => (None, None, None),
+            })
+        })?,
+    )?;
+    screen.set(
+        "average",
+        lua.create_function(|_, (x, y, w, h): (f64, f64, f64, f64)| {
+            Ok(
+                match frame().and_then(|f| f.average(px(x), px(y), px(w), px(h))) {
+                    Some((r, g, b)) => (Some(r), Some(g), Some(b)),
+                    None => (None, None, None),
+                },
+            )
+        })?,
+    )?;
+    screen.set(
+        "match_color",
+        lua.create_function(
+            |_, (x, y, w, h, r, g, b, tol): (f64, f64, f64, f64, u8, u8, u8, Option<u8>)| {
+                Ok(frame().and_then(|f| {
+                    f.match_color(px(x), px(y), px(w), px(h), (r, g, b), tol.unwrap_or(20))
+                }))
+            },
+        )?,
+    )?;
+    screen.set(
+        "cursor",
+        lua.create_function(|_, ()| {
+            let Some((left, top, _, _)) = hebnix_sdk::process::get_rocket_league_window_rect()
+            else {
+                return Ok((None, None));
+            };
+            let mut p = windows::Win32::Foundation::POINT::default();
+            if unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut p) }.is_err() {
+                return Ok((None, None));
+            }
+            Ok((Some(p.x - left), Some(p.y - top)))
+        })?,
+    )?;
+    hebnix.set("screen", screen)?;
+    Ok(())
+}
+
 const UI_TABLE_REGISTRY: &str = "hebnix_ui_table";
 const DRAW_TABLE_REGISTRY: &str = "hebnix_draw_table";
 
@@ -1589,6 +1672,8 @@ pub fn install_api(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<()> {
         })?,
     )?;
     hebnix.set("chat", chat)?;
+    #[cfg(not(feature = "lite"))]
+    install_screen_api(lua, &hebnix)?;
     {
         let host = Rc::clone(&host);
         hebnix.set(
@@ -4257,6 +4342,69 @@ fn build_ui_table(lua: &Lua, host: Rc<HostCtx>) -> mlua::Result<Table> {
                         with_ui_scope(inner, || {
                             if let Err(e) = f.call::<()>(ui_tbl.clone()) {
                                 tracing::warn!("plugin ui.collapsing callback error: {e}");
+                            }
+                        });
+                    });
+            });
+            Ok(())
+        })?,
+    )?;
+
+    // ui.columns(left_fn, right_fn [, right_width]) -- two blocks side by side.
+    // the right one is right_width points wide (default 280), the left takes
+    // the rest. each callback gets the ui table.
+    ui.set(
+        "columns",
+        lua.create_function(
+            |lua, (left, right, right_width): (mlua::Function, mlua::Function, Option<f32>)| {
+                let ui_tbl: Table = ui_table(lua)?;
+                with_current_ui(|outer| {
+                    let spacing = outer.spacing().item_spacing.x;
+                    let total = outer.available_width();
+                    let right_width = right_width
+                        .unwrap_or(280.0)
+                        .clamp(120.0, (total * 0.6).max(120.0));
+                    let left_width = (total - right_width - spacing * 2.0 - 2.0).max(80.0);
+                    outer.horizontal_top(|row| {
+                        let column = |row: &mut egui::Ui, width: f32, f: &mlua::Function| {
+                            row.allocate_ui_with_layout(
+                                egui::vec2(width, 0.0),
+                                egui::Layout::top_down(egui::Align::LEFT),
+                                |inner| {
+                                    inner.set_width(width);
+                                    with_ui_scope(inner, || {
+                                        if let Err(e) = f.call::<()>(ui_tbl.clone()) {
+                                            tracing::warn!("plugin ui.columns callback error: {e}");
+                                        }
+                                    });
+                                },
+                            );
+                        };
+                        column(row, left_width, &left);
+                        row.separator();
+                        column(row, right_width, &right);
+                    });
+                });
+                Ok(())
+            },
+        )?,
+    )?;
+
+    // ui.scroll_area(max_height, function(ui) ... end) -- vertical scroll
+    // area that follows its newest line until the user scrolls up
+    ui.set(
+        "scroll_area",
+        lua.create_function(|lua, (max_height, f): (f32, mlua::Function)| {
+            let ui_tbl: Table = ui_table(lua)?;
+            with_current_ui(|outer| {
+                egui::ScrollArea::vertical()
+                    .max_height(max_height.max(20.0))
+                    .auto_shrink([false, true])
+                    .stick_to_bottom(true)
+                    .show(outer, |inner| {
+                        with_ui_scope(inner, || {
+                            if let Err(e) = f.call::<()>(ui_tbl.clone()) {
+                                tracing::warn!("plugin ui.scroll_area callback error: {e}");
                             }
                         });
                     });

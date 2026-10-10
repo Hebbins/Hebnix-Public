@@ -72,7 +72,7 @@ fn status_name(s: Status) -> &'static str {
     }
 }
 
-fn read_thumb(session: &Session) -> Option<Vec<u8>> {
+fn read_thumb_raw(session: &Session) -> Option<Vec<u8>> {
     let props = session.TryGetMediaPropertiesAsync().ok()?.join().ok()?;
     let stream = props.Thumbnail().ok()?.OpenReadAsync().ok()?.join().ok()?;
     let size = stream.Size().ok()?;
@@ -83,7 +83,14 @@ fn read_thumb(session: &Session) -> Option<Vec<u8>> {
     let got = reader.LoadAsync(size as u32).ok()?.join().ok()?;
     let mut buf = vec![0u8; got as usize];
     reader.ReadBytes(&mut buf).ok()?;
-    Some(square_crop(buf))
+    Some(buf)
+}
+
+fn hash_bytes(bytes: &[u8]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut h);
+    h.finish()
 }
 
 // youtube and friends hand over 16:9 frames, the overlay draws covers square,
@@ -167,13 +174,15 @@ fn worker() {
 
     let mut last_key = String::new();
     let mut thumb_rev = 0u64;
-    let mut thumb_tries = 0u8;
+    let mut polls_since_track = 0u32;
+    let mut thumb_hash = 0u64;
     loop {
         // only report media while rocket league is running, and don't touch
         // the session manager at all otherwise
         if !hebnix_sdk::process::is_rocket_league_running() {
             last_key.clear();
-            thumb_tries = 0;
+            polls_since_track = 0;
+            thumb_hash = 0;
             if let Ok(mut sh) = shared().lock() {
                 sh.snap = None;
                 sh.thumb = None;
@@ -190,18 +199,25 @@ fn worker() {
         let snap = read.map(|(session, (mut snap, key))| {
             if key != last_key {
                 last_key = key;
-                thumb_tries = 0;
+                polls_since_track = 0;
                 thumb_rev += 1;
                 new_thumb = Some(None);
             }
-            // browsers often hand the cover over a beat after the title, so
-            // keep retrying a few polls until one shows up
-            if thumb_tries < 6 {
-                thumb_tries += 1;
-                if let Some(bytes) = read_thumb(&session) {
-                    thumb_tries = u8::MAX;
-                    thumb_rev += 1;
-                    new_thumb = Some(Some(bytes));
+            // browsers (youtube especially) change the title first and swap
+            // the cover in later, sometimes still showing the previous
+            // video's. so keep looking: every poll for the first ~30s of a
+            // track, then every few polls, and only publish when the image
+            // actually changed
+            let check = polls_since_track < 40 || polls_since_track % 5 == 0;
+            polls_since_track = polls_since_track.saturating_add(1);
+            if check {
+                if let Some(raw) = read_thumb_raw(&session) {
+                    let hash = hash_bytes(&raw);
+                    if hash != thumb_hash || new_thumb.is_some() {
+                        thumb_hash = hash;
+                        thumb_rev += 1;
+                        new_thumb = Some(Some(square_crop(raw)));
+                    }
                 }
             }
             snap.thumb_rev = thumb_rev;

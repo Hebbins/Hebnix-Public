@@ -7,6 +7,7 @@ pub mod binary_serializer;
 pub mod configuration;
 pub mod crypto;
 pub mod file_io;
+pub mod item_cleanup;
 pub mod models;
 
 pub use accessors::SaveData;

@@ -285,13 +285,12 @@ enum Tab {
     Colours,
     Settings,
     Plugins,
-    Notifications,
     RlApi,
     About,
 }
 
 impl Tab {
-    const ALL: [Self; 10] = [
+    const ALL: [Self; 9] = [
         Self::Console,
         Self::Workshop,
         Self::Spoofer,
@@ -299,7 +298,6 @@ impl Tab {
         Self::Patcher,
         Self::Settings,
         Self::Plugins,
-        Self::Notifications,
         Self::RlApi,
         Self::About,
     ];
@@ -314,7 +312,6 @@ impl Tab {
             Self::Colours => t("tab-colours"),
             Self::Settings => t("tab-settings"),
             Self::Plugins => t("tab-plugins"),
-            Self::Notifications => t("tab-notifications"),
             Self::RlApi => t("tab-rlapi"),
             Self::About => t("tab-about"),
         }
@@ -331,7 +328,6 @@ impl Tab {
             Self::Colours => "Colours",
             Self::Settings => "Settings",
             Self::Plugins => "Plugins",
-            Self::Notifications => "Notifications",
             Self::RlApi => "Experimental",
             Self::About => "About",
         }
@@ -349,12 +345,6 @@ impl Tab {
 enum ItemsMode {
     Swapper,
     Spawner,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SpawnerSubTab {
-    Tutorial,
-    Category(crate::swapper::SwapCategory),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -473,6 +463,8 @@ pub struct HebnixApp {
     stats_tx: crossbeam_channel::Sender<hebnix_sdk::stats::StatsEvent>,
     monitor: Monitor,
     discord_presence: crate::discord_presence::DiscordPresence,
+    chat_capture: Option<crate::multiplayer_lan::ChatCapture>,
+    egui_ctx: egui::Context,
     discord_link: crate::discord_link::DiscordLinkState,
     plugin_mgr: PluginManager,
     tray: Option<Tray>,
@@ -579,12 +571,8 @@ pub struct HebnixApp {
     spoofer_friends_enabled: bool,
     spoofer_friends: HashMap<String, FriendSpoofState>,
     friends_search: String,
-    item_spawner_enabled: bool,
+    item_clear_error: Option<String>,
     items_mode: ItemsMode,
-    spawn_restart_pending: bool,
-    spawner_subtab: SpawnerSubTab,
-    spawner_enable_prompt_open: bool,
-    spawner_admin_requested: bool,
 
     patcher_ball: crate::ball::PatcherState,
     patcher_boost: crate::boost_patcher::BoostPatcherState,
@@ -730,6 +718,7 @@ impl HebnixApp {
             cc.egui_ctx.clone(),
         );
 
+        crate::screen::init(tx.clone());
         let mut plugin_mgr = PluginManager::new(plugin_dir.clone(), tx.clone(), APP_VERSION);
         plugin_mgr.refresh(&mut config, true);
         let _ = config.save(&base_dir);
@@ -957,12 +946,6 @@ impl HebnixApp {
             spoofer_http_proxy = true;
             swapper.set_owned_only(true);
         }
-        let spawner_restart_marker = base_dir.join("enable_item_spawner.pending");
-        let enable_spawner_after_admin = spoofer::is_admin() && spawner_restart_marker.is_file();
-        if enable_spawner_after_admin {
-            let _ = std::fs::remove_file(&spawner_restart_marker);
-            spoofer_master = true;
-        }
         let cert_installed = spoofer::ca::is_current_installed(&base_dir);
         let rl_launch_draft = config.rl_launch.clone();
         let default_tab = Tab::from_config_key(&config.settings.default_tab);
@@ -987,6 +970,8 @@ impl HebnixApp {
             stats_tx,
             monitor,
             discord_presence,
+            chat_capture: None,
+            egui_ctx: cc.egui_ctx.clone(),
             discord_link: crate::discord_link::DiscordLinkState::new(&base_dir),
             plugin_mgr,
             tray,
@@ -1086,12 +1071,8 @@ impl HebnixApp {
             spoofer_friends_enabled,
             spoofer_friends,
             friends_search: String::new(),
-            item_spawner_enabled: false,
+            item_clear_error: None,
             items_mode: ItemsMode::Swapper,
-            spawn_restart_pending: false,
-            spawner_subtab: SpawnerSubTab::Tutorial,
-            spawner_enable_prompt_open: false,
-            spawner_admin_requested: false,
             patcher_ball,
             patcher_boost,
             patcher_decal,
@@ -1114,16 +1095,67 @@ impl HebnixApp {
         app.plugin_mgr.shared.borrow_mut().is_gui_open = !hidden;
         app.refresh_stats_api_viewer();
         app.check_web_port();
+        app.sync_chat_capture();
 
         app.save_friends_internal();
         app.save_ranks_internal();
         app.evaluate_proxies();
-        if enable_spawner_after_admin {
-            app.enable_item_spawner();
-        }
         fetch_catalogs(app.tx.clone(), cc.egui_ctx.clone());
 
         app
+    }
+
+    /// starts or stops the LAN chat capture to match the `chat_export` setting
+    fn sync_chat_capture(&mut self) {
+        if !self.config.settings.chat_export {
+            self.stop_chat_capture();
+            return;
+        }
+        if self.chat_capture.is_some() {
+            return;
+        }
+        let tx = self.tx.clone();
+        let ctx = self.egui_ctx.clone();
+        match crate::multiplayer_lan::ChatCapture::start(move |message| {
+            let _ = tx.send(AppMsg::ChatMessage(message));
+            ctx.request_repaint();
+        }) {
+            Ok(capture) => self.chat_capture = Some(capture),
+            Err(error) => self.console.write(format!("[Chat] {error}")),
+        }
+    }
+
+    fn stop_chat_capture(&mut self) {
+        if let Some(capture) = self.chat_capture.take() {
+            capture.stop();
+        }
+    }
+
+    /// appends the message to chat_log.jsonl and hands it to the plugins
+    fn handle_chat_message(&mut self, message: &crate::multiplayer_lan::ChatMessage) {
+        use std::io::Write;
+        let line = match serde_json::to_string(message) {
+            Ok(line) => line,
+            Err(_) => return,
+        };
+        let logged = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.base_dir.join("chat_log.jsonl"))
+            .and_then(|mut file| writeln!(file, "{line}"));
+        if let Err(error) = logged {
+            self.console
+                .write(format!("[Chat] could not write chat_log.jsonl: {error}"));
+        }
+        self.plugin_mgr.dispatch_simple(
+            "ChatMessage",
+            serde_json::json!({
+                "sender": message.sender,
+                "text": message.text,
+                "time": message.time,
+                "counter": message.counter,
+            }),
+        );
     }
 
     fn save_config(&mut self) {
@@ -1901,13 +1933,6 @@ impl HebnixApp {
         let cache_cleared = false;
 
         if !self.spoofer_master {
-            if self.item_spawner_enabled {
-                self.item_spawner_enabled = false;
-                self.spawn_restart_pending = false;
-                self.spawner_subtab = SpawnerSubTab::Tutorial;
-                let _ = self.spoofer_mgr.set_item_spawner_enabled(false);
-                clear_rl_cache(&self.tx);
-            }
             if self.spoofer_mgr.socket_running() {
                 self.spoofer_mgr.stop_socket();
                 clear_rl_cache(&self.tx);
@@ -1926,7 +1951,6 @@ impl HebnixApp {
             && (self.spoofer_username_enabled
                 || self.spoofer_friends_enabled
                 || self.spoofer_rank_enabled
-                || self.item_spawner_enabled
                 || self.swapper.owned_only());
         if needs_http && !self.spoofer_mgr.http_running() {
             if let Err(e) = self.spoofer_mgr.start_http() {
@@ -1945,7 +1969,7 @@ impl HebnixApp {
         // on current clients, so this must not depend on the Title toggle.
         let needs_socket = (self.spoofer_socket_proxy && self.spoofer_title_enabled)
             || self.spoofer_rank_enabled
-            || self.item_spawner_enabled;
+;
         if needs_socket && !self.spoofer_mgr.socket_running() {
             if let Err(e) = self.spoofer_mgr.start_socket() {
                 self.console
@@ -2042,6 +2066,7 @@ impl HebnixApp {
             self.ws_stats.stop();
             self.monitor.stop();
             self.discord_presence.stop();
+            self.stop_chat_capture();
             self.tray = None;
             // Keep the proxy alive without leaving a transparent viewport on screen.
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
@@ -2049,15 +2074,13 @@ impl HebnixApp {
             return;
         }
 
-        if self.item_spawner_enabled {
-            self.disable_item_spawner();
-        }
         self.spoofer_mgr.shutdown();
         self.plugin_mgr.unload_all();
         self.stats.stop();
         self.ws_stats.stop();
         self.monitor.stop();
         self.discord_presence.stop();
+        self.stop_chat_capture();
         self.tray = None;
         // std::process::exit() terminates immediately without running Rust
         // destructors, so `impl Drop for HebnixApp` (which would otherwise
@@ -2184,7 +2207,6 @@ impl HebnixApp {
                     self.handle_rl_status(rl_open, api_open);
 
                     if launched {
-                        self.spawn_restart_pending = false;
                         self.workshop.rocket_league_reopened();
                         self.check_statsapi_rate();
                         self.check_web_port();
@@ -2609,6 +2631,10 @@ impl HebnixApp {
                 } => {
                     self.plugin_mgr
                         .on_http_result(&slug, &req_id, status, &body, &headers);
+                    ctx.request_repaint();
+                }
+                AppMsg::ChatMessage(message) => {
+                    self.handle_chat_message(&message);
                     ctx.request_repaint();
                 }
                 AppMsg::PluginWsOpen { slug, id } => {
@@ -4689,6 +4715,7 @@ impl HebnixApp {
                                         t("settings-theme-label"),
                                         t("settings-opacity-label"),
                                         t("settings-toast-position-label"),
+                                        t("system-default-tab"),
                                     ],
                                 );
                                 ui.horizontal(|ui| {
@@ -4856,6 +4883,31 @@ impl HebnixApp {
                                             }
                                         });
                                     if changed {
+                                        self.save_config();
+                                    }
+                                });
+                                ui.add_space(8.0);
+                                ui.horizontal(|ui| {
+                                    ui.add_sized(
+                                        [label_w, 20.0],
+                                        egui::Label::new(t("system-default-tab")),
+                                    );
+                                    let mut selected =
+                                        Tab::from_config_key(&self.config.settings.default_tab);
+                                    egui::ComboBox::from_id_salt("default_tab")
+                                        .selected_text(selected.label())
+                                        .show_ui(ui, |ui| {
+                                            for tab in Tab::ALL {
+                                                ui.selectable_value(
+                                                    &mut selected,
+                                                    tab,
+                                                    tab.label(),
+                                                );
+                                            }
+                                        });
+                                    if self.config.settings.default_tab != selected.config_key() {
+                                        self.config.settings.default_tab =
+                                            selected.config_key().to_string();
                                         self.save_config();
                                     }
                                 });
@@ -5306,6 +5358,18 @@ impl HebnixApp {
                                     }
                                 });
                                 ui.horizontal(|ui| {
+                                    ui.add_sized([label_w, 20.0], egui::Label::new("Export LAN Chat:"));
+                                    let response = ui
+                                        .checkbox(&mut self.config.settings.chat_export, "")
+                                        .on_hover_text(
+                                            "Reads text chat out of LAN match traffic (port 7777), writes it to chat_log.jsonl and sends plugins a ChatMessage event. Needs Hebnix to run as administrator (WinDivert). Quick chats are not included.",
+                                        );
+                                    if response.changed() {
+                                        self.sync_chat_capture();
+                                        self.save_config();
+                                    }
+                                });
+                                ui.horizontal(|ui| {
                                     ui.add_sized(
                                         [label_w, 20.0],
                                         egui::Label::new(t("system-p2p")),
@@ -5422,28 +5486,23 @@ impl HebnixApp {
                                         self.spoofer_mgr.shutdown();
                                     }
                                 }
-                                ui.add_space(8.0);
                                 ui.horizontal(|ui| {
                                     ui.add_sized(
                                         [label_w, 20.0],
-                                        egui::Label::new(t("system-default-tab")),
+                                        egui::Label::new("Overlay refresh rate:"),
                                     );
-                                    let mut selected =
-                                        Tab::from_config_key(&self.config.settings.default_tab);
-                                    egui::ComboBox::from_id_salt("default_tab")
-                                        .selected_text(selected.label())
-                                        .show_ui(ui, |ui| {
-                                            for tab in Tab::ALL {
-                                                ui.selectable_value(
-                                                    &mut selected,
-                                                    tab,
-                                                    tab.label(),
-                                                );
-                                            }
-                                        });
-                                    if self.config.settings.default_tab != selected.config_key() {
-                                        self.config.settings.default_tab =
-                                            selected.config_key().to_string();
+                                    let slider = ui
+                                        .add(
+                                            egui::Slider::new(
+                                                &mut self.config.settings.overlay_refresh_fps,
+                                                20..=60,
+                                            )
+                                            .suffix(" fps"),
+                                        )
+                                        .on_hover_text(
+                                            "How often the overlay and plugins update while a plugin is reading the screen (like PfpOverlayV2's menu detection). Lower it to use less CPU on slower PCs, higher is more responsive.",
+                                        );
+                                    if slider.drag_stopped() || slider.lost_focus() {
                                         self.save_config();
                                     }
                                 });
@@ -5722,101 +5781,50 @@ impl HebnixApp {
         }
     }
 
-    fn disable_item_spawner(&mut self) {
-        self.item_spawner_enabled = false;
-        self.spawn_restart_pending = false;
-        self.spawner_subtab = SpawnerSubTab::Tutorial;
-        let _ = self.spoofer_mgr.set_item_spawner_enabled(false);
-        self.evaluate_proxies();
-        clear_rl_cache(&self.tx);
-        if self.spoofer_mgr.http_running() || self.spoofer_mgr.socket_running() {
-            self.console.write(
-                "[Item Spawner] Disabled. Hosts redirects remain for other enabled Spoofer features."
-            );
-        } else {
-            match crate::spoofer::hosts::clear() {
-                Ok(()) => {
-                    crate::spoofer::hosts::flush_dns();
-                    self.console.write(
-                        "[Item Spawner] Disabled. Hebnix hosts redirects removed and DNS flushed.",
-                    );
-                }
-                Err(error) => self.console.write(format!(
-                    "[Item Spawner] Disabled, but hosts cleanup failed: {error}"
-                )),
+    fn check_item_clear(&mut self) {
+        match self.spoofer_mgr.finish_item_clear() {
+            Ok(true) => {
+                self.item_clear_error = None;
+                self.console.write(&format!("[Items] {}", self.spoofer_mgr.item_status().text));
             }
-        }
-    }
-
-    fn enable_item_spawner(&mut self) {
-        if hebnix_sdk::process::is_rocket_league_running() {
-            self.console
-                .write("[Item Spawner] Close Rocket League before enabling Item Spawner.");
-            return;
-        }
-        if !spoofer::is_admin() {
-            self.spawner_admin_requested = true;
-            self.admin_prompt_open = true;
-            return;
-        }
-        self.spoofer_master = true;
-        self.save_config();
-        match self.spoofer_mgr.set_item_spawner_enabled(true) {
-            Ok(()) => {
-                self.item_spawner_enabled = true;
-                self.evaluate_proxies();
-                if self.spoofer_mgr.socket_running() {
-                    self.spawn_restart_pending = true;
-                    self.console
-                        .write("[Item Spawner] Enabled. Start Rocket League to use Item Spawner.");
-                } else {
-                    self.disable_item_spawner();
-                    self.console.write("[Item Spawner] Could not start the PsyNet proxy. Check the Spoofer settings and certificate.");
-                }
+            Ok(false) => {
+                self.item_clear_error = None;
             }
             Err(error) => {
-                self.item_spawner_enabled = false;
-                self.console
-                    .write(format!("[Item Spawner] Could not enable: {error}"));
+                self.item_clear_error =
+                    Some(format!("Clear incomplete: {error}. Check Again or Cancel."));
             }
         }
     }
 
-    fn render_spawner_enable_prompt(&mut self, ctx: &egui::Context) {
-        if !self.spawner_enable_prompt_open {
+    fn render_item_clear_prompt(&mut self, ctx: &egui::Context) {
+        if !self.spoofer_mgr.item_status().clearing {
             return;
         }
-        let mut enable = false;
+        let mut check = false;
         let mut cancel = false;
-        egui::Window::new(t("spawner-enable-prompt-read-the-item-spawner-tutorial"))
-            .id(egui::Id::new(
-                "spawner-enable-prompt-read-the-item-spawner-tutorial",
-            ))
-            .collapsible(false)
-            .resizable(false)
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-            .show(ctx, |ui| {
-                ui.label(t(
-                    "spawner-enable-prompt-read-the-tutorial-tab-before-enabling",
-                ));
-                ui.label(t(
-                    "spawner-enable-prompt-rocket-league-must-be-closed-first",
-                ));
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    if ui.button(t("spawner-enable-prompt-continue")).clicked() {
-                        enable = true;
-                    }
-                    if ui.button(t("spawner-enable-prompt-cancel")).clicked() {
-                        cancel = true;
-                    }
-                });
+        egui::Modal::new(egui::Id::new("clear_hebnix_items")).show(ctx, |ui| {
+            ui.heading("Clear Items");
+            ui.label("Removes tracked instances from the most recently saved RL account's inventory and equipped loadouts, including rotating save copies. Original saves are backed up before editing.");
+            ui.label("Close Rocket League and Item Spawner to remove tracked items. Your normal inventory will not be removed.");
+            ui.weak(self.spoofer_mgr.item_status().text);
+            if let Some(error) = &self.item_clear_error { ui.label(error); }
+            ui.horizontal(|ui| {
+                check = ui.button("Check Again").clicked();
+                cancel = ui.add_enabled(self.spoofer_mgr.item_status().can_cancel, egui::Button::new("Cancel")).clicked();
             });
-        if enable {
-            self.spawner_enable_prompt_open = false;
-            self.enable_item_spawner();
-        } else if cancel {
-            self.spawner_enable_prompt_open = false;
+        });
+        if check {
+            self.check_item_clear();
+        }
+        if cancel {
+            match self.spoofer_mgr.cancel_item_clear() {
+                Ok(()) => self.item_clear_error = None,
+                Err(error) => {
+                    self.item_clear_error =
+                        Some(format!("Could not cancel durably: {error}. Retry Cancel."))
+                }
+            }
         }
     }
 
@@ -5833,9 +5841,7 @@ impl HebnixApp {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
-                ui.label(if self.spawner_admin_requested {
-                    t("admin-prompt-item-spawner-needs-administrator-access")
-                } else if self.owned_admin_requested {
+                ui.label(if self.owned_admin_requested {
                     t("admin-prompt-owned-filter-needs-proxy")
                 } else {
                     t("admin-prompt-this-action-requires-hebnix-to-be")
@@ -5854,9 +5860,6 @@ impl HebnixApp {
         if ok {
             self.admin_prompt_open = false;
             self.spoofer_master = true;
-            if self.spawner_admin_requested {
-                let _ = std::fs::write(self.base_dir.join("enable_item_spawner.pending"), b"1");
-            }
             if self.owned_admin_requested {
                 let _ = std::fs::write(
                     self.base_dir.join("enable_owned_replacements.pending"),
@@ -5870,18 +5873,11 @@ impl HebnixApp {
                 std::process::exit(0);
             }
             self.spoofer_master = false;
-            let _ = std::fs::remove_file(self.base_dir.join("enable_item_spawner.pending"));
-            self.spawner_admin_requested = false;
-            self.disable_item_spawner();
             self.save_config();
             self.console.write("[Spoofer] Couldn't relaunch as admin.");
         } else if cancel {
             self.admin_prompt_open = false;
             self.owned_admin_requested = false;
-            self.spawner_admin_requested = false;
-            self.disable_item_spawner();
-            self.console
-                .write("[Item Spawner] Disabled because Administrator access was declined.");
         }
     }
 
@@ -7278,13 +7274,11 @@ impl Drop for HebnixApp {
         if !crate::watchdog::has_live_handoff()
             && !crate::watchdog::handoff_live_spoofer(Arc::clone(&self.spoofer_mgr))
         {
-            if self.item_spawner_enabled {
-                self.disable_item_spawner();
-            }
             self.spoofer_mgr.shutdown();
         }
         self.workshop.suspend_multiplayer();
         self.discord_presence.stop();
+        self.stop_chat_capture();
     }
 }
 
@@ -7374,19 +7368,14 @@ impl eframe::App for HebnixApp {
                         Tab::Patcher,
                         Tab::Settings,
                         Tab::Plugins,
-                        Tab::Notifications,
                         Tab::RlApi,
                         Tab::About,
                     ] {
-                        let label = if tab == Tab::Notifications {
-                            crate::ui::toasts::tab_label(&self.toasts)
-                        } else {
-                            tab.label()
-                        };
-                        ui.selectable_value(&mut self.tab, tab, label);
+                        ui.selectable_value(&mut self.tab, tab, tab.label());
                     }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        crate::ui::toasts::render_bell(ui, &mut self.toast_view, &mut self.toasts);
                         ui.label(
                             egui::RichText::new(&self.status_text)
                                 .strong()
@@ -7414,85 +7403,17 @@ impl eframe::App for HebnixApp {
                         });
                         ui.separator();
                         if self.items_mode == ItemsMode::Spawner {
+                            let status = self.spoofer_mgr.item_status();
                             ui.horizontal(|ui| {
-                                let mut enabled = self.item_spawner_enabled;
-                                if ui.checkbox(&mut enabled, t("app-enable-items-spawner")).changed() {
-                                    if enabled {
-                                        self.spawner_enable_prompt_open = true;
-                                    } else {
-                                        self.disable_item_spawner();
-                                    }
-                                }
-                                ui.weak(t("app-read-tutorial-before-enabling"));
-                            });
-                            let cooked_pc = std::path::Path::new(&self.config.settings.rl_path)
-                                .join("TAGame").join("CookedPCConsole");
-                            egui::Panel::left("spawner_categories")
-                                .resizable(false)
-                                .default_size(200.0)
-                                .size_range(200.0..=320.0)
-                                .show(ui, |ui| {
-                                    egui::ScrollArea::vertical().id_salt("spawner_subtabs").show(ui, |ui| {
-                                        ui.selectable_value(&mut self.spawner_subtab, SpawnerSubTab::Tutorial, t("app-tutorial"));
-                                        ui.separator();
-                                        ui.add_enabled_ui(self.item_spawner_enabled && !self.spawn_restart_pending, |ui| {
-                                            for category in crate::swapper::SwapCategory::ALL {
-                                                ui.selectable_value(&mut self.spawner_subtab,
-                                                    SpawnerSubTab::Category(category), category.label());
-                                            }
-                                        });
-                                    });
-                                });
-                            egui::CentralPanel::default().frame(egui::Frame::new()).show(ui, |ui| {
-                                if !self.item_spawner_enabled || self.spawn_restart_pending {
-                                    self.spawner_subtab = SpawnerSubTab::Tutorial;
-                                }
-                                match self.spawner_subtab {
-                                    SpawnerSubTab::Tutorial => {
-                                        ui.heading(t("app-item-spawner-tutorial"));
-                                        ui.add_space(8.0);
-                                        ui.label(t("app-rocket-league-must-be-closed-before"));
-                                        ui.add_space(8.0);
-                                        ui.label(t("app-if-you-close-hebnix-while-rocket"));
-                                        ui.add_space(8.0);
-                                        ui.label(t("app-if-you-have-problems-connecting-to"));
-                                        ui.add_space(8.0);
-                                        ui.label(t("app-spawned-items-can-persist-locally-or"));
-                                        ui.add_space(8.0);
-                                        ui.label(t("app-disabling-item-spawner-stops-interceptio"));
-                                        ui.add_space(8.0);
-                                        if self.spawn_restart_pending {
-                                            ui.add_space(12.0);
-                                            ui.weak(t("app-start-rocket-league-to-use-the"));
-                                        }
-                                    }
-                                    SpawnerSubTab::Category(category) => {
-                                        if self.catalogs_loading {
-                                            ui.horizontal(|ui| { ui.spinner(); ui.label(t("app-loading-item-catalogs")); });
-                                        }
-                                        if let Some(error) = self.catalogs_error.clone() {
-                                            ui.colored_label(egui::Color32::from_rgb(0xe7, 0x4c, 0x3c),
-                                                t_args("app-catalog-download-failed-error", &[("error", error.to_string().into())]));
-                                            if ui.button(t("app-reload-catalogs")).clicked() { self.reload_catalogs(ctx); }
-                                        }
-                                        if self.catalogs_loaded {
-                                            if let Some((product_id, paint)) = self.swapper.render_spawn_tab(
-                                                ui, category, &cooked_pc, &self.tx) {
-                                                let request = crate::item_spawning::ItemSpawnRequest {
-                                                    product_id, series_id: 1, quality: 0, paint,
-                                                    certification: 0, quantity: 1,
-                                                };
-                                                match self.spoofer_mgr.spawn_item(&request) {
-                                                    Ok(()) => self.console.write(format!(
-                                                        "[Item Spawner] Queued product ID {product_id}.")),
-                                                    Err(error) => self.console.write(format!(
-                                                        "[Item Spawner] Could not spawn {product_id}: {error}")),
-                                                }
-                                            }
-                                        }
+                                ui.label(format!("{} items; {} legacy tracked IDs", status.active, status.legacy));
+                                if ui.add_enabled(!status.clearing, egui::Button::new("Remove Items")).clicked() {
+                                    match self.spoofer_mgr.begin_item_clear() {
+                                        Ok(()) => self.check_item_clear(),
+                                        Err(error) => self.item_clear_error = Some(error),
                                     }
                                 }
                             });
+                            if let Some(error) = &self.item_clear_error { ui.label(error); }
                         } else {
                         let rl_path = self.config.settings.rl_path.clone();
                         let cooked_pc = std::path::Path::new(&rl_path)
@@ -7907,10 +7828,6 @@ impl eframe::App for HebnixApp {
 
                     Tab::Settings => self.render_settings_tab(ui),
                     Tab::Plugins => self.render_plugins_tab(ui),
-                    Tab::Notifications => {
-                        self.toasts.mark_read();
-                        self.toast_view.render(ui, &mut self.toasts);
-                    }
                     Tab::RlApi => {
                         let cooked_pc = PathBuf::from(&self.config.settings.rl_path)
                             .join("TAGame")
@@ -8076,7 +7993,7 @@ impl eframe::App for HebnixApp {
         }
 
         if !self.hidden {
-            self.render_spawner_enable_prompt(ctx);
+            self.render_item_clear_prompt(ctx);
             self.render_admin_prompt(ctx);
             self.render_replay_upload_start_prompt(ctx);
             self.render_item_action_prompt(ctx);
@@ -8099,7 +8016,11 @@ impl eframe::App for HebnixApp {
             self.render_install_modal(ctx);
             self.render_rl_launch_setup(ctx);
         }
-        let plugin_tick_interval = if self.last_rl_open {
+        let screen_active = self.last_rl_open && crate::screen::is_active();
+        let fast_ms = 1000 / u64::from(self.config.settings.overlay_refresh_fps.clamp(20, 60));
+        let plugin_tick_interval = if screen_active {
+            Duration::from_millis(fast_ms)
+        } else if self.last_rl_open {
             Duration::from_millis(50)
         } else {
             Duration::from_millis(500)
@@ -8115,6 +8036,8 @@ impl eframe::App for HebnixApp {
                 || self.toasts.has_work());
         let heartbeat = if self.toasts.showing() {
             Duration::from_millis(16)
+        } else if screen_active {
+            Duration::from_millis(fast_ms)
         } else if fast {
             Duration::from_millis(50)
         } else {

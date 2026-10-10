@@ -1,0 +1,5 @@
+name = "Heads Up"
+author = "nixvio64"
+version = "1.0.0"
+entry = "main.lua"
+plugin_id = "bc22b0c3032d44389af85a71fd8ea86d"

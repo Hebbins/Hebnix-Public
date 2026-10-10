@@ -191,8 +191,7 @@ pub struct SpooferManager {
     socket_active: Arc<AtomicBool>,
     title_settings: Arc<Mutex<TitleSettings>>,
     skill_bridge: Mutex<Option<SkillBridge>>,
-    item_spawner_enabled: Arc<AtomicBool>,
-    spawned_items: crate::item_spawning::SpawnedItemLedger,
+    item_cleanup: crate::item_cleanup::Cleaner,
     crl: Mutex<Option<crl::CrlServer>>,
     rlapi_retained: AtomicBool,
 }
@@ -246,7 +245,7 @@ impl SpooferManager {
             .unwrap_or_default()
             .into_iter()
             .collect();
-        let spawned_items = crate::item_spawning::SpawnedItemLedger::new(&base_dir);
+        let item_cleanup = crate::item_cleanup::Cleaner::new(&base_dir);
         Self {
             base_dir,
             tx,
@@ -260,8 +259,7 @@ impl SpooferManager {
             socket_active: Arc::new(AtomicBool::new(false)),
             title_settings: Arc::new(Mutex::new(TitleSettings::default())),
             skill_bridge: Mutex::new(None),
-            item_spawner_enabled: Arc::new(AtomicBool::new(false)),
-            spawned_items,
+            item_cleanup,
             crl: Mutex::new(None),
             rlapi_retained: AtomicBool::new(false),
         }
@@ -366,27 +364,8 @@ impl SpooferManager {
                 let _ = std::fs::write(self.base_dir.join("rank_spoofer_status.log"), &detail);
                 let _ = self.tx.send(AppMsg::Log(detail));
             }
-        } else if !self.item_spawner_enabled.load(Ordering::Relaxed) {
-            self.stop_skill_bridge();
-        }
-    }
-
-    pub fn set_item_spawner_enabled(&self, enabled: bool) -> Result<(), String> {
-        if enabled {
-            self.start_skill_bridge()?;
-            self.item_spawner_enabled.store(true, Ordering::SeqCst);
-            Ok(())
         } else {
-            self.item_spawner_enabled.store(false, Ordering::SeqCst);
-            let ranks_active = self
-                .spoofed_ranks
-                .lock()
-                .map(|ranks| !ranks.is_empty())
-                .unwrap_or(false);
-            if !ranks_active {
-                self.stop_skill_bridge();
-            }
-            Ok(())
+            self.stop_skill_bridge();
         }
     }
 
@@ -400,7 +379,6 @@ impl SpooferManager {
                 Arc::clone(&self.spoofed_ranks),
                 self.tx.clone(),
                 self.base_dir.join("rank_spoofer_frames.log"),
-                &self.base_dir,
             )?);
         }
         Ok(())
@@ -499,42 +477,10 @@ impl SpooferManager {
         Ok(())
     }
 
-    pub fn spawn_item(
-        &self,
-        request: &crate::item_spawning::ItemSpawnRequest,
-    ) -> Result<(), String> {
-        if !self.item_spawner_enabled.load(Ordering::Relaxed) {
-            return Err("Enable Item Spawning first".into());
-        }
-        if !self.item_spawner_websocket_connected() {
-            return Err("Wait for Rocket League's PsyNet WebSocket to connect".into());
-        }
-
-        self.start_skill_bridge()?;
-        let psy_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| e.to_string())?
-            .as_secs() as i64;
-        let (message, instance_ids) = crate::item_spawning::reward_message(request, psy_time)?;
-        self.spawned_items
-            .record(&instance_ids)
-            .map_err(|error| format!("Could not track spawned item: {error}"))?;
-        let slot = self
-            .skill_bridge
-            .lock()
-            .map_err(|_| "item bridge lock poisoned")?;
-        slot.as_ref()
-            .ok_or_else(|| "PsyNet websocket bridge is not running".to_string())?
-            .send_text(message)
-    }
-
-    pub fn item_spawner_websocket_connected(&self) -> bool {
-        self.skill_bridge
-            .lock()
-            .ok()
-            .and_then(|slot| slot.as_ref().map(SkillBridge::is_connected))
-            .unwrap_or(false)
-    }
+    pub fn item_status(&self) -> crate::item_cleanup::ItemStatus { self.item_cleanup.status() }
+    pub fn begin_item_clear(&self) -> Result<(), String> { self.item_cleanup.begin_clear() }
+    pub fn cancel_item_clear(&self) -> Result<(), String> { self.item_cleanup.cancel_clear() }
+    pub fn finish_item_clear(&self) -> Result<bool, String> { self.item_cleanup.finish_clear() }
 
     pub fn stop_socket(&self) {
         self.socket_active.store(false, Ordering::Relaxed);
@@ -583,9 +529,8 @@ impl SpooferManager {
                 self.base_dir.join("owned_products.json"),
             )),
             Box::new(TitleRule::new(Arc::clone(&self.title_settings))),
-            Box::new(crate::spoofer::rules::RankRule::with_item_spawner(
+            Box::new(crate::spoofer::rules::RankRule::new(
                 Arc::clone(&self.spoofed_ranks),
-                Arc::clone(&self.item_spawner_enabled),
             )),
         ];
         let mut rules: Vec<Box<dyn Rule>> = spoof_rules
@@ -643,7 +588,6 @@ impl SpooferManager {
     pub fn shutdown(&self) {
         self.rlapi_retained.store(false, Ordering::Release);
         hebnix_sdk::rlapi::session::shared_game_session().reset();
-        self.item_spawner_enabled.store(false, Ordering::SeqCst);
         self.stop_socket();
         self.stop_http();
         // Clear a redirect even if the socket failed to start or its state was lost.
